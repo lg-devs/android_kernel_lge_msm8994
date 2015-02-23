@@ -182,6 +182,7 @@ static void msm_spm_config_q2s(struct msm_spm_device *dev, unsigned int mode)
 
 	val = spm_legacy_mode << 2 | qchannel_ignore << 1;
 	__raw_writel(val, dev->q2s_reg);
+
 	mb();
 }
 

@@ -3624,6 +3624,31 @@ static int ci13xxx_pullup(struct usb_gadget *_gadget, int is_active)
 	return 0;
 }
 
+#ifdef CONFIG_USB_G_LGE_FUNCTION_IO
+static int ci13xxx_func_io(struct usb_gadget *gadget,
+			char *name, int *value, bool io)
+{
+	struct ci13xxx *udc = _udc;
+	struct usb_gadget_driver *driver = udc->driver;
+
+	if (driver->func_io)
+		driver->func_io(gadget, name, value, io);
+
+	return 0;
+}
+#endif
+
+#ifdef CONFIG_MAXIM_EVP
+ static int ci13xxx_evp_connect(struct usb_gadget *_gadget, bool connect)
+{
+	struct ci13xxx *udc = container_of(_gadget, struct ci13xxx, gadget);
+
+	if (udc->transceiver)
+		return usb_phy_evp_connect(udc->transceiver, connect);
+	return -ENOTSUPP;
+}
+#endif
+
 static int ci13xxx_start(struct usb_gadget *gadget,
 			 struct usb_gadget_driver *driver);
 static int ci13xxx_stop(struct usb_gadget *gadget,
@@ -3641,6 +3666,12 @@ static const struct usb_gadget_ops usb_gadget_ops = {
 	.pullup		= ci13xxx_pullup,
 	.udc_start	= ci13xxx_start,
 	.udc_stop	= ci13xxx_stop,
+#ifdef CONFIG_USB_G_LGE_FUNCTION_IO
+	.gadget_func_io	= ci13xxx_func_io,
+#endif
+#ifdef CONFIG_MAXIM_EVP
+	.evp_connect = ci13xxx_evp_connect,
+#endif
 };
 
 /**

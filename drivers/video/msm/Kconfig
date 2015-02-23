@@ -514,4 +514,22 @@ config FB_MSM_QPIC_PANEL_DETECT
 if FB_MSM_MDSS
 	source "drivers/video/msm/mdss/Kconfig"
 endif
+
+config Z2_LGD_POLED_PANEL
+	bool "LGDisplay FHD POLED Panel"
+	---help---
+	Support for LGDisplay FHD POLED Panel (1080*1920)
+
+config LGE_LCD_OFF_DIMMING
+	bool "Enable LCD DIMMING for FOTA"
+	depends on MACH_LGE
+	default n
+	---help---
+	Support for LCD DIMMING (for FOTA)
+
 endif
+
+config LGE_DYNAMIC_FPS_LUT
+	bool "DFPS LUT porch mode"
+	---help---
+	Support for LUT mode for dynamic FPS

@@ -1633,7 +1633,6 @@ static void _kgsl_cmdbatch_timer(unsigned long data)
 			break;
 		}
 	}
-
 done:
 	spin_unlock(&cmdbatch->lock);
 }

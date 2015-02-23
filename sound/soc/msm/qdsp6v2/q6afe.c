@@ -24,6 +24,13 @@
 #include <sound/q6audio-v2.h>
 #include "msm-pcm-routing-v2.h"
 #include <sound/audio_cal_utils.h>
+#ifdef CONFIG_SND_SOC_MAXIM_DSM
+#include <sound/maxim_dsm.h>
+#ifdef USE_DSM_LOG
+#include <linux/file.h>
+#include <linux/fs.h>
+#endif
+#endif
 
 enum {
 	AFE_COMMON_RX_CAL = 0,
@@ -85,7 +92,11 @@ struct afe_ctl {
 
 	u16 dtmf_gen_rx_portid;
 	struct audio_cal_info_spk_prot_cfg	prot_cfg;
+#ifdef CONFIG_SND_SOC_MAXIM_DSM
+	struct afe_dsm_spkr_prot_calib_get_resp calib_data;
+#else
 	struct afe_spkr_prot_calib_get_resp	calib_data;
+#endif
 	int vi_tx_port;
 	int vi_rx_port;
 	uint32_t afe_sample_rates[AFE_MAX_PORTS];
@@ -191,10 +202,12 @@ static int32_t afe_callback(struct apr_client_data *data, void *priv)
 			   sizeof(this_afe.calib_data));
 		if (!this_afe.calib_data.status) {
 			atomic_set(&this_afe.state, 0);
+#ifndef CONFIG_SND_SOC_MAXIM_DSM
 			pr_err("%s: rest = %d %d state = %s\n", __func__
 			, this_afe.calib_data.res_cfg.r0_cali_q24[SP_V2_SPKR_1],
 			this_afe.calib_data.res_cfg.r0_cali_q24[SP_V2_SPKR_2],
 			cali_state[this_afe.calib_data.res_cfg.th_vi_ca_state]);
+#endif
 		} else
 			atomic_set(&this_afe.state, -1);
 		wake_up(&this_afe.wait[data->token]);
@@ -669,6 +682,84 @@ fail_cmd:
 	return ret;
 }
 
+#ifdef CONFIG_SND_SOC_MAXIM_DSM
+static int afe_dsm_spk_prot_prepare(int port, int param_id,
+		union afe_dsm_spkr_prot_config *prot_config)
+{
+	int ret = -EINVAL;
+	int index = 0;
+	struct afe_dsm_spkr_prot_config_command config;
+
+	memset(&config, 0 , sizeof(config));
+	if (!prot_config) {
+		pr_err("%s Invalid params\n", __func__);
+		goto fail_cmd;
+	}
+	if ((q6audio_validate_port(port) < 0)) {
+		pr_err("%s invalid port %d", __func__, port);
+		goto fail_cmd;
+	}
+	index = q6audio_get_port_index(port);
+	switch (param_id) {
+	case AFE_PARAM_ID_FBSP_MODE_RX_CFG:
+		if(port == DSM_RX_PORT_ID)
+		config.pdata.module_id = AFE_PARAM_ID_ENABLE_DSM_RX;
+		else
+		config.pdata.module_id = AFE_PARAM_ID_ENABLE_DSM_TX;			
+		break;
+	case AFE_PARAM_ID_FEEDBACK_PATH_CFG:
+		this_afe.vi_tx_port = port;
+	case AFE_PARAM_ID_SPKR_CALIB_VI_PROC_CFG:
+	case AFE_PARAM_ID_MODE_VI_PROC_CFG:
+		config.pdata.module_id = AFE_MODULE_FB_SPKR_PROT_VI_PROC;
+		break;
+	default:
+		goto fail_cmd;
+		break;
+	}
+
+	config.hdr.hdr_field = APR_HDR_FIELD(APR_MSG_TYPE_SEQ_CMD,
+				APR_HDR_LEN(APR_HDR_SIZE), APR_PKT_VER);
+	config.hdr.pkt_size = sizeof(config);
+	config.hdr.src_port = 0;
+	config.hdr.dest_port = 0;
+	config.hdr.token = index;
+
+	config.hdr.opcode = AFE_PORT_CMD_SET_PARAM_V2;
+	config.param.port_id = q6audio_get_port_id(port);
+	config.param.payload_size = sizeof(config) - sizeof(config.hdr)
+		- sizeof(config.param);
+	config.pdata.param_id = param_id;
+	config.pdata.param_size = sizeof(config.prot_config);
+	config.prot_config = *prot_config;
+	atomic_set(&this_afe.state, 1);
+	ret = apr_send_pkt(this_afe.apr, (uint32_t *) &config);
+	if (ret < 0) {
+		pr_err("%s: Setting param for port %d param[0x%x]failed\n",
+		 __func__, port, param_id);
+		goto fail_cmd;
+	}
+	ret = wait_event_timeout(this_afe.wait[index],
+		(atomic_read(&this_afe.state) == 0),
+		msecs_to_jiffies(TIMEOUT_MS));
+	if (!ret) {
+		pr_err("%s: wait_event timeout\n", __func__);
+		ret = -EINVAL;
+		goto fail_cmd;
+	}
+	if (atomic_read(&this_afe.status) != 0) {
+		pr_err("%s: config cmd failed\n", __func__);
+		ret = -EINVAL;
+		goto fail_cmd;
+	}
+	ret = 0;
+fail_cmd:
+	pr_debug("%s config.pdata.param_id %x status %d\n",
+	__func__, config.pdata.param_id, ret);
+	return ret;
+}
+
+#endif
 static void afe_send_cal_spkr_prot_tx(int port_id)
 {
 	union afe_spkr_prot_config afe_spk_config;
@@ -3937,6 +4028,70 @@ fail_cmd:
 	return ret;
 }
 
+#ifdef CONFIG_SND_SOC_MAXIM_DSM
+int afe_dsm_spk_prot_get_calib_data(struct afe_dsm_spkr_prot_get_vi_calib *calib_resp)
+{
+	int ret = -EINVAL;
+	int index = 0, port = DSM_RX_PORT_ID;
+
+	if (!calib_resp) {
+		pr_err("%s: Invalid params\n", __func__);
+		goto fail_cmd;
+	}
+	ret = q6audio_validate_port(port);
+	if (ret < 0) {
+		pr_err("%s: invalid port 0x%x ret %d\n", __func__, port, ret);
+		ret = -EINVAL;
+		goto fail_cmd;
+	}
+	index = q6audio_get_port_index(port);
+	calib_resp->hdr.hdr_field =
+	APR_HDR_FIELD(APR_MSG_TYPE_SEQ_CMD,
+	APR_HDR_LEN(APR_HDR_SIZE), APR_PKT_VER);
+	calib_resp->hdr.pkt_size = sizeof(*calib_resp);
+	calib_resp->hdr.src_port = 0;
+	calib_resp->hdr.dest_port = 0;
+	calib_resp->hdr.token = index;
+	calib_resp->hdr.opcode =  AFE_PORT_CMD_GET_PARAM_V2;
+	calib_resp->get_param.mem_map_handle = 0;
+	calib_resp->get_param.module_id = AFE_PARAM_ID_ENABLE_DSM_RX;
+	calib_resp->get_param.param_id = AFE_PARAM_ID_CALIB_RES_CFG_V2;
+	calib_resp->get_param.payload_address_lsw = 0;
+	calib_resp->get_param.payload_address_msw = 0;
+	calib_resp->get_param.payload_size = sizeof(*calib_resp)
+		- sizeof(calib_resp->get_param) - sizeof(calib_resp->hdr);
+	calib_resp->get_param.port_id = q6audio_get_port_id(port);
+	calib_resp->pdata.module_id = AFE_PARAM_ID_ENABLE_DSM_RX;
+	calib_resp->pdata.param_id = AFE_PARAM_ID_CALIB_RES_CFG_V2;
+	calib_resp->pdata.param_size = sizeof(calib_resp->res_cfg);
+	atomic_set(&this_afe.state, 1);
+	ret = apr_send_pkt(this_afe.apr, (uint32_t *)calib_resp);
+	if (ret < 0) {
+		pr_err("%s: get param port 0x%x param id[0x%x]failed %d\n",
+			   __func__, port, calib_resp->get_param.param_id, ret);
+		goto fail_cmd;
+	}
+	ret = wait_event_timeout(this_afe.wait[index],
+		(atomic_read(&this_afe.state) == 0),
+		msecs_to_jiffies(TIMEOUT_MS));
+	if (!ret) {
+		pr_err("%s: wait_event timeout\n", __func__);
+		ret = -EINVAL;
+		goto fail_cmd;
+	}
+	if (atomic_read(&this_afe.status) != 0) {
+		pr_err("%s: config cmd failed\n", __func__);
+		ret = -EINVAL;
+		goto fail_cmd;
+	}
+	memcpy(&calib_resp->res_cfg , &this_afe.calib_data.res_cfg,
+		sizeof(this_afe.calib_data.res_cfg));
+	ret = 0;
+fail_cmd:
+	return ret;
+}
+
+#endif
 int afe_spk_prot_feed_back_cfg(int src_port, int dst_port,
 	int l_ch, int r_ch, u32 enable)
 {
@@ -4458,6 +4613,270 @@ done:
 	return result;
 }
 
+#ifdef CONFIG_SND_SOC_CS35L32
+int q6afe_set_rtip(int enable)
+{
+	struct afe_rtip_v1 set_param;
+	int ret = 0;
+
+	pr_debug("%s\n", __func__);
+	if (this_afe.apr == NULL) {
+		this_afe.apr = apr_register("ADSP", "AFE",afe_callback,
+					    0xFFFFFFFF, &this_afe);
+		pr_info("%s: Register AFE\n", __func__);
+		if (this_afe.apr == NULL) {
+			pr_err("%s: Unable to register AFE\n",__func__);
+			ret = -ENODEV;
+			return ret;
+		}
+	}
+	set_param.hdr.hdr_field = APR_HDR_FIELD(APR_MSG_TYPE_SEQ_CMD,
+						APR_HDR_LEN(20), APR_PKT_VER);
+
+	set_param.hdr.pkt_size = APR_PKT_SIZE(APR_HDR_SIZE,
+					      sizeof(set_param) - APR_HDR_SIZE);
+	set_param.hdr.src_port = 0;
+	set_param.hdr.dest_port = 0;
+	set_param.hdr.token = 0;
+	set_param.hdr.opcode = AFE_PORT_CMD_SET_PARAM_V2;
+	set_param.param.port_id = AFE_PORT_ID_QUATERNARY_MI2S_TX;
+	set_param.param.payload_size = (sizeof(set_param) - sizeof(struct apr_hdr) -
+				sizeof(struct afe_port_cmd_set_param_v2) -
+				sizeof(struct afe_param_rtip_enable));
+
+	set_param.param.payload_address_lsw = 0;
+	set_param.param.payload_address_msw = 0;
+	set_param.param.mem_map_handle = 0x00;
+	set_param.pdata.module_id = AFE_MODULE_RTIP_ENABLE;
+
+	switch (enable){
+		case 0:
+		case 1:
+			pr_debug("%s: enable/disable the module", __func__);
+			set_param.pdata.param_id = AFE_PARAM_RTIP_ENABLE;
+			set_param.pdata.param_size = sizeof(struct afe_param_rtip_enable);
+			set_param.rtip_t.enable = enable;
+			set_param.rtip_t.reserved = 0;
+		break;
+		case 2:
+		case 3:
+			pr_debug("%s: set/reset debugging of the module", __func__);
+			set_param.pdata.param_id = AFE_PARAM_RTIP_DEBUG;
+			set_param.pdata.param_size = sizeof(struct afe_param_rtip_enable);
+			set_param.rtip_t.enable = enable - 2;
+			set_param.rtip_t.reserved = 0;
+		break;
+		case 4:
+		case 5:
+			pr_debug("%s: set/reset performance monitoring of the module", __func__);
+			set_param.pdata.param_id = AFE_PARAM_RTIP_PERF;
+			set_param.pdata.param_size      = sizeof(struct afe_param_rtip_enable);
+			set_param.rtip_t.enable           = enable - 4;
+			set_param.rtip_t.reserved                 = 0;
+		break;
+		default:
+			return ret;
+	}
+
+	ret = afe_apr_send_pkt(&set_param, &this_afe.wait[0]);
+	if (ret < 0) {
+		pr_err("%s: AFE enable or disable RTIP failed\n", __func__);
+		ret = -EINVAL;
+		goto fail_cmd;
+	}
+
+	return 0;
+
+fail_cmd:
+	return	ret;
+}
+#endif  // CONFIG_SND_SOC_CS35L32
+
+#ifdef CONFIG_SND_SOC_MAXIM_DSM
+int afe_dsm_spk_prot_feed_back_cfg(int src_port, struct afe_dsm_filter_set_params_t *dsm_set_config)
+{
+	return afe_dsm_spk_prot_prepare(src_port,
+			AFE_PARAM_ID_FBSP_MODE_RX_CFG, (union afe_dsm_spkr_prot_config *)dsm_set_config);
+}
+
+int32_t dsm_open(int32_t port_id, uint32_t* dsm_params, u8 *user_params)
+{
+  int32_t  ret = 0;
+  uint32_t *user_data = (uint32_t *) user_params;
+
+  switch(*dsm_params) {
+    case DSM_ID_FILTER_GET_AFE_PARAMS:
+    {
+		struct afe_dsm_spkr_prot_get_vi_calib	calib_resp;
+
+		if (!afe_dsm_spk_prot_get_calib_data(&calib_resp)) {
+			if(user_data) {
+				int idx = 0;
+				user_data[idx++] = calib_resp.res_cfg.coilTemp;
+				user_data[idx++] = (1 << 19);
+				user_data[idx++] = calib_resp.res_cfg.excursionMeasure;
+				user_data[idx++] = 1;
+				user_data[idx++] = calib_resp.res_cfg.dcResistance;
+				user_data[idx++] = (1 << 27);
+				user_data[idx++] = calib_resp.res_cfg.qualityfactor;
+				user_data[idx++] = (1 << 29);
+				user_data[idx++] = calib_resp.res_cfg.resonanceFreq;
+				user_data[idx++] = (1 << 9);
+				user_data[idx++] = calib_resp.res_cfg.excursionlimit;
+				user_data[idx++] = (1 << 27);
+				user_data[idx++] = calib_resp.res_cfg.rdcroomtemp;
+				user_data[idx++] = (1 << 27);
+				user_data[idx++] = calib_resp.res_cfg.coilthermallimit;
+				user_data[idx++] = (1 << 19);
+				user_data[idx++] = calib_resp.res_cfg.releasetime;
+				user_data[idx++] = (1 << 30);
+				user_data[idx++] = calib_resp.res_cfg.dsmenabled;
+				user_data[idx++] = 1;
+				user_data[idx++] = calib_resp.res_cfg.staticgain;
+				user_data[idx++] = (1 << 29);
+				user_data[idx++] = calib_resp.res_cfg.lfxgain;
+				user_data[idx++] = (1 << 30);
+				user_data[idx++] = calib_resp.res_cfg.pilotgain;
+				user_data[idx++] = (1 << 31);
+				user_data[idx++] = calib_resp.res_cfg.flagToWrite;
+				user_data[idx++] = 1;
+				user_data[idx++] = calib_resp.res_cfg.featureSetEnable;
+				user_data[idx++] = 1;
+				user_data[idx++] = calib_resp.res_cfg.smooFacVoltClip;
+				user_data[idx++] = (1 << 30);
+				user_data[idx++] = calib_resp.res_cfg.highPassCutOffFactor;
+				user_data[idx++] = (1 << 30);
+				user_data[idx++] = calib_resp.res_cfg.leadResistance;
+				user_data[idx++] = (1 << 27);
+				user_data[idx++] = calib_resp.res_cfg.rmsSmooFac;
+				user_data[idx++] = (1 << 31);
+				user_data[idx++] = calib_resp.res_cfg.clipLimit;
+				user_data[idx++] = (1 << 27);
+				user_data[idx++] = calib_resp.res_cfg.thermalCoeff;
+				user_data[idx++] = (1 << 20);
+				user_data[idx++] = calib_resp.res_cfg.qSpk;
+				user_data[idx++] = (1 << 29);
+				user_data[idx++] = calib_resp.res_cfg.excurLoggingThresh;
+				user_data[idx++] = 1;
+				user_data[idx++] = calib_resp.res_cfg.coilTempLoggingThresh;
+				user_data[idx++] = 1;
+				user_data[idx++] = calib_resp.res_cfg.resFreq;
+				user_data[idx++] = (1 << 9);
+				user_data[idx++] = calib_resp.res_cfg.resFreqGuardBand;
+				user_data[idx++] = (1 << 9);
+
+#ifdef USE_DSM_LOG
+				if (likely(calib_resp.res_cfg.byteLogArray[0] & 0x3)) {
+					maxdsm_log_update(calib_resp.res_cfg.byteLogArray, calib_resp.res_cfg.intLogArray, calib_resp.res_cfg.afterProbByteLogArray, calib_resp.res_cfg.afterProbIntLogArray);
+				}
+#endif /* USE_DSM_LOG */
+			}
+#ifdef DEBUG_DSM
+      pr_info("DSM(0) - GET_PARAMS parameters %s: %8x, %8x, %8x, %8x, %8x\n",
+              __func__, calib_resp.res_cfg.coilTemp,
+                        calib_resp.res_cfg.excursionMeasure,
+                        calib_resp.res_cfg.dcResistance,
+                        calib_resp.res_cfg.qualityfactor,
+                        calib_resp.res_cfg.resonanceFreq);
+      pr_info("DSM(1) - GET_PARAMS parameters %s: %8x, %8x, %8x, %8x, %8x\n",
+              __func__, calib_resp.res_cfg.excursionlimit,
+                        calib_resp.res_cfg.rdcroomtemp,
+                        calib_resp.res_cfg.coilthermallimit,
+                        calib_resp.res_cfg.releasetime,
+                        calib_resp.res_cfg.dsmenabled);
+      pr_info("DSM(2) - GET_PARAMS parameters %s: %8x, %8x, %8x, %8x, %8x\n",
+              __func__, calib_resp.res_cfg.staticgain,
+                        calib_resp.res_cfg.lfxgain,
+                        calib_resp.res_cfg.pilotgain,
+                        calib_resp.res_cfg.flagToWrite,
+                        calib_resp.res_cfg.featureSetEnable);
+      pr_info("DSM(3) - GET_PARAMS parameters %s: %8x, %8x, %8x, %8x, %8x\n",
+              __func__, calib_resp.res_cfg.smooFacVoltClip,
+                        calib_resp.res_cfg.highPassCutOffFactor,
+                        calib_resp.res_cfg.leadResistance,
+                        calib_resp.res_cfg.rmsSmooFac,
+                        calib_resp.res_cfg.clipLimit);
+      pr_info("DSM(4) - GET_PARAMS parameters %s: %8x, %8x, %8x, %8x, %8x\n",
+              __func__, calib_resp.res_cfg.thermalCoeff,
+                        calib_resp.res_cfg.qSpk,
+                        calib_resp.res_cfg.excurLoggingThresh,
+                        calib_resp.res_cfg.coilTempLoggingThresh,
+                        calib_resp.res_cfg.resFreq);
+      pr_info("DSM(5) - GET_PARAMS parameters %s: %8x\n",
+              __func__, calib_resp.res_cfg.resFreqGuardBand);
+#endif
+	      break;
+		}
+		goto fail_cmd;
+    }
+    case DSM_ID_FILTER_SET_AFE_CNTRLS:
+    {
+      struct afe_dsm_filter_set_params_t filter_params;
+
+      if(user_data) {
+		filter_params.excursionlimit = user_data[10];
+		filter_params.rdcroomtemp = user_data[12];
+		filter_params.coilthermallimit = user_data[14];
+		filter_params.releasetime = user_data[16];
+		filter_params.dsmenabled = user_data[18];
+		filter_params.staticgain = user_data[20];
+		filter_params.lfxgain = user_data[22];
+		filter_params.pilotgain = user_data[24];
+		filter_params.flagToWrite = user_data[26];
+		filter_params.featureSetEnable = user_data[28];
+		filter_params.smooFacVoltClip = user_data[30];
+		filter_params.highPassCutOffFactor = user_data[32];
+		filter_params.leadResistance = user_data[34];
+		filter_params.rmsSmooFac = user_data[36];
+		filter_params.clipLimit = user_data[38];
+		filter_params.thermalCoeff = user_data[40];
+		filter_params.qSpk = user_data[42];
+		filter_params.excurLoggingThresh = user_data[44];
+		filter_params.coilTempLoggingThresh = user_data[46];
+		filter_params.resFreq = user_data[48];
+		filter_params.resFreqGuardBand = user_data[50];
+
+#ifdef DEBUG_DSM
+		pr_info("DSM(0) - SET_PARAMS parameters %s: %8x, %8x, %8x, %8x, %8x\n",
+			  __func__, filter_params.excursionlimit,
+						filter_params.rdcroomtemp,
+						filter_params.coilthermallimit,
+						filter_params.releasetime,
+						filter_params.dsmenabled);
+		pr_info("DSM(1) - SET_PARAMS parameters %s: %8x, %8x, %8x, %8x, %8x\n",
+			  __func__, filter_params.staticgain,
+						filter_params.lfxgain,
+						filter_params.pilotgain,
+						filter_params.flagToWrite,
+						filter_params.featureSetEnable);
+		pr_info("DSM(2) - SET_PARAMS parameters %s: %8x, %8x, %8x, %8x, %8x\n",
+			  __func__, filter_params.smooFacVoltClip,
+						filter_params.highPassCutOffFactor,
+						filter_params.leadResistance,
+						filter_params.rmsSmooFac,
+						filter_params.clipLimit);
+		pr_info("DSM(3) - SET_PARAMS parameters %s: %8x, %8x, %8x, %8x, %8x\n",
+			  __func__, filter_params.thermalCoeff,
+						filter_params.qSpk,
+                        filter_params.excurLoggingThresh,
+                        filter_params.coilTempLoggingThresh,
+                        filter_params.resFreq);
+		pr_info("DSM(4) - SET_PARAMS parameters %s: %8x\n",
+			  __func__, filter_params.resFreqGuardBand);
+
+#endif
+		ret = afe_dsm_spk_prot_feed_back_cfg(DSM_RX_PORT_ID, &filter_params);
+     }
+       break;
+    }
+    default:
+      goto fail_cmd;
+  }
+fail_cmd:
+  return ret;
+
+} // dsm_open()  
+#endif
 static int __init afe_init(void)
 {
 	int i = 0, ret;

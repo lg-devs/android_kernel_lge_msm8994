@@ -455,6 +455,67 @@ config QPNP_SMBCHARGER
 	  The driver also offers relevant information to userspace via the
 	  power supply framework.
 
+config LGE_PM_MAXIM_EVP_CONTROL
+	bool "add evp control func."
+	default y
+	depends on QPNP_SMBCHARGER
+	help
+	  add evp control func.
+
+config LGE_PM_CHARGE_INFO
+	bool "add chaarging information log"
+	default y
+	depends on QPNP_SMBCHARGER
+	help
+	  add charging information log
+
+config LGE_PM_EVP_TESTCMD_SUPPORT
+	bool "add evp enable store function for testcmd support"
+	default y
+	depends on LGE_PM_MAXIM_EVP_CONTROL
+	help
+	  add evp enable store function for testcmd support
+
+config LGE_PM_DETECT_QC20
+	bool "add QC2.0 control func."
+	default n
+	depends on QPNP_SMBCHARGER
+	help
+	  add QC2.0 control func.
+
+config LGE_PM_PARALLEL_CHARGING
+	tristate "Qualcomm parallel charging"
+	depends on I2C && SMB135X_CHARGER
+	default n
+	help
+	  enable parallel charging feature
+
+config LGE_PM_USE_FG
+	bool "LGE feature for qpnp fg"
+	depends on QPNP_FG
+	help
+	  Say Y here to enable debug feature & LGE feature for QPNP chip fg device.
+
+config LGE_PM_UNIFIED_WLC
+	tristate "wireless charger control driver"
+	default n
+	help
+	  wireless charger control driver
+
+config LGE_PM_UNIFIED_WLC_ALIGNMENT
+	tristate "wireless charger control driver"
+	depends on LGE_PM_UNIFIED_WLC
+	default n
+	help
+	  wireless charger control driver
+
+config LGE_PM_UNIFIED_WLC_ALIGNMENT_IDT9025A
+	tristate "wireless charger control driver"
+	depends on LGE_PM_UNIFIED_WLC
+	default n
+	help
+	  wireless charger control driver
+
 config QPNP_FG
 	tristate "QPNP fuel gauge driver"
 	depends on SPMI
@@ -552,6 +613,25 @@ config MSM_BCL_PERIPHERAL_CTL
 	  Say Y here to enable this BCL PMIC peripheral driver. This driver
 	  provides routines to configure and monitor the BCL
 	  PMIC peripheral.
+
+config BATTERY_MAX17048
+	tristate "Maxim MAX17048 fuel gauge external driver"
+	depends on I2C && MACH_LGE
+	default n
+	help
+	  MAX17048 is fuel-gauge systems for lithium-ion (Li+) batteries
+	  in handheld and portable equipment. The MAX17048 is configured
+	  to operate with a single lithium cell
+
+config LGE_PM_BATTERY_ID_CHECKER
+	tristate "Virtual Device for LGE Battery ID Checker"
+	depends on LGE_PM
+	default n
+	help
+	  Say Y to enable LGE Battery ID Checker. Manufacturer have their own
+	  systematic identification of cell types, and protect the system from
+	  problems as using non-standard or unexpected types. so cross-
+	  reference battery identification are useful to identify.
 
 source "drivers/power/reset/Kconfig"
 

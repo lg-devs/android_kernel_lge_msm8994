@@ -19,6 +19,11 @@
 #include "mdss_debug.h"
 #include "mdss_mdp_trace.h"
 
+#if defined(CONFIG_LGE_MIPI_JDI_INCELL_QHD_CMD_PANEL)
+#include "mdss_dsi.h"
+#include "mdss_dsi_cmd.h"
+#endif
+
 #define VSYNC_EXPIRE_TICK 6
 
 #define MAX_SESSIONS 2
@@ -29,6 +34,10 @@
 
 #define STOP_TIMEOUT(hz) msecs_to_jiffies((1000 / hz) * (VSYNC_EXPIRE_TICK + 2))
 #define POWER_COLLAPSE_TIME msecs_to_jiffies(100)
+
+#if defined(CONFIG_LGE_MIPI_JDI_INCELL_QHD_CMD_PANEL)
+struct mdss_dsi_ctrl_pdata *lg_ctrl_pdata;
+#endif
 
 static DEFINE_MUTEX(cmd_clk_mtx);
 
@@ -59,6 +68,36 @@ struct mdss_mdp_cmd_ctx {
 	struct mdss_mdp_cmd_ctx *sync_ctx; /* for partial update */
 	u32 pp_timeout_report_cnt;
 };
+
+#if defined(CONFIG_LGE_MIPI_JDI_INCELL_QHD_CMD_PANEL)
+static char jdi_cmd1[2] = {0x2C, 0x00};
+static char jdi_cmd2[2] = {0xC0, 0x03};
+static char jdi_cmd3[2] = {0x2C, 0x00};
+static char jdi_cmd4[2] = {0xC0, 0x00};
+
+static struct dsi_cmd_desc jdi_cmds[] = {
+	{{DTYPE_DCS_WRITE , 1, 0, 0, 0, sizeof(jdi_cmd1)}, jdi_cmd1},
+	{{DTYPE_DCS_WRITE1, 1, 0, 0, 0, sizeof(jdi_cmd2)}, jdi_cmd2},
+	{{DTYPE_DCS_WRITE , 1, 0, 0, 0, sizeof(jdi_cmd3)}, jdi_cmd3},
+	{{DTYPE_DCS_WRITE1, 1, 0, 0, 0, sizeof(jdi_cmd4)}, jdi_cmd4}
+};
+
+static void mdss_dsi_jdi_cmd(struct mdss_dsi_ctrl_pdata *ctrl)
+{
+	int i;
+	struct dcs_cmd_req cmdreq;
+
+	for(i = 0 ; i < 4 ; i++) {
+		cmdreq.cmds = &jdi_cmds[i];
+		cmdreq.cmds_cnt = 1;
+		cmdreq.flags = CMD_REQ_COMMIT;
+		cmdreq.rlen = 0;
+		cmdreq.cb = NULL;
+
+		mdss_dsi_cmdlist_put(ctrl, &cmdreq);
+	}
+}
+#endif
 
 struct mdss_mdp_cmd_ctx mdss_mdp_cmd_ctx_list[MAX_SESSIONS];
 
@@ -863,6 +902,15 @@ int mdss_mdp_cmd_kickoff(struct mdss_mdp_ctl *ctl, void *arg)
 {
 	struct mdss_mdp_ctl *sctl = NULL;
 	struct mdss_mdp_cmd_ctx *ctx, *sctx = NULL;
+#if defined(CONFIG_LGE_MIPI_JDI_INCELL_QHD_CMD_PANEL)
+	struct mdss_panel_info *pinfo = NULL;
+	struct mdss_dsi_ctrl_pdata *ctrl_pdata = NULL;
+#endif
+
+#if defined(CONFIG_LGE_MIPI_JDI_INCELL_QHD_CMD_PANEL)
+	ctrl_pdata = container_of(ctl->panel_data, struct mdss_dsi_ctrl_pdata, panel_data);
+	pinfo = &(ctrl_pdata->panel_data.panel_info);
+#endif
 
 	ctx = (struct mdss_mdp_cmd_ctx *) ctl->priv_data;
 	if (!ctx) {
@@ -913,6 +961,13 @@ int mdss_mdp_cmd_kickoff(struct mdss_mdp_ctl *ctl, void *arg)
 	mdss_mdp_cmd_clk_on(ctx);
 
 	mdss_mdp_cmd_set_partial_roi(ctl);
+
+#if defined(CONFIG_LGE_MIPI_JDI_INCELL_QHD_CMD_PANEL)
+	if(pinfo->panel_type == JDI_INCELL_CMD_PANEL && pinfo->jdi_cut == JDI_FIRST_CUT) {
+		pr_debug("[JDI Abnormal Display] send additional packet\n");
+		mdss_dsi_jdi_cmd(lg_ctrl_pdata);
+	}
+#endif
 
 	/*
 	 * tx dcs command if had any

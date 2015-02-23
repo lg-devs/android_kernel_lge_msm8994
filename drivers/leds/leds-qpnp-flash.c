@@ -703,6 +703,9 @@ static void qpnp_flash_led_brightness_set(struct led_classdev *led_cdev,
 
 	flash_node->cdev.brightness = value;
 
+	/*                               */
+	pr_err("%s: %d: name = %s, val = %d\n",
+		__func__, __LINE__, flash_node->cdev.name, value);
 	schedule_work(&flash_node->work);
 
 	return;
@@ -1163,10 +1166,13 @@ static int qpnp_flash_led_parse_common_dt(
 
 	led->pdata->hdrm_sns_ch1_en = of_property_read_bool(node,
 						"qcom,headroom-sense-ch1-enabled");
-
+/*                          */
+#if 0//QMC original
 	led->pdata->power_detect_en = of_property_read_bool(node,
 						"qcom,power-detect-enabled");
-
+#else
+	led->pdata->power_detect_en = false;
+#endif
 	return 0;
 }
 

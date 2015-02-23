@@ -19,6 +19,9 @@ obj-$(CONFIG_DEVFREQ_GOV_MSM_GPUBW_MON)	+= governor_bw_vbif.o
 obj-$(CONFIG_DEVFREQ_GOV_SPDM_HYP) 	+= governor_spdm_bw_hyp.o
 
 # DEVFREQ Drivers
+obj-$(CONFIG_LGE_DEVFREQ_DFPS)  += g3_display.o
+ccflags-$(CONFIG_LGE_DEVFREQ_DFPS) += -I$(srctree)/drivers/video/msm/mdss
+
 obj-$(CONFIG_ARM_EXYNOS4_BUS_DEVFREQ)	+= exynos4_bus.o
 obj-$(CONFIG_MSM_DEVFREQ_DEVBW)		+= devfreq_devbw.o
 obj-$(CONFIG_DEVFREQ_SIMPLE_DEV)	+= devfreq_simple_dev.o

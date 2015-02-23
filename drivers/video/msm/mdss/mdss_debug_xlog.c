@@ -73,7 +73,10 @@ int mdss_create_xlog_debug(struct mdss_debug_data *mdd)
 						&mdss_xlog_fops);
 	debugfs_create_bool("enable", 0644, mdd->logd.xlog,
 			    &mdd->logd.xlog_enable);
-	debugfs_create_bool("panic", 0644, mdd->logd.xlog,
+    /*xlog enable to debug DSI fifo underflow/overflow issue */
+    mdd->logd.xlog_enable = true;
+
+    debugfs_create_bool("panic", 0644, mdd->logd.xlog,
 			    &mdd->logd.panic_on_err);
 	debugfs_create_bool("reg_dump", 0644, mdd->logd.xlog,
 			    &mdd->logd.enable_reg_dump);

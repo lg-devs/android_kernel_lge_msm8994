@@ -39,6 +39,12 @@ struct msm_hdmi_mode_timing_info {
 					 MSM_HDMI_MODES_XTND |\
 					 MSM_HDMI_MODES_DVI)
 
+#if defined(CONFIG_MACH_MSM8994_G4) && defined(CONFIG_SLIMPORT_ANX7816)
+#define SUPPORTED_4K_for_LION 1
+#else
+#define SUPPORTED_4K_for_LION 0
+#endif
+
 /* all video formats defined by CEA 861D */
 #define HDMI_VFRMT_UNKNOWN		0
 #define HDMI_VFRMT_640x480p60_4_3	1
@@ -349,14 +355,14 @@ do {	\
 			HDMI_VFRMT_3840x2160p24_16_9);	\
 		MSM_HDMI_MODES_SET_TIMING(__lut,	\
 			HDMI_VFRMT_4096x2160p24_16_9);	\
-	}	\
+	} 	\
 	if (__type & MSM_HDMI_MODES_DVI) {	\
 		MSM_HDMI_MODES_SET_TIMING(__lut,	\
 			HDMI_VFRMT_1024x768p60_4_3);	\
 		MSM_HDMI_MODES_SET_TIMING(__lut,	\
 			HDMI_VFRMT_1280x1024p60_5_4);	\
 		MSM_HDMI_MODES_SET_TIMING(__lut,	\
-			HDMI_VFRMT_2560x1600p60_16_9);	\
+			HDMI_VFRMT_2560x1600p60_16_9);  \
 		MSM_HDMI_MODES_SET_TIMING(__lut,	\
 			HDMI_VFRMT_800x600p60_4_3);	\
 		MSM_HDMI_MODES_SET_TIMING(__lut,	\

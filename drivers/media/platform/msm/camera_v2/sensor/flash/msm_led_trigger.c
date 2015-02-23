@@ -54,6 +54,18 @@ static int32_t msm_led_trigger_config(struct msm_led_flash_ctrl_t *fctrl,
 		return -EINVAL;
 	}
 
+	/*                */
+	if (cfg->cfgtype == MSM_CAMERA_LED_LOW ||
+		cfg->cfgtype == MSM_CAMERA_LED_TORCH ||
+		cfg->cfgtype == MSM_CAMERA_LED_HIGH ) {
+		pr_info("called led_state %d, torch_current values %d, %d\n",
+			   cfg->cfgtype, cfg->torch_current[0], cfg->torch_current[1]);
+		pr_info("called led_state %d, flash_current values %d, %d\n",
+			   cfg->cfgtype, cfg->flash_current[0], cfg->flash_current[1]);
+	} else {
+		pr_info("called led_state %d \n", cfg->cfgtype);
+	}
+
 	switch (cfg->cfgtype) {
 	case MSM_CAMERA_LED_OFF:
 		/* Flash off */
@@ -67,11 +79,13 @@ static int32_t msm_led_trigger_config(struct msm_led_flash_ctrl_t *fctrl,
 		break;
 
 	case MSM_CAMERA_LED_LOW:
+	/*                                 */
+	case MSM_CAMERA_LED_TORCH:
 		for (i = 0; i < fctrl->torch_num_sources; i++)
 			if (fctrl->torch_trigger[i]) {
 				max_curr_l = fctrl->torch_max_current[i];
 				if (cfg->torch_current[i] >= 0 &&
-					cfg->torch_current[i] < max_curr_l) {
+					cfg->torch_current[i] <= max_curr_l) {/*                          */
 					curr_l = cfg->torch_current[i];
 				} else {
 					curr_l = fctrl->torch_op_current[i];
@@ -93,7 +107,7 @@ static int32_t msm_led_trigger_config(struct msm_led_flash_ctrl_t *fctrl,
 			if (fctrl->flash_trigger[i]) {
 				max_curr_l = fctrl->flash_max_current[i];
 				if (cfg->flash_current[i] >= 0 &&
-					cfg->flash_current[i] < max_curr_l) {
+					cfg->flash_current[i] <= max_curr_l) {/*                          */
 					curr_l = cfg->flash_current[i];
 				} else {
 					curr_l = fctrl->flash_op_current[i];

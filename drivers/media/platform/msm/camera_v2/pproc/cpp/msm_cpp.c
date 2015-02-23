@@ -182,8 +182,8 @@ static void cpp_timer_callback(unsigned long data);
 
 uint8_t induce_error;
 static int msm_cpp_enable_debugfs(struct cpp_device *cpp_dev);
-
-static void msm_cpp_write(u32 data, void __iomem *cpp_base)
+/*                                                                                  */
+static inline void msm_cpp_write(u32 data, void __iomem *cpp_base)
 {
 	writel_relaxed((data), cpp_base + MSM_CPP_MICRO_FIFO_RX_DATA);
 }

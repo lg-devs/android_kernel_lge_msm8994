@@ -692,4 +692,8 @@ int smd_debugfs_init(void);
 static inline int smd_debugfs_init(void) { return 0; }
 #endif
 
+#ifdef CONFIG_LGE_QFPROM_INTERFACE
+void __init lge_add_qfprom_devices(void);
+#endif
+
 #endif

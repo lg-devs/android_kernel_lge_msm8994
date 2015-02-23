@@ -167,8 +167,8 @@ static struct dsi_pll_vco_clk mdss_dsi1_vco_clk_src = {
 
 static struct dsi_pll_vco_clk dsi_vco_clk_8994 = {
 	.ref_clk_rate = 19200000,
-	.min_rate = 300000000,
-	.max_rate = 1500000000,
+	.min_rate = 1000000000,
+	.max_rate = 2000000000,
 	.pll_en_seq_cnt = 1,
 	.pll_enable_seqs[0] = pll_20nm_vco_enable_seq,
 	.c = {
@@ -180,8 +180,8 @@ static struct dsi_pll_vco_clk dsi_vco_clk_8994 = {
 
 static struct dsi_pll_vco_clk shadow_dsi_vco_clk_8994 = {
 	.ref_clk_rate = 19200000,
-	.min_rate = 300000000,
-	.max_rate = 1500000000,
+	.min_rate = 1000000000,
+	.max_rate = 2000000000,
 	.c = {
 		.dbg_name = "shadow_dsi_vco_clk_8994",
 		.ops = &shadow_clk_ops_dsi_vco,

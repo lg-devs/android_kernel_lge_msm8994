@@ -20,6 +20,7 @@
 #include <linux/of.h>
 #include <linux/of_device.h>
 #include <linux/io.h>
+#include <linux/string.h>
 #include <linux/platform_device.h>
 #include <linux/regulator/driver.h>
 #include <linux/regulator/machine.h>
@@ -194,12 +195,56 @@ static void __update_acc_custom(struct mem_acc_regulator *mem_acc_vreg,
 static void update_acc_sel(struct mem_acc_regulator *mem_acc_vreg, int corner)
 {
 	int i;
+	static int svs_flag = true, row_flag = true;
 
 	for (i = 0; i < MEMORY_MAX; i++) {
 		if (mem_acc_vreg->mem_acc_supported[i])
 			__update_acc_sel(mem_acc_vreg, corner, i);
 		if (mem_acc_vreg->mem_acc_custom_supported[i])
 			__update_acc_custom(mem_acc_vreg, corner, i);
+	}
+
+	if (strcmp("mem_acc0_corner", mem_acc_vreg->rdev->constraints->name))
+		return;
+
+	/*
+	 * TODO: This is a hack for an 8994 test.  If the test is successful,
+	 * then a final version of the feature will need to be implemented using
+	 * device tree to pass in the register addresses as well as the register
+	 * values to write for all corners.
+	 */
+
+	if (corner <= 2) {
+		/* SVS2 and SVS corners */
+		scm_io_write(0xF900D084, 0x02);
+		scm_io_write(0xF900D088, 0x02);
+		scm_io_write(0xF900D08C, 0x02);
+		scm_io_write(0xF900D090, 0x02);
+		scm_io_write(0xF900D094, 0x0A);
+
+		if (svs_flag) {
+			pr_info("SVS Info: 0xF900D084 = (0x%x), 0xF900D088 = (0x%x), 0xF900D08C = (0x%x),\
+				0xF900D090 = (0x%x), 0xF900D094 = (0x%x)\n", scm_io_read(0xF900D084),
+				scm_io_read(0xF900D088), scm_io_read(0xF900D08C), scm_io_read(0xF900D090),
+				scm_io_read(0xF900D094));
+			svs_flag = false;
+		}
+
+	} else {
+		/* NOM and TURBO corners */
+		scm_io_write(0xF900D084, 0x00);
+		scm_io_write(0xF900D088, 0x00);
+		scm_io_write(0xF900D08C, 0x00);
+		scm_io_write(0xF900D090, 0x00);
+		scm_io_write(0xF900D094, 0x0E);
+
+		if (row_flag) {
+			pr_info("NOM/TURBO Info: 0xF900D084 = (0x%x), 0xF900D088 = (0x%x), 0xF900D08C = (0x%x),\
+				0xF900D090 = (0x%x), 0xF900D094 = (0x%x)\n", scm_io_read(0xF900D084),
+				scm_io_read(0xF900D088), scm_io_read(0xF900D08C), scm_io_read(0xF900D090),
+				scm_io_read(0xF900D094));
+			row_flag = false;
+		}
 	}
 }
 

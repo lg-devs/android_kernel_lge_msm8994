@@ -644,10 +644,12 @@ int msm_camio_csid_config(struct msm_camera_csid_params *csid_params);
 int add_axi_qos(void);
 int update_axi_qos(uint32_t freq);
 void release_axi_qos(void);
-void msm_camera_io_w(u32 data, void __iomem *addr);
-void msm_camera_io_w_mb(u32 data, void __iomem *addr);
-u32 msm_camera_io_r(void __iomem *addr);
-u32 msm_camera_io_r_mb(void __iomem *addr);
+/*                                                                        */
+//void msm_camera_io_w(u32 data, void __iomem *addr);
+//void msm_camera_io_w_mb(u32 data, void __iomem *addr);
+//u32 msm_camera_io_r(void __iomem *addr);
+//u32 msm_camera_io_r_mb(void __iomem *addr);
+/*                                                                        */
 void msm_camera_io_dump(void __iomem *addr, int size);
 void msm_camera_io_memcpy(void __iomem *dest_addr,
 		void __iomem *src_addr, u32 len);

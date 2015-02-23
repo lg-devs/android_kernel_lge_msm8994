@@ -18,6 +18,7 @@
 #include "mdss_mdp_rotator.h"
 #include "mdss_panel.h"
 #include "mdss_mdp_trace.h"
+#include "mdss_debug.h"
 
 /*
  * if BWC enabled and format is H1V2 or 420, do not use site C or I.
@@ -572,6 +573,7 @@ static int mdss_mdp_wb_wait4comp(struct mdss_mdp_ctl *ctl, void *arg)
 		rc = -ENODEV;
 		WARN(1, "writeback kickoff timed out (%d) ctl=%d\n",
 						rc, ctl->num);
+		MDSS_XLOG_TOUT_HANDLER("mdp", "vbif", "panic");
 	} else {
 		ctx->end_time = ktime_get();
 		mdss_mdp_ctl_notify(ctl, MDP_NOTIFY_FRAME_DONE);

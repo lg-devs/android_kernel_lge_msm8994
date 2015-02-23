@@ -30,6 +30,7 @@ config SND_SOC_ALL_CODECS
 	select SND_SOC_ALC5623 if I2C
 	select SND_SOC_ALC5632 if I2C
 	select SND_SOC_CQ0093VC if MFD_DAVINCI_VOICECODEC
+	select SND_SOC_CS35L32 if I2C
 	select SND_SOC_CS42L51 if I2C
 	select SND_SOC_CS42L52 if I2C
 	select SND_SOC_CS42L73 if I2C
@@ -64,6 +65,7 @@ config SND_SOC_ALL_CODECS
 	select SND_SOC_STA529 if I2C
 	select SND_SOC_STAC9766 if SND_SOC_AC97_BUS
 	select SND_SOC_TAS5086 if I2C
+	select SND_SOC_TAS2552 if I2C
 	select SND_SOC_TLV320AIC23 if I2C
 	select SND_SOC_TLV320AIC26 if SPI_MASTER
 	select SND_SOC_TLV320AIC32X4 if I2C
@@ -282,6 +284,17 @@ config SND_SOC_MAX98090
 config SND_SOC_MAX98095
        tristate
 
+config SND_SOC_MAX98925
+	bool "Support MAX98925"
+	depends on I2C
+	help
+	MAX98925 driver
+
+config SND_SOC_MAXIM_DSM
+	bool "Support MAXIM DSM"
+	depends on SND_SOC_MAX98925
+	help
+	MAXIM DSM driver
 config SND_SOC_MAX9850
 	tristate
 
@@ -553,9 +566,31 @@ config SND_SOC_TPA6130A2
 config SND_SOC_MSM_STUB
 	tristate
 
+config SND_SOC_CS35L32
+	tristate "cs35l32 amp"
+	depends on MACH_LGE
+	default n
+	help
+	 Say Y here to enable
+
+config SND_SOC_TAS2552
+	tristate "tps2552 boost amp"
+	depends on MACH_LGE
+	default n
+
+config ENABLE_MBHC
+	bool "Qualcomm MBHC enable"
+	default n
+
 config SND_SOC_MSM_HDMI_CODEC_RX
 	bool "HDMI Audio Playback"
 	depends on FB_MSM_MDSS_HDMI_PANEL && (SND_SOC_MSM8974 || SND_SOC_APQ8084 || SND_SOC_MSM8994)
 	help
 	HDMI audio drivers should be built only if the platform
         supports hdmi panel.
+
+config SND_SOC_ZDET_ENABLE
+	tristate "zdet measurement"
+	default n
+	help
+	 Recalibrates dce_z and sta_z parameters. Say Y here to enable

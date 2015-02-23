@@ -47,6 +47,9 @@
 #include <linux/sw_sync.h>
 #include <linux/file.h>
 #include <linux/kthread.h>
+#ifdef CONFIG_MACH_LGE
+#include <soc/qcom/lge/board_lge.h>
+#endif
 
 #include <linux/qcom_iommu.h>
 #include <linux/msm_iommu_domains.h>
@@ -81,6 +84,14 @@ static u32 mdss_fb_pseudo_palette[16] = {
 	0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff
 };
 
+#if defined(CONFIG_LGE_BROADCAST_TDMB)
+extern struct mdp_csc_cfg dmb_csc_convert;
+extern int pp_set_dmb_status(int flag);
+#endif /*               */
+
+#ifdef CONFIG_LGE_LCD_OFF_DIMMING
+static bool fb_blank_called;
+#endif
 static struct msm_mdp_interface *mdp_instance;
 
 static int mdss_fb_register(struct msm_fb_data_type *mfd);
@@ -219,11 +230,24 @@ static void mdss_fb_set_bl_brightness(struct led_classdev *led_cdev,
 	if (value > mfd->panel_info->brightness_max)
 		value = mfd->panel_info->brightness_max;
 
+#ifdef CONFIG_LGE_LCD_OFF_DIMMING
+	if (((lge_get_bootreason() == 0x77665560) || (lge_get_bootreason() == 0x77665561))
+			&& !fb_blank_called) {
+		pr_info("%s : lcd dimming mode! minimum brightness.\n",__func__);
+		value = 10;
+	}
+#endif
+
+#if defined(CONFIG_LGE_MIPI_JDI_INCELL_QHD_CMD_PANEL)
+	if (mfd->panel_info->blmap)
+		 bl_lvl = mfd->panel_info->blmap[value];
+	pr_info("value(%d) -> bl_lvl(%d)\n", value, bl_lvl);
+#else
 	/* This maps android backlight level 0 to 255 into
 	   driver backlight level 0 to bl_max with rounding */
 	MDSS_BRIGHT_TO_BL(bl_lvl, value, mfd->panel_info->bl_max,
 				mfd->panel_info->brightness_max);
-
+#endif
 	if (!bl_lvl && value)
 		bl_lvl = 1;
 
@@ -235,12 +259,22 @@ static void mdss_fb_set_bl_brightness(struct led_classdev *led_cdev,
 	}
 }
 
+#if defined(CONFIG_Z2_LGD_POLED_PANEL)
+struct led_classdev backlight_led = {
+	.name           = "lcd-backlight",
+	.brightness     = MDSS_MAX_BL_BRIGHTNESS,
+	.brightness_set = mdss_fb_set_bl_brightness,
+	.max_brightness = MDSS_MAX_BL_BRIGHTNESS,
+};
+EXPORT_SYMBOL(backlight_led);
+#else
 static struct led_classdev backlight_led = {
 	.name           = "lcd-backlight",
 	.brightness     = MDSS_MAX_BL_BRIGHTNESS,
 	.brightness_set = mdss_fb_set_bl_brightness,
 	.max_brightness = MDSS_MAX_BL_BRIGHTNESS,
 };
+#endif
 
 static ssize_t mdss_fb_get_type(struct device *dev,
 				struct device_attribute *attr, char *buf)
@@ -664,6 +698,8 @@ static void mdss_fb_shutdown(struct platform_device *pdev)
 
 	mfd->shutdown_pending = true;
 	lock_fb_info(mfd->fbi);
+	/* Notify listeners */
+	sysfs_notify(&mfd->fbi->dev->kobj, NULL, "show_blank_event");
 	mdss_fb_release_all(mfd->fbi, true);
 	sysfs_notify(&mfd->fbi->dev->kobj, NULL, "show_blank_event");
 	unlock_fb_info(mfd->fbi);
@@ -1060,8 +1096,8 @@ void mdss_fb_set_backlight(struct msm_fb_data_type *mfd, u32 bkl_lvl)
 	int ret = -EINVAL;
 	bool bl_notify_needed = false;
 
-	if (((mdss_fb_is_power_off(mfd) && mfd->dcm_state != DCM_ENTER)
-		|| !mfd->bl_updated) && !IS_CALIB_MODE_BL(mfd) &&
+	if ((((mdss_fb_is_power_off(mfd) && mfd->dcm_state != DCM_ENTER)
+		|| !mfd->bl_updated) && !IS_CALIB_MODE_BL(mfd)) ||
 		mfd->panel_info->cont_splash_enabled) {
 		mfd->unset_bl_level = bkl_lvl;
 		return;
@@ -1218,7 +1254,9 @@ static int mdss_fb_blank_blank(struct msm_fb_data_type *mfd,
 		return 0;
 
 	cur_power_state = mfd->panel_power_state;
-
+#ifdef CONFIG_LGE_LCD_OFF_DIMMING
+	fb_blank_called = true;
+#endif
 	pr_debug("Transitioning from %d --> %d\n", cur_power_state,
 		req_power_state);
 
@@ -1334,7 +1372,7 @@ static int mdss_fb_blank_sub(int blank_mode, struct fb_info *info,
 	if (mfd->dcm_state == DCM_ENTER)
 		return -EPERM;
 
-	pr_debug("%pS mode:%d\n", __builtin_return_address(0),
+	pr_info("%pS mode:%d\n", __builtin_return_address(0),
 		blank_mode);
 
 	snprintf(trace_buffer, sizeof(trace_buffer), "fb%d blank %d",
@@ -2008,6 +2046,8 @@ static int mdss_fb_register(struct msm_fb_data_type *mfd)
 	mfd->panel_power_state = MDSS_PANEL_POWER_OFF;
 	mfd->dcm_state = DCM_UNINIT;
 
+	mdss_fb_get_split(mfd);
+
 	if (mdss_fb_alloc_fbmem(mfd))
 		pr_warn("unable to allocate fb memory in fb register\n");
 
@@ -2366,12 +2406,16 @@ static void __mdss_fb_wait_for_fence_sub(struct msm_sync_pt_data *sync_pt_data,
 		ret = sync_fence_wait(fences[i],
 				WAIT_FENCE_FIRST_TIMEOUT);
 		if (ret == -ETIME) {
-			pr_warn("%s: sync_fence_wait timed out! ",
-					sync_pt_data->fence_name);
+			pr_warn("%s: sync_fence_wait first timed out! - timeline (%d,%d)\n",
+					sync_pt_data->fence_name, sync_pt_data->timeline_value, sync_pt_data->timeline->value);
 			pr_cont("Waiting %ld more seconds\n",
 					WAIT_FENCE_FINAL_TIMEOUT/MSEC_PER_SEC);
 			ret = sync_fence_wait(fences[i],
 					WAIT_FENCE_FINAL_TIMEOUT);
+			if(ret == -ETIME){
+					pr_warn("%s: final fence timed out! - timeline (%d,%d)\n",
+							sync_pt_data->fence_name, sync_pt_data->timeline_value, sync_pt_data->timeline->value);
+			}
 		}
 		sync_fence_put(fences[i]);
 	}
@@ -3302,6 +3346,13 @@ int mdss_fb_do_ioctl(struct fb_info *info, unsigned int cmd,
 	struct msm_sync_pt_data *sync_pt_data = NULL;
 	unsigned int dsi_mode = 0;
 	struct mdss_panel_data *pdata = NULL;
+#ifdef CONFIG_MACH_LGE
+    u32 dsi_panel_invert = 0;
+#endif
+#if defined(CONFIG_LGE_BROADCAST_TDMB)
+	int dmb_flag = 0;
+	struct mdp_csc_cfg dmb_csc_cfg;
+#endif /*               */
 
 	if (!info || !info->par)
 		return -EINVAL;
@@ -3371,7 +3422,28 @@ int mdss_fb_do_ioctl(struct fb_info *info, unsigned int cmd,
 	case MSMFB_DISPLAY_COMMIT:
 		ret = mdss_fb_display_commit(info, argp);
 		break;
-
+#ifdef CONFIG_MACH_LGE
+    case MSMFB_INVERT_PANEL:
+        ret = copy_from_user(&dsi_panel_invert, argp, sizeof(int));
+        if (ret)
+            return ret;
+        ret = mdss_dsi_panel_invert(dsi_panel_invert);
+        break;
+#endif
+#if defined(CONFIG_LGE_BROADCAST_TDMB)
+	case MSMFB_DMB_SET_FLAG:
+		ret = copy_from_user(&dmb_flag, argp, sizeof(int));
+		if (ret)
+			return ret;
+		ret = pp_set_dmb_status(dmb_flag);
+		break;
+	case MSMFB_DMB_SET_CSC_MATRIX:
+		ret = copy_from_user(&dmb_csc_cfg, argp, sizeof(dmb_csc_cfg));
+		if (ret)
+			return ret;
+		memcpy(dmb_csc_convert.csc_mv, dmb_csc_cfg.csc_mv, sizeof(dmb_csc_cfg.csc_mv));
+		break;
+#endif /*               */
 	case MSMFB_LPM_ENABLE:
 		ret = copy_from_user(&dsi_mode, argp, sizeof(dsi_mode));
 		if (ret) {

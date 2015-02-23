@@ -53,3 +53,41 @@ config FB_MSM_MDSS_MDP3
 	---help---
 	The MDP3 provides support for an older version display controller
 	included in latest display sub-system, known as MDSS.
+
+config LGE_MIPI_JDI_INCELL_QHD_CMD_PANEL
+	bool "LGE_MIPI_JDI_INCELL_QHD_CMD_PANEL"
+	default n
+
+config LGE_MIPI_LGD_INCELL_QHD_CMD_PANEL
+	bool "LGE_MIPI_LGD_INCELL_QHD_CMD_PANEL"
+	default n
+
+config LGE_Z2_POLED_BORDER
+	bool "MSM8994 Z2 POLED BORDER"
+	depends on ARCH_MSM8994
+	select MACH_LGE
+	---help---
+	Z2 POLED qcom,mdss-dsi-v-top-border = <5> temporal patch
+
+config LGE_DSV_TPS65132
+     bool "TPS65132 Power Management chip"
+     depends on ARCH_MSM8994
+     select MACH_LGE
+     ---help---
+       if you say yes here you get support for the TPS65132 series of Power Management chips.
+
+config LGE_LION_DSV
+     bool "LION_DSV Power Management chip"
+     depends on ARCH_MSM8994
+     select MACH_LGE
+     ---help---
+       if you say yes here you get support for the SM5107 series of Power Management chips.
+
+config LGE_LCD_TUNING
+	bool "Enable sysfs for LCD TUNING"
+	default n
+
+config LGE_VSYNC_SKIP
+     bool "MDSS VSYNC Skip scheme"
+	---help---
+	This feature provides VSYNC skip scheme.

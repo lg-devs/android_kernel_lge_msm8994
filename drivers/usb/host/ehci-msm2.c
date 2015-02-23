@@ -1329,6 +1329,21 @@ static int ehci_msm2_probe(struct platform_device *pdev)
 
 	dev_dbg(&pdev->dev, "ehci_msm2 probe\n");
 
+#ifdef CONFIG_MACH_LGE
+	{
+		struct device_node *node = of_find_node_by_path("/soc/qusb@f9b39000");
+
+		if (node != NULL) {
+			const char *status;
+
+			status = of_get_property(node, "status", NULL);
+			if (status != NULL && !strcmp(status, "disabled")) {
+				return -ENODEV;
+			}
+		}
+	}
+#endif
+
 	/*
 	 * Fail probe in case of uicc till userspace activates driver through
 	 * sysfs entry.

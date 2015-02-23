@@ -295,6 +295,10 @@ static int32_t msm_flash_gpio_init(
 	return rc;
 }
 
+#ifdef CONFIG_LGE_PM
+extern void usbin_suspend_for_flash_led(bool suspend);
+#endif
+
 static int32_t msm_flash_i2c_release(
 	struct msm_flash_ctrl_t *flash_ctrl)
 {
@@ -317,6 +321,9 @@ static int32_t msm_flash_off(struct msm_flash_ctrl_t *flash_ctrl,
 			led_trigger_event(flash_ctrl->torch_trigger[i], 0);
 
 	CDBG("Exit\n");
+#ifdef CONFIG_LGE_PM
+	usbin_suspend_for_flash_led(false);
+#endif
 	return 0;
 }
 
@@ -432,6 +439,9 @@ static int32_t msm_flash_low(
 	int32_t i = 0;
 
 	CDBG("Enter\n");
+#ifdef CONFIG_LGE_PM
+	usbin_suspend_for_flash_led(true);
+#endif
 	/* Turn off flash triggers */
 	for (i = 0; i < flash_ctrl->flash_num_sources; i++)
 		if (flash_ctrl->flash_trigger[i])
@@ -442,7 +452,8 @@ static int32_t msm_flash_low(
 		if (flash_ctrl->torch_trigger[i]) {
 			max_current = flash_ctrl->torch_max_current[i];
 			if (flash_data->flash_current[i] >= 0 &&
-				flash_data->flash_current[i] <
+			    /*                        */
+				flash_data->flash_current[i] <=
 				max_current) {
 				curr = flash_data->flash_current[i];
 			} else {
@@ -468,6 +479,10 @@ static int32_t msm_flash_high(
 	int32_t max_current = 0;
 	int32_t i = 0;
 
+#ifdef CONFIG_LGE_PM
+	usbin_suspend_for_flash_led(true);
+#endif
+
 	/* Turn off torch triggers */
 	for (i = 0; i < flash_ctrl->torch_num_sources; i++)
 		if (flash_ctrl->torch_trigger[i])
@@ -478,7 +493,8 @@ static int32_t msm_flash_high(
 		if (flash_ctrl->flash_trigger[i]) {
 			max_current = flash_ctrl->flash_max_current[i];
 			if (flash_data->flash_current[i] >= 0 &&
-				flash_data->flash_current[i] <
+				/*                        */
+				flash_data->flash_current[i] <=
 				max_current) {
 				curr = flash_data->flash_current[i];
 			} else {
@@ -524,7 +540,15 @@ static int32_t msm_flash_config(struct msm_flash_ctrl_t *flash_ctrl,
 	mutex_lock(flash_ctrl->flash_mutex);
 
 	CDBG("Enter %s type %d\n", __func__, flash_data->cfg_type);
-
+/*                                                                                                    */
+	if (flash_data->cfg_type != CFG_FLASH_INIT
+		&& flash_ctrl->flash_state != MSM_CAMERA_FLASH_INIT) {
+		pr_err("%s:%d flash_state= %d cfg_type= %d, returned!!",__func__, __LINE__, flash_ctrl->flash_state
+			, flash_data->cfg_type);
+		mutex_unlock(flash_ctrl->flash_mutex);
+		return -EFAULT;
+	}
+/*                                                                                                   */
 	switch (flash_data->cfg_type) {
 	case CFG_FLASH_INIT:
 		rc = msm_flash_init(flash_ctrl, flash_data);
@@ -538,6 +562,8 @@ static int32_t msm_flash_config(struct msm_flash_ctrl_t *flash_ctrl,
 			flash_ctrl, flash_data);
 		break;
 	case CFG_FLASH_LOW:
+	/*                             */
+	case CFG_FLASH_TORCH:
 		rc = flash_ctrl->func_tbl->camera_flash_low(
 			flash_ctrl, flash_data);
 		break;

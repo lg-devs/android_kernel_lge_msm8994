@@ -225,4 +225,10 @@ int afe_port_group_set_param(u16 *port_id, int channel_count);
 int afe_port_group_enable(u16 enable);
 int afe_unmap_rtac_block(uint32_t *mem_map_handle);
 int afe_map_rtac_block(struct rtac_cal_block_data *cal_block);
+#ifdef CONFIG_SND_SOC_CS35L32
+int q6afe_set_rtip(int enable);
+#endif /* CONFIG_SND_SOC_CS35L32 */
+#ifdef USE_DSM_LOG
+int32_t dsm_open(int32_t port_id, uint32_t *dsm_params, u8 *param);
+#endif
 #endif /* __Q6AFE_V2_H__ */

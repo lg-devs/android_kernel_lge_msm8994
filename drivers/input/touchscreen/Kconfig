@@ -11,7 +11,7 @@ menuconfig INPUT_TOUCHSCREEN
 
 if INPUT_TOUCHSCREEN
 
-source "drivers/input/touchscreen/synaptics_dsx/Kconfig"
+#source "drivers/input/touchscreen/synaptics_dsx/Kconfig"
 
 config TOUCHSCREEN_88PM860X
 	tristate "Marvell 88PM860x touchscreen"
@@ -1001,12 +1001,20 @@ config TOUCHSCREEN_SYNAPTICS_DSX_FW_UPDATE
 	  To compile this driver as a module, choose M here: the
 	  module will be called synaptics_dsx_fw_update.
 
+config TOUCHSCREEN_SYNAPTICS_FW_PATH
+	string "Synaptics Touchscreen Firmware Path"
+	help
+	TOUCHSCREEN_SYNAPTICS_FW_PATH is set to path of synaptics firmware
+	in firmware/synaptics.
+	ex) TOUCHSCREEN_SYNAPTICS_FW_PATH="z2_kr".
+
 config SECURE_TOUCH
 	bool "Secure Touch"
 	depends on (TOUCHSCREEN_ATMEL_MXT || TOUCHSCREEN_SYNAPTICS_I2C_RMI4 || \
 	  TOUCHSCREEN_SYNAPTICS_DSX_I2C_v21 || TOUCHSCREEN_ATMEL_MAXTOUCH_TS)
 	help
-	  Say Y here to enable Secure Touch in supported drivers.
+	  Say Y here to enable Secure Touch support in the Atmel MXT
+	  driver.
 
 	  If unsure, say N.
 

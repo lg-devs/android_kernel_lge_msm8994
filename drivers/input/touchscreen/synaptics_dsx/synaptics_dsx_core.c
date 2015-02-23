@@ -1092,6 +1092,8 @@ static int synaptics_rmi4_f12_abs_report(struct synaptics_rmi4_data *rmi4_data,
 					finger_status,
 					x, y, wx, wy);
 
+			printk(KERN_ERR "%s: Finger %d status = 0x%02x x = %4d y = %4d wx = %2d wy = %2d \n", __func__, finger, finger_status, x, y, wx, wy);
+
 			touch_count++;
 		} else {
 #ifdef TYPE_B_PROTOCOL

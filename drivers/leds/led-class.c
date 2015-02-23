@@ -275,6 +275,7 @@ static int __init leds_init(void)
 	leds_class->suspend = led_suspend;
 	leds_class->resume = led_resume;
 	leds_class->dev_attrs = led_class_attrs;
+
 	return 0;
 }
 

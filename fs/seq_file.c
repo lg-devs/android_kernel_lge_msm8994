@@ -44,6 +44,14 @@ static void *seq_buf_alloc(unsigned long size)
 	return buf;
 }
 
+static void kvfree(const void *addr)
+{
+    if (is_vmalloc_addr(addr))
+        vfree(addr);
+    else
+        kfree(addr);
+}
+
 /**
  *	seq_open -	initialize sequential file
  *	@file: file we initialize

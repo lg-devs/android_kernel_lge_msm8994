@@ -536,6 +536,10 @@ qpnp_pon_input_dispatch(struct qpnp_pon *pon, u32 pon_type)
 					cfg->key_code, pon_rt_sts);
 	key_status = pon_rt_sts & pon_rt_bit;
 
+#ifdef CONFIG_LGE_PM_DEBUG
+	pr_err("%s: code(%d), value(%d)\n",
+			__func__, cfg->key_code, key_status);
+#endif
 	/* simulate press event in case release event occured
 	 * without a press event
 	 */

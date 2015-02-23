@@ -54,6 +54,18 @@
 #define MDSS_DSI_HW_REV_103		0x10030000	/* 8994    */
 #define MDSS_DSI_HW_REV_103_1		0x10030001	/* 8916/8936 */
 
+#if defined(CONFIG_LGE_MIPI_JDI_INCELL_QHD_CMD_PANEL)
+#define DSV_TPS65132 1
+#define DSV_SM5107 2
+#define DSV_DW8768 3
+
+#define LGE_LDO_19 1
+#define LGE_LDO_25 2
+#define LGE_LDO_NONE 3
+
+#define JDI_FIRST_CUT 1
+#define JDI_SECOND_CUT 2
+#endif
 #define NONE_PANEL "none"
 
 enum {		/* mipi dsi panel */
@@ -189,6 +201,10 @@ extern struct device dsi_dev;
 extern u32 dsi_irq;
 extern struct mdss_dsi_ctrl_pdata *ctrl_list[];
 
+#if defined(CONFIG_LGE_MIPI_JDI_INCELL_QHD_CMD_PANEL)
+extern struct mdss_dsi_ctrl_pdata *lg_ctrl_pdata;
+#endif
+
 struct dsiphy_pll_divider_config {
 	u32 clk_rate;
 	u32 fb_divider;
@@ -298,6 +314,7 @@ struct mdss_dsi_ctrl_pdata {
 	struct dss_io_data ctrl_io;
 	struct dss_io_data mmss_misc_io;
 	struct dss_io_data phy_io;
+    struct work_struct fifo_underflow;
 	int reg_size;
 	u32 bus_clk_cnt;
 	u32 link_clk_cnt;
@@ -332,6 +349,16 @@ struct mdss_dsi_ctrl_pdata {
 	int bklt_max;
 	int new_fps;
 	int pwm_enabled;
+#if defined(CONFIG_LGE_MIPI_JDI_INCELL_QHD_CMD_PANEL)
+	int dsv_ena;
+	int dsv_enb;
+	int dsv_manufacturer;
+	int vdd_ldo;
+	int vddio_en;
+	struct notifier_block   notif;
+
+	bool touch_driver_registered;
+#endif
 	bool dmap_iommu_map;
 	bool panel_bias_vreg;
 	bool dsi_irq_line;
@@ -398,6 +425,7 @@ struct mdss_dsi_ctrl_pdata {
 	int horizontal_idle_cnt;
 	struct panel_horizontal_idle *line_idle;
 	struct mdss_util_intf *mdss_util;
+	u32 reset_low_hold_ms;
 };
 
 struct dsi_status_data {
@@ -414,7 +442,18 @@ int mdss_dsi_cmds_tx(struct mdss_dsi_ctrl_pdata *ctrl,
 
 int mdss_dsi_cmds_rx(struct mdss_dsi_ctrl_pdata *ctrl,
 			struct dsi_cmd_desc *cmds, int rlen);
-
+#if defined(CONFIG_Z2_LGD_POLED_PANEL)
+#define	IMG_TUNE_COUNT	12
+#define PLC_ACTIVATION_THRESHOLD	133
+enum img_tune_plc_status {
+	PLC_UNSET,
+	PLC_SET_DEACTIVATION,
+	PLC_SET_ACTIVATION,
+};
+int mdss_dsi_panel_img_tune_apply(unsigned int screen_mode);
+int mdss_dsi_panel_dimming_dcs(struct mdss_dsi_ctrl_pdata *ctrl, int enable);
+int mdss_dsi_lane_config(struct mdss_panel_data *pdata, int enable);
+#endif
 void mdss_dsi_host_init(struct mdss_panel_data *pdata);
 void mdss_dsi_op_mode_config(int mode,
 				struct mdss_panel_data *pdata);
@@ -455,6 +494,8 @@ void mdss_dsi_cmd_test_pattern(struct mdss_dsi_ctrl_pdata *ctrl);
 void mdss_dsi_video_test_pattern(struct mdss_dsi_ctrl_pdata *ctrl);
 void mdss_dsi_panel_pwm_cfg(struct mdss_dsi_ctrl_pdata *ctrl);
 void mdss_dsi_ctrl_phy_restore(struct mdss_dsi_ctrl_pdata *ctrl);
+void mdss_dsi_phy_sw_reset(struct mdss_dsi_ctrl_pdata *ctrl);
+void mdss_dsi_phy_init(struct mdss_dsi_ctrl_pdata *ctrl);
 void mdss_dsi_ctrl_init(struct device *ctrl_dev,
 			struct mdss_dsi_ctrl_pdata *ctrl);
 void mdss_dsi_cmd_mdp_busy(struct mdss_dsi_ctrl_pdata *ctrl);

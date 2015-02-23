@@ -20,7 +20,7 @@
 #include <linux/slab.h>
 #include <linux/iopoll.h>
 #include <linux/kthread.h>
-
+#include <linux/kernel.h>
 #include <linux/msm_iommu_domains.h>
 
 #include "mdss.h"
@@ -71,6 +71,12 @@ static struct mdss_dsi_event dsi_event;
 
 static int dsi_event_thread(void *data);
 
+static void dsi_fifo_underflow_work_fnc(struct work_struct *work)
+{
+    mdss_xlog_dump();
+    pr_err("DSI FIFO error!\n");
+}
+
 void mdss_dsi_ctrl_init(struct device *ctrl_dev,
 			struct mdss_dsi_ctrl_pdata *ctrl)
 {
@@ -110,6 +116,7 @@ void mdss_dsi_ctrl_init(struct device *ctrl_dev,
 	mdss_dsi_buf_alloc(ctrl_dev, &ctrl->status_buf, SZ_4K);
 	ctrl->cmdlist_commit = mdss_dsi_cmdlist_commit;
 
+    INIT_WORK(&ctrl->fifo_underflow, dsi_fifo_underflow_work_fnc);
 
 	if (dsi_event.inited == 0) {
 		kthread_run(dsi_event_thread, (void *)&dsi_event,
@@ -211,6 +218,131 @@ void mdss_dsi_disable_irq_nosync(struct mdss_dsi_ctrl_pdata *ctrl, u32 term)
 	spin_unlock(&ctrl->irq_lock);
 }
 
+#define DSI_0_PHY_DSIPHY_GLBL_DIGTOP_DEBUG_SEL	0x1D8
+#define DSI_0_PHY_DSIPHY_LN0_DEBUG_SEL		0x18
+#define DSI_0_PHY_DSIPHY_LN1_DEBUG_SEL		0x58
+#define DSI_0_PHY_DSIPHY_LN2_DEBUG_SEL		0x98
+#define DSI_0_PHY_DSIPHY_LN3_DEBUG_SEL		0xD8
+#define DSI_0_PHY_DSIPHY_GLBL_STATUS_DEBUG_BUS0	0x1F0
+#define DSI_0_PHY_DSIPHY_GLBL_STATUS_DEBUG_BUS1	0x1F4
+#define DSI_0_PHY_DSIPHY_GLBL_STATUS_DEBUG_BUS2	0x1F8
+#define DSI_0_PHY_DSIPHY_GLBL_STATUS_DEBUG_BUS3	0x1FC
+
+void mdss_dsi_get_phy_debug_bus_sub(struct mdss_dsi_ctrl_pdata *ctrl,
+	u32 off, char *off_name)
+{
+	u32 x0, x1, x2, x3;
+
+	MIPI_OUTP((ctrl->phy_io.base) + off, 0x19);
+	pr_err("write %s-> 0x19\n", off_name);
+	x0 = MIPI_INP((ctrl->phy_io.base) + DSI_0_PHY_DSIPHY_GLBL_STATUS_DEBUG_BUS0);
+	x1 = MIPI_INP((ctrl->phy_io.base) + DSI_0_PHY_DSIPHY_GLBL_STATUS_DEBUG_BUS1);
+	x2 = MIPI_INP((ctrl->phy_io.base) + DSI_0_PHY_DSIPHY_GLBL_STATUS_DEBUG_BUS2);
+	x3 = MIPI_INP((ctrl->phy_io.base) + DSI_0_PHY_DSIPHY_GLBL_STATUS_DEBUG_BUS3);
+	pr_err("STATUS_DEBUG Bus0  = %08x, Bus1 = %08x, bus2 = %08x, bus3 = %08x\n", x0, x1, x2, x3);
+
+	MIPI_OUTP((ctrl->phy_io.base) + off, 0x1A);
+	pr_err("write %s-> 0x1A\n", off_name);
+	x0 = MIPI_INP((ctrl->phy_io.base) + DSI_0_PHY_DSIPHY_GLBL_STATUS_DEBUG_BUS0);
+	x1 = MIPI_INP((ctrl->phy_io.base) + DSI_0_PHY_DSIPHY_GLBL_STATUS_DEBUG_BUS1);
+	x2 = MIPI_INP((ctrl->phy_io.base) + DSI_0_PHY_DSIPHY_GLBL_STATUS_DEBUG_BUS2);
+	x3 = MIPI_INP((ctrl->phy_io.base) + DSI_0_PHY_DSIPHY_GLBL_STATUS_DEBUG_BUS3);
+	pr_err("STATUS_DEBUG Bus0  = %08x, Bus1 = %08x, bus2 = %08x, bus3 = %08x\n", x0, x1, x2, x3);
+
+	MIPI_OUTP((ctrl->phy_io.base) + off, 0x1B);
+	pr_err("write %s-> 0x1B\n", off_name);
+	x0 = MIPI_INP((ctrl->phy_io.base) + DSI_0_PHY_DSIPHY_GLBL_STATUS_DEBUG_BUS0);
+	x1 = MIPI_INP((ctrl->phy_io.base) + DSI_0_PHY_DSIPHY_GLBL_STATUS_DEBUG_BUS1);
+	x2 = MIPI_INP((ctrl->phy_io.base) + DSI_0_PHY_DSIPHY_GLBL_STATUS_DEBUG_BUS2);
+	x3 = MIPI_INP((ctrl->phy_io.base) + DSI_0_PHY_DSIPHY_GLBL_STATUS_DEBUG_BUS3);
+	pr_err("STATUS_DEBUG Bus0  = %08x, Bus1 = %08x, bus2 = %08x, bus3 = %08x\n", x0, x1, x2, x3);
+
+	MIPI_OUTP((ctrl->phy_io.base) + off, 0x00);
+	pr_err("write %s-> 0x00\n", off_name);
+}
+
+void mdss_dsi_get_phy_debug_bus(struct mdss_dsi_ctrl_pdata *ctrl)
+{
+	if (ctrl == NULL) {
+		pr_err("%s: Invalid input data\n", __func__);
+		return;
+	}
+
+	pr_err("%s: Start+++++\n", __func__);
+
+	MIPI_OUTP((ctrl->phy_io.base) + DSI_0_PHY_DSIPHY_GLBL_DIGTOP_DEBUG_SEL, 0x07);
+	pr_err("write DIGTOP_DEBUG_SEL-> 0x07\n");
+
+	mdss_dsi_get_phy_debug_bus_sub(ctrl, DSI_0_PHY_DSIPHY_LN0_DEBUG_SEL,
+		"DSI_0_PHY_DSIPHY_LN0_DEBUG_SEL");
+
+	mdss_dsi_get_phy_debug_bus_sub(ctrl, DSI_0_PHY_DSIPHY_LN1_DEBUG_SEL,
+		"DSI_0_PHY_DSIPHY_LN1_DEBUG_SEL");
+
+	mdss_dsi_get_phy_debug_bus_sub(ctrl, DSI_0_PHY_DSIPHY_LN2_DEBUG_SEL,
+		"DSI_0_PHY_DSIPHY_LN2_DEBUG_SEL");
+
+	mdss_dsi_get_phy_debug_bus_sub(ctrl, DSI_0_PHY_DSIPHY_LN3_DEBUG_SEL,
+		"DSI_0_PHY_DSIPHY_LN3_DEBUG_SEL");
+
+	pr_err("%s: End----\n", __func__);
+}
+
+#define DSI0_DEBUG_BUS_CTRL	0x0124
+#define DSI0_DEBUG_BUS		0x0128
+
+void mdss_dsi_get_ctrl_debug_bus(struct mdss_dsi_ctrl_pdata *ctrl)
+{
+	int i;
+	u32 x0;
+
+	if (ctrl == NULL) {
+		pr_err("%s: Invalid input data\n", __func__);
+		return;
+	}
+
+	pr_err("%s: Start+++++\n", __func__);
+	for (i = 0; i < 3; i++) {
+		pr_err("Loop -> %d\n", i);
+		MIPI_OUTP((ctrl->ctrl_base) + DSI0_DEBUG_BUS_CTRL, 0xa1);
+		x0 = MIPI_INP(ctrl->ctrl_base + DSI0_DEBUG_BUS);
+		pr_err("write DSI0_DEBUG_BUS_CTRL-> 0xa1, DSI0_DEBUG_BUS = %08x\n", x0);
+
+		MIPI_OUTP((ctrl->ctrl_base) + DSI0_DEBUG_BUS_CTRL, 0xb1);
+		x0 = MIPI_INP(ctrl->ctrl_base + DSI0_DEBUG_BUS);
+		pr_err("write DSI0_DEBUG_BUS_CTRL-> 0xb1, DSI0_DEBUG_BUS = %08x\n", x0);
+
+		MIPI_OUTP((ctrl->ctrl_base) + DSI0_DEBUG_BUS_CTRL, 0xc1);
+		x0 = MIPI_INP(ctrl->ctrl_base + DSI0_DEBUG_BUS);
+		pr_err("write DSI0_DEBUG_BUS_CTRL-> 0xc1, DSI0_DEBUG_BUS = %08x\n", x0);
+
+		MIPI_OUTP((ctrl->ctrl_base) + DSI0_DEBUG_BUS_CTRL, 0xd1);
+		x0 = MIPI_INP(ctrl->ctrl_base + DSI0_DEBUG_BUS);
+		pr_err("write DSI0_DEBUG_BUS_CTRL-> 0xd1, DSI0_DEBUG_BUS = %08x\n", x0);
+
+		MIPI_OUTP((ctrl->ctrl_base) + DSI0_DEBUG_BUS_CTRL, 0xe1);
+		x0 = MIPI_INP(ctrl->ctrl_base + DSI0_DEBUG_BUS);
+		pr_err("write DSI0_DEBUG_BUS_CTRL-> 0xe1, DSI0_DEBUG_BUS = %08x\n", x0);
+
+		MIPI_OUTP((ctrl->ctrl_base) + DSI0_DEBUG_BUS_CTRL, 0xf1);
+		x0 = MIPI_INP(ctrl->ctrl_base + DSI0_DEBUG_BUS);
+		pr_err("write DSI0_DEBUG_BUS_CTRL-> 0xf1, DSI0_DEBUG_BUS = %08x\n", x0);
+
+		MIPI_OUTP((ctrl->ctrl_base) + DSI0_DEBUG_BUS_CTRL, 0x1c1);
+		x0 = MIPI_INP(ctrl->ctrl_base + DSI0_DEBUG_BUS);
+		pr_err("write DSI0_DEBUG_BUS_CTRL-> 0x1c1, DSI0_DEBUG_BUS = %08x\n", x0);
+
+		MIPI_OUTP((ctrl->ctrl_base) + DSI0_DEBUG_BUS_CTRL, 0x1d1);
+		x0 = MIPI_INP(ctrl->ctrl_base + DSI0_DEBUG_BUS);
+		pr_err("write DSI0_DEBUG_BUS_CTRL-> 0x1d1, DSI0_DEBUG_BUS = %08x\n", x0);
+
+		MIPI_OUTP((ctrl->ctrl_base) + DSI0_DEBUG_BUS_CTRL, 0x1e1);
+		x0 = MIPI_INP(ctrl->ctrl_base + DSI0_DEBUG_BUS);
+		pr_err("write DSI0_DEBUG_BUS_CTRL-> 0x1e1, DSI0_DEBUG_BUS = %08x\n", x0);
+	}
+	pr_err("%s: End------\n", __func__);
+}
+
 void mdss_dsi_video_test_pattern(struct mdss_dsi_ctrl_pdata *ctrl)
 {
 	int i;
@@ -224,6 +356,21 @@ void mdss_dsi_video_test_pattern(struct mdss_dsi_ctrl_pdata *ctrl)
 		msleep(20);
 	}
 	MIPI_OUTP((ctrl->ctrl_base) + 0x015c, 0x0);
+}
+
+void dsidumpreg(struct mdss_dsi_ctrl_pdata *ctrl){
+    u32 tmp0x0,tmp0x4, tmp0x8, tmp0xC;
+    int i;
+
+    pr_info("%s: ============= DSI DUMP ==============\n", __func__);
+    for(i=0; i< 122; i++){ //0x558/16 = 85
+        tmp0x0 = MIPI_INP(ctrl->ctrl_base + (i*16)+0x0);
+        tmp0x4 = MIPI_INP(ctrl->ctrl_base +(i*16)+0x4);
+        tmp0x8 = MIPI_INP(ctrl->ctrl_base +(i*16)+0x8);
+        tmp0xC = MIPI_INP(ctrl->ctrl_base +(i*16)+0xC);
+        pr_info("[DSI0 offset : %04x] : %08x  %08x  %08x  %08x\n",(u32)i*16, tmp0x0,tmp0x4, tmp0x8, tmp0xC);
+    }
+    pr_info("%s: ============= END ==============\n", __func__);
 }
 
 void mdss_dsi_cmd_test_pattern(struct mdss_dsi_ctrl_pdata *ctrl)
@@ -797,6 +944,9 @@ void mdss_dsi_op_mode_config(int mode,
 {
 	u32 dsi_ctrl, intr_ctrl, dma_ctrl;
 	struct mdss_dsi_ctrl_pdata *ctrl_pdata = NULL;
+#if defined(CONFIG_LGE_MIPI_JDI_INCELL_QHD_CMD_PANEL)
+	struct mdss_panel_info *pinfo = NULL;
+#endif
 
 	if (pdata == NULL) {
 		pr_err("%s: Invalid input data\n", __func__);
@@ -805,6 +955,10 @@ void mdss_dsi_op_mode_config(int mode,
 
 	ctrl_pdata = container_of(pdata, struct mdss_dsi_ctrl_pdata,
 				panel_data);
+
+#if defined(CONFIG_LGE_MIPI_JDI_INCELL_QHD_CMD_PANEL)
+	pinfo = &(ctrl_pdata->panel_data.panel_info);
+#endif
 
 	dsi_ctrl = MIPI_INP((ctrl_pdata->ctrl_base) + 0x0004);
 	/*If Video enabled, Keep Video and Cmd mode ON */
@@ -826,7 +980,18 @@ void mdss_dsi_op_mode_config(int mode,
 			DSI_INTR_CMD_MDP_DONE_MASK | DSI_INTR_BTA_DONE_MASK;
 	}
 
-	dma_ctrl = BIT(28) | BIT(26);	/* embedded mode & LP mode */
+#if defined(CONFIG_LGE_MIPI_JDI_INCELL_QHD_CMD_PANEL)
+	if(pinfo->panel_type == JDI_INCELL_CMD_PANEL) {
+		dma_ctrl = BIT(28);
+	} else if(pinfo->panel_type == LGD_INCELL_CMD_PANEL) {
+		dma_ctrl = BIT(28) | BIT(26); /* embedded mode & LP mode */
+	} else {
+		pr_err("%s: Invalid panel type\n", __func__);
+	}
+#else
+	dma_ctrl = BIT(28) | BIT(26); /* embedded mode & LP mode */
+#endif
+
 	if (mdss_dsi_sync_wait_enable(ctrl_pdata))
 		dma_ctrl |= BIT(31);
 
@@ -975,6 +1140,7 @@ static void mdss_dsi_mode_setup(struct mdss_panel_data *pdata)
 
 	mipi = &pdata->panel_info.mipi;
 	if (pdata->panel_info.type == MIPI_VIDEO_PANEL) {
+		// Enable DSI TIMING register double buffering
 		if (ctrl_pdata->timing_db_mode)
 			MIPI_OUTP((ctrl_pdata->ctrl_base) + 0x1e8, 0x1);
 		MIPI_OUTP((ctrl_pdata->ctrl_base) + 0x24,
@@ -990,6 +1156,7 @@ static void mdss_dsi_mode_setup(struct mdss_panel_data *pdata)
 		MIPI_OUTP((ctrl_pdata->ctrl_base) + 0x30, (hspw << 16));
 		MIPI_OUTP((ctrl_pdata->ctrl_base) + 0x34, 0);
 		MIPI_OUTP((ctrl_pdata->ctrl_base) + 0x38, (vspw << 16));
+		// Flush DSI TIMING registers
 		if (ctrl_pdata->timing_db_mode)
 			MIPI_OUTP((ctrl_pdata->ctrl_base) + 0x1e4, 0x1);
 	} else {		/* command mode */
@@ -2119,6 +2286,11 @@ void mdss_dsi_fifo_status(struct mdss_dsi_ctrl_pdata *ctrl)
 	if (status & 0xcccc4489) {
 		MIPI_OUTP(base + 0x000c, status);
 		pr_err("%s: status=%x\n", __func__, status);
+        dsidumpreg(ctrl);
+        mdss_dsi_get_phy_debug_bus(ctrl);
+        mdss_dsi_get_ctrl_debug_bus(ctrl);
+
+        schedule_work(&ctrl->fifo_underflow);
 		if (status & 0x44440000) {/* DLNx_HS_FIFO_OVERFLOW */
 			dsi_send_events(ctrl, DSI_EV_DLNx_FIFO_OVERFLOW);
 			/* Ignore FIFO EMPTY when overflow happens */

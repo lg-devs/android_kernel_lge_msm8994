@@ -23,6 +23,9 @@
 #include "mdss_panel.h"
 #include "mdss_debug.h"
 #include "mdss_mdp_trace.h"
+#ifdef CONFIG_MACH_LGE
+#include <soc/qcom/lge/board_lge.h>
+#endif
 
 /* wait for at least 2 vsyncs for lowest refresh rate (24hz) */
 #define VSYNC_TIMEOUT_US 100000
@@ -289,6 +292,15 @@ static int mdss_mdp_video_timegen_setup(struct mdss_mdp_ctl *ctl,
 		       (vsync_polarity << 1) | /* VSYNC Polarity */
 		       (hsync_polarity << 0);  /* HSYNC Polarity */
 
+#ifdef CONFIG_SLIMPORT_COMMON
+	if (lge_get_boot_mode() == LGE_BOOT_MODE_QEM_130K) {
+		if (MDSS_INTF_HDMI == ctx->intf_type) {
+			pr_info("[minios] Enable HDMI Grayscale Ramp pattern");
+			mdp_video_write(ctx, MDSS_MDP_REG_INTF_TPG_ENABLE, 0x1);
+			mdp_video_write(ctx, MDSS_MDP_REG_INTF_TPG_MAIN_CONTROL, 0x40);
+		}
+	}
+#endif
 	mdp_video_write(ctx, MDSS_MDP_REG_INTF_HSYNC_CTL, hsync_ctl);
 	mdp_video_write(ctx, MDSS_MDP_REG_INTF_VSYNC_PERIOD_F0,
 			vsync_period * hsync_period);
@@ -689,13 +701,57 @@ static int mdss_mdp_video_hfp_fps_update(struct mdss_mdp_video_ctx *ctx,
 	hsync_period = mdss_panel_get_htotal(&pdata->panel_info, true);
 	curr_fps = mdss_panel_get_framerate(&pdata->panel_info);
 
+	pr_err("curr_fps:%d, cur_hfp:%d \n", curr_fps, pdata->panel_info.lcdc.h_front_porch);
+
 	diff = curr_fps - new_fps;
 	add_h_pixels = mult_frac(hsync_period, diff, new_fps);
 	pdata->panel_info.lcdc.h_front_porch += add_h_pixels;
 
+	pr_err("new_fps:%d, new_hfp:%d \n", new_fps, pdata->panel_info.lcdc.h_front_porch);
+
 	mdss_mdp_video_timegen_update(ctx, &pdata->panel_info);
 	return 0;
 }
+
+#if defined (CONFIG_LGE_DYNAMIC_FPS_LUT)
+static int mdss_mdp_video_lut_fps_update(struct mdss_mdp_video_ctx *ctx,
+		struct mdss_panel_data *pdata, int new_fps)
+{
+	int i;
+	int curr_fps;
+	int lut_fps;
+
+	curr_fps = mdss_panel_get_framerate(&pdata->panel_info);
+
+	for (i = 0; i < pdata->panel_info.dfps_lut_size; i++) {
+		lut_fps = i * 7;
+		if(pdata->panel_info.dfps_lut[lut_fps++] == new_fps) {
+			pdata->panel_info.lcdc.h_back_porch = pdata->panel_info.dfps_lut[lut_fps++];
+			pdata->panel_info.lcdc.h_pulse_width = pdata->panel_info.dfps_lut[lut_fps++];
+			pdata->panel_info.lcdc.h_front_porch = pdata->panel_info.dfps_lut[lut_fps++];
+			pdata->panel_info.lcdc.v_back_porch = pdata->panel_info.dfps_lut[lut_fps++];
+			pdata->panel_info.lcdc.v_pulse_width = pdata->panel_info.dfps_lut[lut_fps++];
+			pdata->panel_info.lcdc.v_front_porch = pdata->panel_info.dfps_lut[lut_fps++];
+
+			mdss_mdp_video_timegen_update(ctx, &pdata->panel_info);
+
+			pr_err("curr_fps:%d --> new_fps:%d\n",curr_fps, new_fps);
+			pr_debug("hbp:%d, hsa:%d, hfp:%d, vbp:%d, vsa:%d, vfp:%d\n",
+					pdata->panel_info.lcdc.h_back_porch,
+					pdata->panel_info.lcdc.h_pulse_width,
+					pdata->panel_info.lcdc.h_front_porch,
+					pdata->panel_info.lcdc.v_back_porch,
+					pdata->panel_info.lcdc.v_pulse_width,
+					pdata->panel_info.lcdc.v_front_porch
+					);
+			return 0;
+		}
+	}
+
+	pr_err("not supported fps value : %dFPS\n", new_fps);
+	return -EINVAL;
+}
+#endif
 
 static int mdss_mdp_video_vfp_fps_update(struct mdss_mdp_video_ctx *ctx,
 				 struct mdss_panel_data *pdata, int new_fps)
@@ -729,7 +785,7 @@ static int mdss_mdp_video_vfp_fps_update(struct mdss_mdp_video_ctx *ctx,
 			new_vsync_period_f0 | 0x800000);
 		mdp_video_write(ctx, MDSS_MDP_REG_INTF_VSYNC_PERIOD_F0,
 			new_vsync_period_f0 & 0x7fffff);
-	}
+    }
 
 	return 0;
 }
@@ -742,6 +798,11 @@ static int mdss_mdp_video_fps_update(struct mdss_mdp_video_ctx *ctx,
 	if (pdata->panel_info.dfps_update ==
 				DFPS_IMMEDIATE_PORCH_UPDATE_MODE_HFP)
 		rc = mdss_mdp_video_hfp_fps_update(ctx, pdata, new_fps);
+#if defined (CONFIG_LGE_DYNAMIC_FPS_LUT)
+	else if (pdata->panel_info.dfps_update ==
+				DFPS_IMMEDIATE_PORCH_UPDATE_MODE_LUT)
+		rc = mdss_mdp_video_lut_fps_update(ctx, pdata, new_fps);
+#endif
 	else
 		rc = mdss_mdp_video_vfp_fps_update(ctx, pdata, new_fps);
 
@@ -883,11 +944,21 @@ static int mdss_mdp_video_config_fps(struct mdss_mdp_ctl *ctl,
 					(void *) (unsigned long) new_fps);
 			WARN(rc, "intf %d panel fps update error (%d)\n",
 							ctl->intf_num, rc);
+#if defined (CONFIG_LGE_DYNAMIC_FPS_LUT)
+		} else if (pdata->panel_info.dfps_update
+				== DFPS_IMMEDIATE_PORCH_UPDATE_MODE_VFP ||
+				pdata->panel_info.dfps_update
+				== DFPS_IMMEDIATE_PORCH_UPDATE_MODE_HFP ||
+				pdata->panel_info.dfps_update
+				== DFPS_IMMEDIATE_PORCH_UPDATE_MODE_LUT) {
+#else
 		} else if (pdata->panel_info.dfps_update
 				== DFPS_IMMEDIATE_PORCH_UPDATE_MODE_VFP ||
 				pdata->panel_info.dfps_update
 				== DFPS_IMMEDIATE_PORCH_UPDATE_MODE_HFP) {
+#endif
 			unsigned long flags;
+
 			if (!ctx->timegen_en) {
 				pr_err("TG is OFF. DFPS mode invalid\n");
 				return -EINVAL;

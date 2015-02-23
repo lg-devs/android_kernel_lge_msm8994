@@ -22,8 +22,15 @@
 #include <linux/usb/otg.h>
 #include "power.h"
 
+#ifdef CONFIG_LGE_PM_USB_ID
+#include <soc/qcom/lge/board_lge.h>
+#endif
+
 #define DWC3_IDEV_CHG_MAX 1500
 
+#ifdef CONFIG_LGE_PM_USB_ID
+#define DWC3_USB30_CHG_CURRENT 900
+#endif
 struct dwc3_charger;
 
 /**
@@ -89,6 +96,14 @@ struct dwc3_charger {
 	/* to notify OTG about charger detection completion, provided by OTG */
 	void	(*notify_detection_complete)(struct usb_otg *otg,
 						struct dwc3_charger *charger);
+
+#ifdef CONFIG_MAXIM_EVP
+	void	(*notify_evp_sts)(struct dwc3_charger *charger, unsigned evp_sts);
+#endif
+#ifdef CONFIG_LGE_PM_USB_ID
+	void    (*read_cable_adc)(struct dwc3_charger *charger, bool start);
+	bool    adc_read_complete;
+#endif
 };
 
 /* for external charger driver */
@@ -98,6 +113,9 @@ enum dwc3_ext_events {
 	DWC3_EVENT_NONE = 0,		/* no change event */
 	DWC3_EVENT_PHY_RESUME,		/* PHY has come out of LPM */
 	DWC3_EVENT_XCEIV_STATE,		/* XCEIV state (id/bsv) has changed */
+#ifdef CONFIG_MAXIM_EVP
+	DWC3_EVENT_EVP_DETECT,		/* EVP detection start event */
+#endif
 };
 
 enum dwc3_id_state {
@@ -117,6 +135,9 @@ struct dwc3_ext_xceiv {
 	/* for block reset USB core */
 	void	(*ext_block_reset)(struct dwc3_ext_xceiv *ext_xceiv,
 					bool core_reset);
+#ifdef CONFIG_MAXIM_EVP
+	bool			evp_detect;
+#endif
 };
 
 /* for external transceiver driver */

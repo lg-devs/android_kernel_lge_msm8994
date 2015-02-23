@@ -32,6 +32,10 @@
 #include <soc/qcom/restart.h>
 #include <soc/qcom/watchdog.h>
 
+#ifdef CONFIG_LGE_HANDLE_PANIC
+#include <soc/qcom/lge/lge_handle_panic.h>
+#endif
+
 #define EMERGENCY_DLOAD_MAGIC1    0x322A4F99
 #define EMERGENCY_DLOAD_MAGIC2    0xC67E4350
 #define EMERGENCY_DLOAD_MAGIC3    0x77777777
@@ -116,6 +120,7 @@ static bool get_dload_mode(void)
 	return dload_mode_enabled;
 }
 
+#ifndef CONFIG_LGE_HANDLE_PANIC
 static void enable_emergency_dload_mode(void)
 {
 	int ret;
@@ -140,6 +145,7 @@ static void enable_emergency_dload_mode(void)
 	if (ret)
 		pr_err("Failed to set secure EDLOAD mode: %d\n", ret);
 }
+#endif
 
 static int dload_set(const char *val, struct kernel_param *kp)
 {
@@ -219,18 +225,40 @@ static void msm_restart_prepare(const char *cmd)
 #endif
 
 	/* Hard reset the PMIC unless memory contents must be maintained. */
-	if (get_dload_mode() || (cmd != NULL && cmd[0] != '\0'))
+#if defined(CONFIG_MACH_LGE)
+	/*                                                                          */
+	if (cmd != NULL && !strncmp(cmd, "oem-90466252", 12)) {
+		pr_info("%s: PON_POWER_OFF_HARD_RESET\n", __func__);
+		qpnp_pon_system_pwr_off(PON_POWER_OFF_HARD_RESET);
+	} else if (true || get_dload_mode() || (cmd != NULL && cmd[0] != '\0') || (restart_mode == RESTART_DLOAD)) {
+		pr_info("%s: PON_POWER_OFF_WARM_RESET\n", __func__);
+		qpnp_pon_system_pwr_off(PON_POWER_OFF_WARM_RESET);
+	} else {
+		pr_info("%s: PON_POWER_OFF_HARD_RESET\n", __func__);
+		qpnp_pon_system_pwr_off(PON_POWER_OFF_HARD_RESET);
+	}
+#else
+	if (get_dload_mode() || (cmd != NULL && cmd[0] != '\0') || (restart_mode == RESTART_DLOAD))
 		qpnp_pon_system_pwr_off(PON_POWER_OFF_WARM_RESET);
 	else
 		qpnp_pon_system_pwr_off(PON_POWER_OFF_HARD_RESET);
+#endif
 
 	if (cmd != NULL) {
 		if (!strncmp(cmd, "bootloader", 10)) {
 			__raw_writel(0x77665500, restart_reason);
 		} else if (!strncmp(cmd, "recovery", 8)) {
 			__raw_writel(0x77665502, restart_reason);
+		} else if (!strncmp(cmd, "fota", 4)) {
+			__raw_writel(0x77665566, restart_reason);
 		} else if (!strcmp(cmd, "rtc")) {
 			__raw_writel(0x77665503, restart_reason);
+#ifdef CONFIG_LGE_LCD_OFF_DIMMING
+		} else if (!strncmp(cmd, "FOTA LCD off", 12)) {
+			__raw_writel(0x77665560, restart_reason);
+		} else if (!strncmp(cmd, "FOTA OUT LCD off", 16)) {
+			__raw_writel(0x77665561, restart_reason);
+#endif
 		} else if (!strncmp(cmd, "oem-", 4)) {
 			unsigned long code;
 			int ret;
@@ -238,12 +266,24 @@ static void msm_restart_prepare(const char *cmd)
 			if (!ret)
 				__raw_writel(0x6f656d00 | (code & 0xff),
 					     restart_reason);
+#ifndef CONFIG_LGE_HANDLE_PANIC
 		} else if (!strncmp(cmd, "edl", 3)) {
 			enable_emergency_dload_mode();
+#endif
 		} else {
 			__raw_writel(0x77665501, restart_reason);
 		}
 	}
+
+#ifdef CONFIG_LGE_HANDLE_PANIC
+	if (restart_mode == RESTART_DLOAD) {
+		set_dload_mode(0);
+		lge_set_restart_reason(LAF_DLOAD_MODE);
+	}
+
+	if (in_panic)
+		lge_set_panic_reason();
+#endif
 
 	flush_cache_all();
 

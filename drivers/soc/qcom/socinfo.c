@@ -513,6 +513,18 @@ static struct socinfo_v1 dummy_socinfo = {
 	.version = 1,
 };
 
+#ifdef CONFIG_LGE_PM
+u16 *poweron_st = 0;
+uint16_t power_on_status_info_get(void)
+{
+	poweron_st = smem_alloc(SMEM_POWER_ON_STATUS_INFO,
+			sizeof(poweron_st), 0, 0);
+
+	if (poweron_st == NULL) return 0;
+	return *poweron_st;
+}
+#endif
+
 uint32_t socinfo_get_id(void)
 {
 	return (socinfo) ? socinfo->v1.id : 0;

@@ -1223,7 +1223,10 @@ static void msm_ispif_release(struct ispif_device *ispif)
 	}
 
 	/* make sure no streaming going on */
-	msm_ispif_reset(ispif);
+	if (ispif->fs_vfe && regulator_is_enabled(ispif->fs_vfe))	//                                         
+		msm_ispif_reset(ispif);
+	else
+		pr_err("%s: failed to reset. fs_vfe is NULL \n", __func__);
 
 	msm_ispif_clk_ahb_enable(ispif, 0);
 
@@ -1430,6 +1433,12 @@ static int ispif_probe(struct platform_device *pdev)
 		if (!ispif->clk_mux_io)
 			pr_err("%s: no valid csi_mux region\n", __func__);
 	}
+
+	//                                         
+        ispif->fs_vfe = regulator_get(&pdev->dev, "vdd_vfe");
+
+	if (ispif->fs_vfe == NULL)
+		pr_err("%s: gdsc_vfe is null\n", __func__);
 
 	v4l2_subdev_init(&ispif->msm_sd.sd, &msm_ispif_subdev_ops);
 	ispif->msm_sd.sd.internal_ops = &msm_ispif_internal_ops;

@@ -980,8 +980,11 @@ static int gs_write(struct tty_struct *tty, const unsigned char *buf, int count)
 	unsigned long	flags;
 	int		status;
 
+#ifdef CONFIG_USB_G_LGE_ANDROID
 	if (!port)
 		return 0;
+#endif
+
 	pr_vdebug("gs_write: ttyGS%d (%p) writing %d bytes\n",
 			port->port_num, tty, count);
 
@@ -1002,8 +1005,11 @@ static int gs_put_char(struct tty_struct *tty, unsigned char ch)
 	unsigned long	flags;
 	int		status;
 
+#ifdef CONFIG_USB_G_LGE_ANDROID
 	if (!port)
 		return 0;
+#endif
+
 	pr_vdebug("gs_put_char: (%d,%p) char=0x%x, called from %pf\n",
 		port->port_num, tty, ch, __builtin_return_address(0));
 
@@ -1019,8 +1025,11 @@ static void gs_flush_chars(struct tty_struct *tty)
 	struct gs_port	*port = tty->driver_data;
 	unsigned long	flags;
 
+#ifdef CONFIG_USB_G_LGE_ANDROID
 	if (!port)
 		return;
+#endif
+
 	pr_vdebug("gs_flush_chars: (%d,%p)\n", port->port_num, tty);
 
 	spin_lock_irqsave(&port->port_lock, flags);
@@ -1035,8 +1044,11 @@ static int gs_write_room(struct tty_struct *tty)
 	unsigned long	flags;
 	int		room = 0;
 
+#ifdef CONFIG_USB_G_LGE_ANDROID
 	if (!port)
 		return 0;
+#endif
+
 	spin_lock_irqsave(&port->port_lock, flags);
 	if (port->port_usb)
 		room = gs_buf_space_avail(&port->port_write_buf);
@@ -1054,8 +1066,11 @@ static int gs_chars_in_buffer(struct tty_struct *tty)
 	unsigned long	flags;
 	int		chars = 0;
 
+#ifdef CONFIG_USB_G_LGE_ANDROID
 	if (!port)
 		return 0;
+#endif
+
 	spin_lock_irqsave(&port->port_lock, flags);
 	chars = gs_buf_data_avail(&port->port_write_buf);
 	spin_unlock_irqrestore(&port->port_lock, flags);
@@ -1097,8 +1112,11 @@ static int gs_break_ctl(struct tty_struct *tty, int duration)
 	int		status = 0;
 	struct gserial	*gser;
 
+#ifdef CONFIG_USB_G_LGE_ANDROID
 	if (!port)
 		return 0;
+#endif
+
 	pr_vdebug("gs_break_ctl: ttyGS%d, send break (%d)\n",
 			port->port_num, duration);
 
@@ -1117,8 +1135,11 @@ static int gs_tiocmget(struct tty_struct *tty)
 	struct gserial	*gser;
 	unsigned int result = 0;
 
+#ifdef CONFIG_USB_G_LGE_ANDROID
 	if (!port)
 		return -ENODEV;
+#endif
+
 	spin_lock_irq(&port->port_lock);
 	gser = port->port_usb;
 	if (!gser) {
@@ -1149,8 +1170,11 @@ static int gs_tiocmset(struct tty_struct *tty,
 	struct gserial *gser;
 	int	status = 0;
 
+#ifdef CONFIG_USB_G_LGE_ANDROID
 	if (!port)
 		return -ENODEV;
+#endif
+
 	spin_lock_irq(&port->port_lock);
 	gser = port->port_usb;
 	if (!gser) {

@@ -269,7 +269,7 @@
 
 		secure_mem: secure_region@0 {
 			linux,reserve-contiguous-region;
-			reg = <0 0 0 0x12c00000>;
+			reg = <0 0 0 0xB400000>;
 			label = "secure_mem";
 		};
 
@@ -311,7 +311,8 @@
 			linux,reserve-contiguous-region;
 			linux,reserve-region;
 			linux,remove-completely;
-			reg = <0 0x0c800000 0 0x1f00000>;
+			#reg = <0 0x0c800000 0 0x1f00000>;
+			reg = <0 0x0d000000 0 0x1f00000>;
 			label = "peripheral_mem";
 		};
 
@@ -319,7 +320,8 @@
 			linux,reserve-contiguous-region;
 			linux,reserve-region;
 			linux,remove-completely;
-			reg = <0 0x07000000 0 0x5800000>;
+			#reg = <0 0x07000000 0 0x5800000>;
+			reg = <0 0x07000000 0 0x6000000>;
 			label = "modem_mem";
 		};
 	};
@@ -575,18 +577,14 @@
 			<0xf9944000 0x19000>;
 		status = "disabled";
 		reg-names = "core_mem", "bam_mem";
-		interrupt-names = "core_irq", "bam_irq", "wakeup_irq";
+		interrupt-names = "core_irq", "bam_irq";
 		#address-cells = <0>;
 		interrupt-parent = <&blsp2_uart2>;
-		interrupts = <0 1 2>;
+		interrupts = <0 1>;
 		#interrupt-cells = <1>;
 		interrupt-map-mask = <0xffffffff>;
 		interrupt-map = <0 &intc 0 114 0
-				1 &intc 0 239 0
-				2 &msm_gpio 46 0>;
-
-		qcom,inject-rx-on-wakeup;
-		qcom,rx-char-to-inject = <0xFD>;
+                 1 &intc 0 239 0>;
 
 		qcom,bam-tx-ep-pipe-index = <2>;
 		qcom,bam-rx-ep-pipe-index = <3>;
@@ -604,6 +602,7 @@
 		qcom,msm-bus,vectors-KBps =
 				<84 512 0 0>,
 				<84 512 500 800>;
+				qcom,msm-obs;
 	};
 
 	qcom,sps@f9984000 {
@@ -915,7 +914,7 @@
 		reg = <0xf9017000 0x1000>;
 		reg-names = "wdt-base";
 		interrupts = <0 3 0>, <0 4 0>;
-		qcom,bark-time = <11000>;
+		qcom,bark-time = <16000>;
 		qcom,pet-time = <10000>;
 		qcom,ipi-ping;
 	};
@@ -1163,9 +1162,9 @@
 		clock-names = "iface_clk", "core_clk";
 		clocks = <&clock_gcc clk_gcc_sdcc3_ahb_clk>,
 			 <&clock_gcc clk_gcc_sdcc3_apps_clk>;
-
+		qcom,clk-rates = <400000 20000000 25000000 50000000 100000000 200000000>;
 		qcom,bus-width = <4>;
-		qcom,cpu-dma-latency-us = <301>;
+		qcom,cpu-dma-latency-us = <200>;
 		qcom,cpu-affinity = "affine_cores";
 
 		qcom,msm-bus,name = "sdhc3";
@@ -1667,6 +1666,8 @@
 		qcom,hsusb-otg-phy-init-seq = <0x63 0x81 0xffffffff>;
 		qcom,hsusb-otg-mode = <1>;
 		qcom,hsusb-otg-otg-control = <1>;
+		qcom,pm8994-vadc = <&pm8994_vadc>;
+		qcom,pmi8994-vadc = <&pmi8994_vadc>;
 	};
 
 	usb_ehci: ehci@f9a55000 {
@@ -2371,7 +2372,7 @@
 		qcom,bam-pipe-idx-prod = <11>;
 		qcom,master-id = <86>;
 
-		status = "disabled";
+		/*status = "disabled";*/
 	};
 
 	i2c_2: i2c@f9924000 { /* BLSP1 QUP2 */
@@ -2512,7 +2513,7 @@
 				"msm-compress-dsp", "msm-pcm-hostless", "msm-pcm-afe",
 				"msm-lsm-client", "msm-pcm-routing", "msm-cpe-lsm",
 				"msm-compr-dsp";
-		asoc-cpu = <&dai_pri_auxpcm>, <&dai_sec_auxpcm>, <&dai_hdmi>, <&dai_mi2s>,
+		asoc-cpu = <&dai_pri_auxpcm>, <&dai_sec_auxpcm>, <&dai_hdmi>, <&dai_mi2s>, <&dai_mi2s_quat>,
 				<&sb_0_rx>, <&sb_0_tx>, <&sb_1_rx>, <&sb_1_tx>,
 				<&sb_2_rx>, <&sb_2_tx>, <&sb_3_rx>, <&sb_3_tx>,
 				<&sb_4_rx>, <&sb_4_tx>, <&sb_5_tx>, <&bt_sco_rx>,
@@ -2521,7 +2522,7 @@
 				<&incall_record_rx>, <&incall_record_tx>, <&incall_music_rx>,
 				<&incall_music2_rx>;
 		asoc-cpu-names = "msm-dai-q6-auxpcm.1", "msm-dai-q6-auxpcm.2",
-				"msm-dai-q6-hdmi.8", "msm-dai-q6-mi2s.0",
+				"msm-dai-q6-hdmi.8", "msm-dai-q6-mi2s.0", "msm-dai-q6-mi2s.3",
 				"msm-dai-q6-dev.16384", "msm-dai-q6-dev.16385",
 				"msm-dai-q6-dev.16386", "msm-dai-q6-dev.16387",
 				"msm-dai-q6-dev.16388", "msm-dai-q6-dev.16389",
@@ -2773,6 +2774,12 @@
 		dai_mi2s: qcom,msm-dai-q6-mi2s-prim {
 			compatible = "qcom,msm-dai-q6-mi2s";
 			qcom,msm-dai-q6-mi2s-dev-id = <0>;
+			qcom,msm-mi2s-rx-lines = <2>;
+			qcom,msm-mi2s-tx-lines = <1>;
+		};
+		dai_mi2s_quat: qcom,msm-dai-q6-mi2s-quat {
+			compatible = "qcom,msm-dai-q6-mi2s";
+			qcom,msm-dai-q6-mi2s-dev-id = <3>;
 			qcom,msm-mi2s-rx-lines = <2>;
 			qcom,msm-mi2s-tx-lines = <1>;
 		};
@@ -3148,16 +3155,18 @@
 		qcom,bcl-enable;
 		qcom,bcl-framework-interface;
 		qcom,bcl-hotplug-list = <&CPU6 &CPU7>;
+		qcom,bcl-soc-hotplug-list = <&CPU4 &CPU5 &CPU6 &CPU7>;
 		qcom,ibat-monitor {
 			qcom,low-threshold-uamp = <2000000>;
 			qcom,high-threshold-uamp = <3500000>;
 			qcom,mitigation-freq-khz = <768000>;
-			qcom,vph-high-threshold-uv = <3700000>;
-			qcom,vph-low-threshold-uv = <3600000>;
+			qcom,vph-high-threshold-uv = <3500000>;
+			qcom,vph-low-threshold-uv = <3300000>;
+			qcom,soc-low-threshold = <10>;
 			qcom,thermal-handle = <&msm_thermal_freq>;
 		};
 	};
-
+#if 0
 	cnss: qcom,cnss@06300000 {
 		compatible = "qcom,cnss";
 		reg = <0x06300000 0x200000>;
@@ -3181,6 +3190,7 @@
 					<100 512 25000 200000>,  /* 200 Mbps */
 					<100 512 100000 200000>; /* 800 Mbps */
 	};
+#endif
 
 	audio_heap {
 		compatible = "qcom,msm-shared-memory";

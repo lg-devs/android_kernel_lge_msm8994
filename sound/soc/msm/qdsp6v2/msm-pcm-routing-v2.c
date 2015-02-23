@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2014, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-2015, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -89,6 +89,14 @@ static const char * const mad_audio_mux_text[] = {
 	SLIMBUS_3_TX_TEXT, SLIMBUS_4_TX_TEXT, SLIMBUS_5_TX_TEXT,
 	TERT_MI2S_TX_TEXT
 };
+
+#ifdef CONFIG_SND_USE_QUAT_MI2S
+#define INT_RX_VOL_MAX_STEPS 0x2000
+#define INT_RX_VOL_GAIN 0x2000
+static int msm_route_afe_quat_mi2s_vol_control= 0x2000;
+static const DECLARE_TLV_DB_LINEAR(afe_mi2s_vol_gain, 0,
+	INT_RX_VOL_MAX_STEPS);
+#endif
 
 struct msm_pcm_route_bdai_pp_params {
 	u16 port_id; /* AFE port ID */
@@ -261,6 +269,8 @@ struct msm_pcm_routing_bdai_data msm_bedais[MSM_BACKEND_DAI_MAX] = {
 	{ SLIMBUS_6_RX, 0, 0, 0, 0, 0, 0, 0, LPASS_BE_SLIMBUS_6_RX},
 	{ SLIMBUS_6_TX, 0, 0, 0, 0, 0, 0, 0, LPASS_BE_SLIMBUS_6_TX},
 	{ AFE_PORT_ID_SPDIF_RX, 0, 0, 0, 0, 0, 0, 0, LPASS_BE_SPDIF_RX},
+	{ AFE_PORT_ID_SECONDARY_MI2S_RX_SD1, 0, 0, 0, 0, 0, 0, 0,
+	  LPASS_BE_SEC_MI2S_RX_SD1},
 };
 
 
@@ -327,7 +337,7 @@ static struct msm_pcm_stream_app_type_cfg
 void msm_pcm_routing_get_bedai_info(int be_idx,
 				    struct msm_pcm_routing_bdai_data *be_dai)
 {
-	if (be_idx > 0 && be_idx < MSM_BACKEND_DAI_MAX)
+	if (be_idx >= 0 && be_idx < MSM_BACKEND_DAI_MAX)
 		memcpy(be_dai, &msm_bedais[be_idx],
 		       sizeof(struct msm_pcm_routing_bdai_data));
 }
@@ -1500,6 +1510,23 @@ static int msm_routing_put_port_mixer(struct snd_kcontrol *kcontrol,
 
 	return 1;
 }
+
+#ifdef CONFIG_SND_USE_QUAT_MI2S
+static int msm_routing_get_afe_quat_mi2s_vol_mixer(struct snd_kcontrol *kcontrol,
+	struct snd_ctl_elem_value *ucontrol)
+{
+    ucontrol->value.integer.value[0] = msm_route_afe_quat_mi2s_vol_control;
+	return 0;
+}
+
+static int msm_routing_set_afe_quat_mi2s_vol_mixer(struct snd_kcontrol *kcontrol,
+	struct snd_ctl_elem_value *ucontrol)
+{
+    afe_loopback_gain(AFE_PORT_ID_QUATERNARY_MI2S_TX, ucontrol->value.integer.value[0]);
+	msm_route_afe_quat_mi2s_vol_control = ucontrol->value.integer.value[0];
+	return 0;
+}
+#endif
 
 static int msm_routing_ec_ref_rx_get(struct snd_kcontrol *kcontrol,
 				struct snd_ctl_elem_value *ucontrol)
@@ -3505,7 +3532,23 @@ static const struct snd_kcontrol_new quat_mi2s_rx_port_mixer_controls[] = {
 	SOC_SINGLE_EXT("INTERNAL_FM_TX", MSM_BACKEND_DAI_QUATERNARY_MI2S_RX,
 	MSM_BACKEND_DAI_INT_FM_TX, 1, 0, msm_routing_get_port_mixer,
 	msm_routing_put_port_mixer),
+#ifdef CONFIG_SND_USE_QUAT_MI2S	
+	SOC_SINGLE_EXT("SLIM_0_TX", MSM_BACKEND_DAI_QUATERNARY_MI2S_RX,
+	MSM_BACKEND_DAI_SLIMBUS_0_TX, 1, 0, msm_routing_get_port_mixer,
+	msm_routing_put_port_mixer),
+	SOC_SINGLE_EXT("QUAT_MI2S_TX", MSM_BACKEND_DAI_QUATERNARY_MI2S_RX,
+	MSM_BACKEND_DAI_QUATERNARY_MI2S_TX, 1, 0, msm_routing_get_port_mixer,
+	msm_routing_put_port_mixer),	
+#endif	
 };
+
+#ifdef CONFIG_SND_USE_QUAT_MI2S
+static const struct snd_kcontrol_new afe_quat_mi2s_vol_mixer_controls[] = {
+	SOC_SINGLE_EXT_TLV("QUAT_MI2S_RX Volume", SND_SOC_NOPM, 0,
+	INT_RX_VOL_GAIN, 0, msm_routing_get_afe_quat_mi2s_vol_mixer,
+	msm_routing_set_afe_quat_mi2s_vol_mixer, afe_mi2s_vol_gain),
+};
+#endif
 
 static const struct snd_kcontrol_new slim_fm_switch_mixer_controls =
 	SOC_SINGLE_EXT("Switch", SND_SOC_NOPM,
@@ -3981,6 +4024,26 @@ static const struct snd_kcontrol_new slim0_rx_vi_fb_rch_mux =
 	slim0_rx_vi_fb_rch_mux_enum, spkr_prot_get_vi_rch_port,
 	spkr_prot_put_vi_rch_port);
 
+#ifdef CONFIG_SND_USE_QUAT_MI2S
+static const char * const quat_mi2s_rx_vi_fb_tx_mux_text[] = {
+	"ZERO", "QUAT_MI2S_TX"
+    };
+
+static const int const quat_mi2s_rx_vi_fb_tx_value[] = {
+	MSM_BACKEND_DAI_MAX, MSM_BACKEND_DAI_QUATERNARY_MI2S_TX
+    };
+
+static const struct soc_enum quat_mi2s_rx_vi_fb_mux_enum =
+	SOC_VALUE_ENUM_DOUBLE(0, MSM_BACKEND_DAI_QUATERNARY_MI2S_RX, 0, 0,
+	ARRAY_SIZE(quat_mi2s_rx_vi_fb_tx_mux_text),
+	quat_mi2s_rx_vi_fb_tx_mux_text, quat_mi2s_rx_vi_fb_tx_value);
+
+static const struct snd_kcontrol_new quat_mi2s_rx_vi_fb_mux =
+	SOC_DAPM_ENUM_EXT("QUAT_MI2S_RX_VI_FB_MUX",
+	quat_mi2s_rx_vi_fb_mux_enum, spkr_prot_get_vi_lch_port,
+	spkr_prot_put_vi_lch_port);
+#endif
+
 static const struct snd_soc_dapm_widget msm_qdsp6_widgets[] = {
 	/* Frontend AIF */
 	/* Widget name equals to Front-End DAI name<Need confirmation>,
@@ -4074,10 +4137,15 @@ static const struct snd_soc_dapm_widget msm_qdsp6_widgets[] = {
 		0, 0, 0, 0),
 	SND_SOC_DAPM_AIF_IN("DTMF_DL_HL", "DTMF_RX_HOSTLESS Playback",
 		0, 0, 0, 0),
-	SND_SOC_DAPM_AIF_OUT("QUAT_MI2S_UL_HL",
-		"Quaternary MI2S_TX Hostless Capture",
-		0, 0, 0, 0),
-
+#ifdef CONFIG_SND_USE_QUAT_MI2S
+	SND_SOC_DAPM_AIF_OUT("QUAT_MI2S_UL_HL", "QUAT_MI2S_HOSTLESS Capture",
+	    0, 0, 0, 0),
+	SND_SOC_DAPM_AIF_IN("QUAT_MI2S_DL_HL", "QUAT_MI2S_HOSTLESS Playback",
+	    0, 0, 0, 0),
+#else
+    SND_SOC_DAPM_AIF_OUT("QUAT_MI2S_UL_HL", "Quaternary MI2S_TX Hostless Capture",
+	    0, 0, 0, 0),
+#endif
 	/* LSM */
 	SND_SOC_DAPM_AIF_OUT("LSM1_UL_HL", "Listen 1 Audio Service Capture",
 			     0, 0, 0, 0),
@@ -4418,6 +4486,10 @@ static const struct snd_soc_dapm_widget msm_qdsp6_widgets[] = {
 		&ext_ec_ref_mux_ul8),
 	SND_SOC_DAPM_MUX("AUDIO_REF_EC_UL9 MUX", SND_SOC_NOPM, 0, 0,
 		&ext_ec_ref_mux_ul9),
+#ifdef CONFIG_SND_USE_QUAT_MI2S
+	SND_SOC_DAPM_MUX("QUAT_MI2S_RX_VI_FB_MUX", SND_SOC_NOPM, 0, 0,
+				&quat_mi2s_rx_vi_fb_mux),
+#endif
 };
 
 static const struct snd_soc_dapm_route intercon[] = {
@@ -5120,6 +5192,9 @@ static const struct snd_soc_dapm_route intercon[] = {
 	{"SEC_MI2S_RX", NULL, "SEC_MI2S_DL_HL"},
 	{"PRI_MI2S_RX", NULL, "PRI_MI2S_DL_HL"},
 	{"QUAT_MI2S_UL_HL", NULL, "QUAT_MI2S_TX"},
+#ifdef CONFIG_SND_USE_QUAT_MI2S
+	{"QUAT_MI2S_RX", NULL, "QUAT_MI2S_DL_HL"},
+#endif	
 
 	{"SLIMBUS_0_RX Port Mixer", "INTERNAL_FM_TX", "INT_FM_TX"},
 	{"SLIMBUS_0_RX Port Mixer", "SLIM_0_TX", "SLIMBUS_0_TX"},
@@ -5235,6 +5310,10 @@ static const struct snd_soc_dapm_route intercon[] = {
 
 	{"QUAT_MI2S_RX Port Mixer", "PRI_MI2S_TX", "PRI_MI2S_TX"},
 	{"QUAT_MI2S_RX Port Mixer", "INTERNAL_FM_TX", "INT_FM_TX"},
+#ifdef CONFIG_SND_USE_QUAT_MI2S	
+	{"QUAT_MI2S_RX Port Mixer", "QUAT_MI2S_TX", "QUAT_MI2S_TX"},
+	{"QUAT_MI2S_RX Port Mixer", "SLIM_0_TX", "SLIM_0_TX"},
+#endif	
 	{"QUAT_MI2S_RX", NULL, "QUAT_MI2S_RX Port Mixer"},
 
 	/* Backend Enablement */
@@ -5297,6 +5376,10 @@ static const struct snd_soc_dapm_route intercon[] = {
 	{"SLIM0_RX_VI_FB_RCH_MUX", "SLIM4_TX", "SLIMBUS_4_TX"},
 	{"SLIMBUS_0_RX", NULL, "SLIM0_RX_VI_FB_LCH_MUX"},
 	{"SLIMBUS_0_RX", NULL, "SLIM0_RX_VI_FB_RCH_MUX"},
+#ifdef CONFIG_SND_USE_QUAT_MI2S
+	{"QUAT_MI2S_RX_VI_FB_MUX", "QUAT_MI2S_TX", "QUAT_MI2S_TX"},
+	{"QUAT_MI2S_RX", NULL, "QUAT_MI2S_RX_VI_FB_MUX"},
+#endif
 };
 
 static int msm_pcm_routing_hw_params(struct snd_pcm_substream *substream,
@@ -5681,6 +5764,12 @@ static int msm_routing_probe(struct snd_soc_platform *platform)
 
 	snd_soc_add_platform_controls(platform, lsm_function,
 				      ARRAY_SIZE(lsm_function));
+	
+#ifdef CONFIG_SND_USE_QUAT_MI2S
+	snd_soc_add_platform_controls(platform,
+		        afe_quat_mi2s_vol_mixer_controls,
+		        ARRAY_SIZE(afe_quat_mi2s_vol_mixer_controls));	
+#endif
 
 	snd_soc_add_platform_controls(platform,
 				aanc_slim_0_rx_mux,

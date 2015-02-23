@@ -254,4 +254,8 @@ config QMP_CORE
 	help
 		This option enables Qualcomm Malware Protection Sphinx component
 		to log on-device software API activity.
+config LGE_CEC_US
+	tristate "Support CE Ceritification of US"
+	help
+		this option enables for CEC
 endmenu

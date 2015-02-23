@@ -15,6 +15,9 @@
 #define _APR_AUDIO_V2_H_
 
 #include <linux/qdsp6v2/apr.h>
+#ifdef CONFIG_SND_SOC_MAXIM_DSM
+#include <sound/maxim_dsm.h>
+#endif
 
 /* size of header needed for passing data out of band */
 #define APR_CMD_OB_HDR_SZ  12
@@ -1135,6 +1138,29 @@ struct afe_loopback_cfg_v1 {
  */
 
 } __packed;
+
+#ifdef CONFIG_SND_SOC_CS35L32
+#define AFE_MODULE_RTIP_ENABLE         	0x000101FF
+#define AFE_PARAM_RTIP_ENABLE          	0x000102FF
+#define AFE_PARAM_RTIP_DEBUG		0x00010300
+#define AFE_PARAM_RTIP_PERF		0x00010301
+
+/*  Payload of the #AFE_PARAM_ID_LOOPBACK_CONFIG ,
+ * which enables/disables one AFE loopback.
+ */
+struct afe_param_rtip_enable {
+       u16 enable;
+       u16 reserved;
+} __attribute__ ((packed));
+
+
+struct afe_rtip_v1 {
+	struct apr_hdr	hdr;
+	struct afe_port_cmd_set_param_v2 param;
+	struct afe_port_param_data_v2    pdata;
+	struct afe_param_rtip_enable	 rtip_t;
+} __packed;
+#endif
 
 #define AFE_MODULE_SPEAKER_PROTECTION	0x00010209
 #define AFE_PARAM_ID_SPKR_PROT_CONFIG	0x0001020a
@@ -2725,6 +2751,10 @@ struct asm_softvolume_params {
 #define PCM_FORMAT_MAX_NUM_CHANNEL  8
 
 #define ASM_MEDIA_FMT_MULTI_CHANNEL_PCM_V2 0x00010DA5
+
+#if defined(CONFIG_SND_LGE_EFFECT) || defined(CONFIG_SND_LGE_NORMALIZER) || defined(CONFIG_SND_LGE_MABL)
+#define ASM_STREAM_POSTPROC_TOPO_ID_DEFAULT_LGE 0x10009009
+#endif
 
 #define ASM_MEDIA_FMT_EVRCB_FS 0x00010BEF
 
@@ -6949,6 +6979,51 @@ struct afe_spkr_prot_config_command {
 	union afe_spkr_prot_config prot_config;
 } __packed;
 
+#ifdef CONFIG_SND_SOC_MAXIM_DSM
+struct afe_dsm_filter_set_params_t {
+  uint32_t dcResistance;
+  uint32_t coilTemp;
+  uint32_t qualityfactor;
+  uint32_t resonanceFreq;
+  uint32_t excursionMeasure;
+  uint32_t rdcroomtemp;
+  uint32_t releasetime;
+  uint32_t coilthermallimit;
+  uint32_t excursionlimit;
+  uint32_t dsmenabled;
+  uint32_t staticgain;
+  uint32_t lfxgain;
+  uint32_t pilotgain;
+  uint32_t flagToWrite;
+  uint32_t featureSetEnable;
+  uint32_t smooFacVoltClip;
+  uint32_t highPassCutOffFactor;
+  uint32_t leadResistance;
+  uint32_t rmsSmooFac;
+  uint32_t clipLimit;
+  uint32_t thermalCoeff;
+  uint32_t qSpk;
+  uint32_t excurLoggingThresh;
+  uint32_t coilTempLoggingThresh;
+  uint32_t resFreq;
+  uint32_t resFreqGuardBand;
+} __packed;
+
+union afe_dsm_spkr_prot_config {
+	struct asm_fbsp_mode_rx_cfg mode_rx_cfg;
+	struct asm_spkr_calib_vi_proc_cfg vi_proc_cfg;
+	struct asm_feedback_path_cfg feedback_path_cfg;
+	struct asm_mode_vi_proc_cfg mode_vi_proc_cfg;
+	struct afe_dsm_filter_set_params_t mode_dsm_proc_cfg;
+} __packed;
+
+struct afe_dsm_spkr_prot_config_command {
+	struct apr_hdr hdr;
+	struct afe_port_cmd_set_param_v2 param;
+	struct afe_port_param_data_v2 pdata;
+	union afe_dsm_spkr_prot_config prot_config;
+} __packed;
+#endif
 struct afe_spkr_prot_get_vi_calib {
 	struct apr_hdr hdr;
 	struct afe_port_cmd_get_param_v2 get_param;
@@ -6961,7 +7036,54 @@ struct afe_spkr_prot_calib_get_resp {
 	struct afe_port_param_data_v2 pdata;
 	struct asm_calib_res_cfg res_cfg;
 } __packed;
+#ifdef CONFIG_SND_SOC_MAXIM_DSM
+struct afe_dsm_filter_get_params_t {
+  uint32_t dcResistance;
+  uint32_t coilTemp;
+  uint32_t qualityfactor;
+  uint32_t resonanceFreq;
+  uint32_t excursionMeasure;
+  uint32_t rdcroomtemp;
+  uint32_t releasetime;
+  uint32_t coilthermallimit;
+  uint32_t excursionlimit;
+  uint32_t dsmenabled;
+  uint32_t staticgain;
+  uint32_t lfxgain;
+  uint32_t pilotgain;
+  uint32_t flagToWrite;
+  uint32_t featureSetEnable;
+  uint32_t smooFacVoltClip;
+  uint32_t highPassCutOffFactor;
+  uint32_t leadResistance;
+  uint32_t rmsSmooFac;
+  uint32_t clipLimit;
+  uint32_t thermalCoeff;
+  uint32_t qSpk;
+  uint32_t excurLoggingThresh;
+  uint32_t coilTempLoggingThresh;
+  uint32_t resFreq;
+  uint32_t resFreqGuardBand;
+#ifdef USE_DSM_LOG
+  uint8_t byteLogArray[BEFORE_BUFSIZE];
+  uint32_t intLogArray[BEFORE_BUFSIZE];
+  uint8_t afterProbByteLogArray[AFTER_BUFSIZE];
+  uint32_t afterProbIntLogArray[AFTER_BUFSIZE];
+#endif
+} __packed;
 
+struct afe_dsm_spkr_prot_get_vi_calib {
+	struct apr_hdr hdr;
+	struct afe_port_cmd_get_param_v2 get_param;
+	struct afe_port_param_data_v2 pdata;
+	struct afe_dsm_filter_get_params_t res_cfg;
+} __packed;
+struct afe_dsm_spkr_prot_calib_get_resp {
+	uint32_t status;
+	struct afe_port_param_data_v2 pdata;
+	struct afe_dsm_filter_get_params_t res_cfg;
+} __packed;
+#endif
 
 /* SRS TRUMEDIA start */
 /* topology */
@@ -7285,6 +7407,9 @@ struct afe_param_id_clip_bank_sel {
 #define Q6AFE_LPASS_OSR_CLK_DISABLE		     0x0
 
 /* Supported Bit clock values */
+#ifdef CONFIG_SND_USE_QUAT_MI2S
+#define Q6AFE_LPASS_IBIT_CLK_12_P288_MHZ	0xBB8000
+#endif
 #define Q6AFE_LPASS_IBIT_CLK_8_P192_MHZ		0x7D0000
 #define Q6AFE_LPASS_IBIT_CLK_6_P144_MHZ		0x5DC000
 #define Q6AFE_LPASS_IBIT_CLK_4_P096_MHZ		0x3E8000

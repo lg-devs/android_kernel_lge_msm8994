@@ -236,7 +236,11 @@ int pil_mss_shutdown(struct pil_desc *pil)
 	struct q6v5_data *drv = container_of(pil, struct q6v5_data, desc);
 	int ret = 0;
 
+	pr_err("HALTING AXI PORTS\n");
+
+	pr_emerg("%s: Is modem booted? %d\n", __func__, drv->is_booted);
 	if (drv->axi_halt_base) {
+		pr_emerg("%s: axi_halt_base set to true. Halting q6, modem  and nc ports\n", __func__);
 		pil_q6v5_halt_axi_port(pil,
 			drv->axi_halt_base + MSS_Q6_HALT_BASE);
 		pil_q6v5_halt_axi_port(pil,
@@ -245,21 +249,36 @@ int pil_mss_shutdown(struct pil_desc *pil)
 			drv->axi_halt_base + MSS_NC_HALT_BASE);
 	}
 
-	if (drv->axi_halt_q6)
+	if (drv->axi_halt_q6) {
+		pr_emerg("%s: Halting Q6 AXI port\n", __func__);
 		pil_q6v5_halt_axi_port(pil, drv->axi_halt_q6);
-	if (drv->axi_halt_mss)
+	}
+	if (drv->axi_halt_mss) {
+		pr_emerg("%s: Halting modem AXI port\n", __func__);
 		pil_q6v5_halt_axi_port(pil, drv->axi_halt_mss);
-	if (drv->axi_halt_nc)
+	}
+	if (drv->axi_halt_nc) {
+		pr_emerg("%s: Halting nav AXI port\n", __func__);
 		pil_q6v5_halt_axi_port(pil, drv->axi_halt_nc);
-
-	ret = pil_mss_restart_reg(drv, 1);
-
-	if (drv->is_booted) {
-		pil_mss_disable_clks(drv);
-		pil_mss_power_down(drv);
-		drv->is_booted = false;
 	}
 
+	pr_emerg("%s: Asserting GCC_MSS_RESTART_REG\n", __func__);
+	pr_err("ASSERTING GCC MSS RESTARTING REG\n");
+	ret = pil_mss_restart_reg(drv, 1);
+	pr_err("FINISHED ASSERTING GCC MSS RESTARTING REG\n");
+	pr_emerg("%s: Asserted GCC_MSS_RESTART_REG\n", __func__);
+
+	if (drv->is_booted) {
+		pr_emerg("%s: Disabling clocks\n", __func__);
+		pr_err("DISABLING CLOCKS\n");
+		pil_mss_disable_clks(drv);
+		pr_emerg("%s: Disabling power\n", __func__);
+		pr_err("POWERING DOWN MSS\n");
+		pil_mss_power_down(drv);
+		pr_emerg("%s: Finished disabling power\n", __func__);
+		drv->is_booted = false;
+	}
+	pr_err("FINISHED SHUTTING DOWN MODEM\n");
 	return ret;
 }
 

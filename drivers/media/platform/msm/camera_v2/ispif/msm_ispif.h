@@ -64,5 +64,6 @@ struct ispif_device {
 	uint32_t hw_num_isps;
 	uint32_t num_ahb_clk;
 	uint32_t clk_idx;
+	struct regulator *fs_vfe;	//                                         
 };
 #endif

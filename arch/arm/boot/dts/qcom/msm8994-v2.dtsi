@@ -474,10 +474,12 @@
 		<244800 150000000 0x04000000>;
 };
 
+#if 0
 &cnss {
 	wlan-bootstrap-gpio = <&msm_gpio 112 0>;
 	pinctrl-names = "default";
 	pinctrl-0 = <&cnss_default &cnss_lpass_default>;
 };
+#endif
 
 #include "msm8994-v2-pm.dtsi"

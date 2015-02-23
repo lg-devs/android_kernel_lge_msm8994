@@ -624,6 +624,12 @@ static int mmc_compare_ext_csds(struct mmc_card *card, unsigned bus_width)
 	err = mmc_get_ext_csd(card, &bw_ext_csd);
 
 	if (err || bw_ext_csd == NULL) {
+		#ifdef CONFIG_MACH_LGE
+		/*                                                 
+                                                
+  */
+		pr_err("%s: %s: 0x%x, 0x%x\n", mmc_hostname(card->host), __func__, err, bw_ext_csd ? *bw_ext_csd : 0x0);
+		#endif
 		err = -EINVAL;
 		goto out;
 	}
@@ -663,8 +669,19 @@ static int mmc_compare_ext_csds(struct mmc_card *card, unsigned bus_width)
 			bw_ext_csd[EXT_CSD_SEC_CNT + 2]) &&
 		(card->ext_csd.raw_sectors[3] ==
 			bw_ext_csd[EXT_CSD_SEC_CNT + 3]));
+
+	#ifdef CONFIG_MACH_LGE
+	/*                                                 
+                                               
+ */
+	if (err) {
+		pr_err("%s: %s: fail during compare, err = 0x%x\n", mmc_hostname(card->host), __func__, err);
+		err = -EINVAL;
+	}
+	#else
 	if (err)
 		err = -EINVAL;
+	#endif
 
 out:
 	mmc_free_ext_csd(bw_ext_csd);
@@ -786,8 +803,15 @@ static int mmc_select_powerclass(struct mmc_card *card,
 				EXT_CSD_PWR_CL_200_360;
 		break;
 	default:
+		#ifdef CONFIG_MACH_LGE
+		/*                                                 
+                                                
+  */
+		pr_err("%s: %s: Voltage range not supported for power class, host->ios.vdd = 0x%x\n", mmc_hostname(host), __func__, host->ios.vdd);
+		#else
 		pr_warning("%s: Voltage range not supported "
 			   "for power class.\n", mmc_hostname(host));
+		#endif
 		return -EINVAL;
 	}
 
@@ -1449,12 +1473,18 @@ static int mmc_init_card(struct mmc_host *host, u32 ocr,
 					mmc_hostname(host), __func__, err);
 			goto free_card;
 		}
+#ifndef CONFIG_MACH_LGE
+		/*           
+                                                                           
+                                          
+   */
 		err = mmc_decode_cid(card);
 		if (err) {
 			pr_err("%s: %s: mmc_decode_cid() fails %d\n",
 					mmc_hostname(host), __func__, err);
 			goto free_card;
 		}
+#endif
 	}
 
 	/*
@@ -1487,6 +1517,18 @@ static int mmc_init_card(struct mmc_host *host, u32 ocr,
 					mmc_hostname(host), __func__, err);
 			goto free_card;
 		}
+#ifdef CONFIG_MACH_LGE
+		/*           
+                     
+                                         
+   */
+		err = mmc_decode_cid(card);
+		if (err) {
+			pr_err("%s: %s: mmc_decode_cid() fails %d\n",
+					mmc_hostname(host), __func__, err);
+			goto free_card;
+		}
+#endif
 
 		/* If doing byte addressing, check if required to do sector
 		 * addressing.  Handle the case of <2GB cards needing sector

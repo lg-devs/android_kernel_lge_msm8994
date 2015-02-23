@@ -32,5 +32,7 @@ int msm_fb_writeback_stop(struct fb_info *info);
 int msm_fb_writeback_terminate(struct fb_info *info);
 int msm_fb_writeback_set_secure(struct fb_info *info, int enable);
 int msm_fb_writeback_iommu_ref(struct fb_info *info, int enable);
-
+#ifdef CONFIG_MACH_LGE
+int mdss_dsi_panel_invert(u32 enable);
+#endif
 #endif /*_MSM_MDP_H_*/

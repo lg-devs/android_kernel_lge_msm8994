@@ -478,13 +478,40 @@ static int msm_ssphy_qmp_init(struct usb_phy *uphy)
 	}
 
 	writel_relaxed(0x00, phy->base + PCIE_USB3_PHY_SW_RESET);
-	writel_relaxed(0x03, phy->base + PCIE_USB3_PHY_START);
+#ifdef CONFIG_USB_G_LGE_ANDROID
+	dev_info(uphy->dev, "PCIE_USB3_PHY_SW_RESET: 0x%x\n",
+			readl_relaxed(phy->base + PCIE_USB3_PHY_SW_RESET) & 0xFF);
+#endif
 
+#ifdef CONFIG_USB_G_LGE_ANDROID
+	usleep_range(1000, 1200);
+#endif
+
+	writel_relaxed(0x03, phy->base + PCIE_USB3_PHY_START);
+#ifdef CONFIG_USB_G_LGE_ANDROID
+	dev_info(uphy->dev, "PCIE_USB3_PHY_START: 0x%x\n",
+			readl_relaxed(phy->base + PCIE_USB3_PHY_START) & 0xFF);
+#endif
+
+#ifdef CONFIG_USB_G_LGE_ANDROID
+	if (!phy->switch_pipe_clk_src) {
+		/* this clock wasn't enabled before, enable it now */
+		ret = clk_prepare_enable(phy->pipe_clk);
+		if (ret) {
+			dev_err(uphy->dev, "clk_prepare_enable failed\n");
+			//return ret;
+		}
+	}
+#else
 	if (!phy->switch_pipe_clk_src)
 		/* this clock wasn't enabled before, enable it now */
 		clk_prepare_enable(phy->pipe_clk);
+#endif
 
 	/* Wait for PHY initialization to be done */
+#ifdef CONFIG_USB_G_LGE_ANDROID
+	pr_info("[BSP-USB] %s: check PCIE_USB3_PHY_PCS_STATUS\n", __func__);
+#endif
 	do {
 		if (readl_relaxed(phy->base + PCIE_USB3_PHY_PCS_STATUS) &
 			PHYSTATUS)
@@ -493,6 +520,15 @@ static int msm_ssphy_qmp_init(struct usb_phy *uphy)
 			break;
 	} while (--init_timeout_usec);
 
+#ifdef CONFIG_USB_G_LGE_ANDROID
+	dev_info(uphy->dev, "PCIE_USB3_PHY_PCS_STATUS: 0x%x\n",
+			readl_relaxed(phy->base + PCIE_USB3_PHY_PCS_STATUS) & 0xFF);
+
+	pr_info("[BSP-USB] %s: INIT_MAX_TIME_USEC(%d), required(%d), remain(%d)\n", __func__,
+			INIT_MAX_TIME_USEC,
+			INIT_MAX_TIME_USEC - init_timeout_usec,
+			init_timeout_usec);
+#endif
 	if (!init_timeout_usec) {
 		dev_err(uphy->dev, "QMP PHY initialization timeout\n");
 		return -EBUSY;

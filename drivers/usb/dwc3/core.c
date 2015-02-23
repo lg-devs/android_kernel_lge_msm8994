@@ -539,7 +539,14 @@ EXPORT_SYMBOL(dwc3_set_notifier);
 int dwc3_notify_event(struct dwc3 *dwc, unsigned event)
 {
 	int ret = 0;
-
+#ifdef CONFIG_MAXIM_EVP
+	if (((event == DWC3_CORE_PM_PREPARE_EVENT)
+			|| (event == DWC3_CORE_PM_SUSPEND_EVENT)
+			|| (event == DWC3_CORE_PM_RESUME_EVENT)
+			|| (event == DWC3_CORE_PM_COMPLETE_EVENT))
+			&& (dwc->gadget.evp_sts & EVP_STS_EVP))
+		return ret;
+#endif
 	if (dwc->notify_event)
 		dwc->notify_event(dwc, event);
 	else
@@ -745,6 +752,9 @@ static int dwc3_probe(struct platform_device *pdev)
 			dev_err(dev, "failed to initialize gadget\n");
 			goto err2;
 		}
+#ifdef CONFIG_MAXIM_EVP
+		INIT_DELAYED_WORK(&dwc->dcp_check_work, dwc_dcp_check_work);
+#endif
 		break;
 	case DWC3_MODE_HOST:
 		dwc3_set_mode(dwc, DWC3_GCTL_PRTCAP_HOST);
@@ -776,6 +786,9 @@ static int dwc3_probe(struct platform_device *pdev)
 			dwc3_otg_exit(dwc);
 			goto err2;
 		}
+#ifdef CONFIG_MAXIM_EVP
+		INIT_DELAYED_WORK(&dwc->dcp_check_work, dwc_dcp_check_work);
+#endif
 		break;
 	default:
 		dev_err(dev, "Unsupported mode of operation %d\n", mode);

@@ -480,7 +480,10 @@ out_unlock:
 	mutex_unlock(&iommu_meta->lock);
 out:
 
-	msm_iommu_meta_put(iommu_meta);
+	if (iommu_meta)
+		msm_iommu_meta_put(iommu_meta);
+	else
+		pr_err("%s: size=%ld, iova_length=%ld", __func__, size, iova_length);
 	return ret;
 
 }

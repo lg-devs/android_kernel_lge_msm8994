@@ -25,6 +25,9 @@
 #include <linux/msm_tsens.h>
 #include <linux/err.h>
 #include <linux/of.h>
+#ifdef CONFIG_LGE_PM
+#include <linux/wakelock.h>
+#endif
 
 #define CREATE_TRACE_POINTS
 #include <trace/trace_thermal.h>
@@ -513,6 +516,11 @@
 #define TSENS4_OFFSET_ZIRC_MASK		0xf0
 #define TSENS4_OFFSET_ZIRC_SHIFT	4
 
+#ifdef CONFIG_LGE_PM
+#define TSENS_WAKE_LOCK_NAME		"msm_tsens_lock"
+#define TSENS_OPERATION_HOLD_TIME	2000
+#endif
+
 enum tsens_calib_fuse_map_type {
 	TSENS_CALIB_FUSE_MAP_8974 = 0,
 	TSENS_CALIB_FUSE_MAP_8X26,
@@ -553,6 +561,10 @@ struct tsens_tm_device_sensor {
 struct tsens_tm_device {
 	struct platform_device		*pdev;
 	struct workqueue_struct		*tsens_wq;
+#ifdef CONFIG_LGE_PM
+	/* Never add member after last member(sensor[0]) */
+	struct wake_lock		wakelock;
+#endif
 	bool				is_ready;
 	bool				prev_reading_avail;
 	bool				calibration_less_mode;
@@ -1044,6 +1056,10 @@ static void tsens_scheduler_fn(struct work_struct *work)
 					tm->sensor[i].sensor_hw_num);
 		}
 	}
+#ifdef CONFIG_LGE_PM
+	wake_lock_timeout(&tmdev->wakelock,
+			msecs_to_jiffies(TSENS_OPERATION_HOLD_TIME));
+#endif
 	mb();
 
 	enable_irq(tmdev->tsens_irq);
@@ -3045,6 +3061,11 @@ static int tsens_tm_probe(struct platform_device *pdev)
 	} else
 		return -ENODEV;
 
+#ifdef CONFIG_LGE_PM
+	wake_lock_init(&tmdev->wakelock, WAKE_LOCK_SUSPEND,
+			TSENS_WAKE_LOCK_NAME);
+#endif
+
 	tmdev->pdev = pdev;
 	tmdev->tsens_wq = alloc_workqueue("tsens_wq", WQ_HIGHPRI, 0);
 	if (!tmdev->tsens_wq) {
@@ -3068,6 +3089,9 @@ static int tsens_tm_probe(struct platform_device *pdev)
 
 	return 0;
 fail:
+#ifdef CONFIG_LGE_PM
+	wake_lock_destroy(&tmdev->wakelock);
+#endif
 	if (tmdev->tsens_wq)
 		destroy_workqueue(tmdev->tsens_wq);
 	if (tmdev->tsens_calib_addr)
@@ -3164,6 +3188,9 @@ static int tsens_tm_remove(struct platform_device *pdev)
 			tmdev->tsens_len);
 	free_irq(tmdev->tsens_irq, tmdev);
 	destroy_workqueue(tmdev->tsens_wq);
+#ifdef CONFIG_LGE_PM
+	wake_lock_destroy(&tmdev->wakelock);
+#endif
 	platform_set_drvdata(pdev, NULL);
 
 	return 0;

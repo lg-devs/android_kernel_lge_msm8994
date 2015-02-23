@@ -3057,7 +3057,7 @@ static int i2c_msm_qup_post_xfer(struct i2c_msm_ctrl *ctrl, int err)
 		/* Flush for the BAM registers */
 		if (ctrl->xfer.mode_id == I2C_MSM_XFER_MODE_BAM)
 			writel_relaxed(QUP_I2C_FLUSH, ctrl->rsrcs.base
-								+ QUP_STATE);
+					+ QUP_STATE);
 
 		/* reset the sw core */
 		i2c_msm_qup_sw_reset(ctrl);

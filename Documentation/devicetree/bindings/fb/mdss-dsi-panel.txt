@@ -145,6 +145,9 @@ Optional properties:
 - qcom,mdss-dsi-border-color:		Defines the border color value if border is present.
 					0 = default value.
 - qcom,mdss-dsi-pan-enable-dynamic-fps:	Boolean used to enable change in frame rate dynamically.
+- qcom,mdss-dsi-pan-dfps-hfp:		Boolean indicates adjusting horizontal front porch
+					to achieve new frame rate. Default is use vertical
+					front porch.
 - qcom,mdss-dsi-pan-fps-update:		A string that specifies when to change the frame rate.
 					"dfps_suspend_resume_mode"= FPS change request is
 					implemented during suspend/resume.

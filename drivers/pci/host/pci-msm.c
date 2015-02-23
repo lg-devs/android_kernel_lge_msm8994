@@ -2234,9 +2234,14 @@ static int msm_pcie_gpio_init(struct msm_pcie_dev_t *dev)
 			break;
 		}
 
-		if (info->out)
+		if (info->out) {
+			/*                                      */
+#ifdef CONFIG_LGE_PM
+			rc = gpio_direction_input(info->num);
+#else
 			rc = gpio_direction_output(info->num, info->init);
-		else
+#endif
+		} else
 			rc = gpio_direction_input(info->num);
 		if (rc) {
 			PCIE_ERR(dev,

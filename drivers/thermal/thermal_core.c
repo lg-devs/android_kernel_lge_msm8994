@@ -227,8 +227,7 @@ static int __update_sensor_thresholds(struct sensor_info *sensor)
 			sensor->sensor_id, max_of_low_thresh,
 			min_of_high_thresh);
 
-	if ((min_of_high_thresh != sensor->threshold_max) &&
-		(min_of_high_thresh != LONG_MAX)) {
+	if (min_of_high_thresh != LONG_MAX) {
 		ret = sensor->tz->ops->set_trip_temp(sensor->tz,
 			sensor->max_idx, min_of_high_thresh);
 		if (ret) {
@@ -249,8 +248,7 @@ static int __update_sensor_thresholds(struct sensor_info *sensor)
 		goto update_done;
 	}
 
-	if ((max_of_low_thresh != sensor->threshold_min) &&
-		(max_of_low_thresh != LONG_MIN)) {
+	if (max_of_low_thresh != LONG_MIN) {
 		ret = sensor->tz->ops->set_trip_temp(sensor->tz,
 			sensor->min_idx, max_of_low_thresh);
 		if (ret) {
@@ -292,7 +290,7 @@ static void sensor_update_work(struct work_struct *work)
 	mutex_unlock(&sensor->lock);
 }
 
-/* May be called in an interrupt context.
+/* Should not be called in an interrupt context.
  * Do NOT call sensor_set_trip from this function
  */
 int thermal_sensor_trip(struct thermal_zone_device *tz,
@@ -307,6 +305,8 @@ int thermal_sensor_trip(struct thermal_zone_device *tz,
 
 	if (list_empty(&tz->sensor.threshold_list))
 		return 0;
+
+	mutex_lock(&tz->sensor.lock);
 
 	list_for_each_entry_safe(pos, var, &tz->sensor.threshold_list, list) {
 		if ((pos->trip != trip) || (!pos->active))
@@ -325,6 +325,8 @@ int thermal_sensor_trip(struct thermal_zone_device *tz,
 			pos->notify(trip, temp, pos->data);
 		}
 	}
+
+	mutex_unlock(&tz->sensor.lock);
 
 	schedule_work(&tz->sensor.work);
 

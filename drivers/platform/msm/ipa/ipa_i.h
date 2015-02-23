@@ -939,6 +939,11 @@ struct ipa_context {
 	struct ipa_wlan_comm_memb wc_memb;
 
 	struct ipa_uc_ctx uc_ctx;
+
+//                                                                                                            
+	struct ipa_hw_pkt_status status[128];
+	u32 status_wr_idx;
+//             
 };
 
 /**

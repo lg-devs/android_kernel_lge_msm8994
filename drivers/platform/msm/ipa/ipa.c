@@ -29,6 +29,10 @@
 #include <linux/msm-bus-board.h>
 #include <linux/netdevice.h>
 #include <linux/delay.h>
+#if defined(CONFIG_LGE_CEC_US)
+#include <soc/qcom/subsystem_restart.h>
+#include <soc/qcom/subsystem_notif.h>
+#endif
 #include "ipa_i.h"
 #include "ipa_rm_i.h"
 
@@ -1500,6 +1504,10 @@ static int ipa_q6_set_ex_path_dis_agg(void)
 				kfree(desc[index].user1);
 			retval = -EINVAL;
 		}
+
+                /* Ignoring TAG process timeout */
+                if (retval == -ETIME)
+                        retval = 0;
 	}
 
 	kfree(desc);
@@ -2902,6 +2910,26 @@ static void sps_event_cb(enum sps_callback_case event, void *param)
 
 	spin_unlock_irqrestore(&ipa_ctx->sps_pm.lock, flags);
 }
+#if defined(CONFIG_LGE_CEC_US)
+static int ssr_notifier_cb(struct notifier_block *this,
+			   unsigned long code,
+			   void *data)
+{
+	if (SUBSYS_BEFORE_POWERUP == code) {
+		pr_info("IPA received MPSS BEFORE_POWERUP\n");
+		if (!ipa_ctx->q6_proxy_clk_vote_valid) {
+			ipa_inc_client_enable_clks();
+			ipa_ctx->q6_proxy_clk_vote_valid = true;
+		}
+	}
+
+	return NOTIFY_DONE;
+}
+
+static struct notifier_block ssr_notifier = {
+	.notifier_call = ssr_notifier_cb,
+};
+#endif
 /**
 * ipa_init() - Initialize the IPA Driver
 * @resource_p:	contain platform specific values from DST file
@@ -3385,7 +3413,9 @@ static int ipa_init(const struct ipa_plat_drv_res *resource_p,
 	ipa_ctx->q6_proxy_clk_vote_valid = true;
 
 	ipa_register_panic_hdlr();
-
+#if defined(CONFIG_LGE_CEC_US)
+	subsys_notif_register_notifier("modem", &ssr_notifier);
+#endif
 	pr_info("IPA driver initialization was successful.\n");
 
 	return 0;
@@ -3590,11 +3620,39 @@ static int ipa_plat_drv_probe(struct platform_device *pdev_p)
 	return result;
 }
 
+static int ipa_ap_suspend(struct device *dev)
+{
+	int res = 0;
+
+	IPADBG("Enter...\n");
+	/* Do not allow A7 to suspend in case there are active clients of IPA */
+	ipa_active_clients_lock();
+	if (ipa_ctx->ipa_active_clients.cnt != 0) {
+		IPADBG("IPA is in use, postponing AP suspend.\n");
+		res = -EAGAIN;
+	}
+	ipa_active_clients_unlock();
+	IPADBG("Exit\n");
+
+	return res;
+}
+
+static int ipa_ap_resume(struct device *dev)
+{
+	return 0;
+}
+
+static const struct dev_pm_ops ipa_pm_ops = {
+	.suspend_noirq = ipa_ap_suspend,
+	.resume_noirq = ipa_ap_resume,
+};
+
 static struct platform_driver ipa_plat_drv = {
 	.probe = ipa_plat_drv_probe,
 	.driver = {
 		.name = DRV_NAME,
 		.owner = THIS_MODULE,
+		.pm = &ipa_pm_ops,
 		.of_match_table = ipa_plat_drv_match,
 	},
 };

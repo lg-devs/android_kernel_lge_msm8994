@@ -61,7 +61,7 @@
 		qcom,strtstp-sleepwake;
 
 		qcom,pm-qos-active-latency = <501>;
-		qcom,pm-qos-wakeup-latency = <101>;
+		qcom,pm-qos-wakeup-latency = <501>;
 
 		/*
 		 * Clocks = KGSL_CLK_CORE | KGSL_CLK_IFACE

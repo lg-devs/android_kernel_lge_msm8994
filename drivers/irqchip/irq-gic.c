@@ -279,9 +279,12 @@ static void gic_show_resume_irq(struct gic_chip_data *gic)
 
 	raw_spin_lock(&irq_controller_lock);
 	for (i = 0; i * 32 < gic->gic_irqs; i++) {
+		/* Temporary fix for 64bit long type error.
+		 * Revert before applying CR 732218 official fix */
+		unsigned int *pendp = (unsigned int *)pending;
 		enabled = readl_relaxed(base + GIC_DIST_ENABLE_CLEAR + i * 4);
-		pending[i] = readl_relaxed(base + GIC_DIST_PENDING_SET + i * 4);
-		pending[i] &= enabled;
+		pendp[i] = readl_relaxed(base + GIC_DIST_PENDING_SET + i * 4);
+		pendp[i] &= enabled;
 	}
 	raw_spin_unlock(&irq_controller_lock);
 

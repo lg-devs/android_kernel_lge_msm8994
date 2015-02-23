@@ -28,6 +28,8 @@
 
 #include "base.h"
 #include "power/power.h"
+#include <soc/qcom/lge/board_lge.h>
+
 
 /*
  * Deferred Probe infrastructure.
@@ -352,10 +354,16 @@ probe_failed:
 			driver_deferred_probe_trigger();
 	} else if (ret != -ENODEV && ret != -ENXIO) {
 		/* driver matched but the probe failed */
+#if defined(CONFIG_PRE_SELF_DIAGNOSIS)
+		lge_pre_self_diagnosis((char *) drv->bus->name,4,(char *) dev_name(dev),(char *) drv->name, ret);
+#endif
 		printk(KERN_WARNING
 		       "%s: probe of %s failed with error %d\n",
 		       drv->name, dev_name(dev), ret);
 	} else {
+#if defined(CONFIG_PRE_SELF_DIAGNOSIS)
+		lge_pre_self_diagnosis((char *) drv->bus->name,0,(char *) dev_name(dev),(char *) drv->name, ret);
+#endif
 		pr_debug("%s: probe of %s rejects match %d\n",
 		       drv->name, dev_name(dev), ret);
 	}

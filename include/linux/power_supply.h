@@ -165,15 +165,61 @@ enum power_supply_property {
 	POWER_SUPPLY_PROP_USB_OTG,
 	POWER_SUPPLY_PROP_CHARGE_ENABLED,
 	POWER_SUPPLY_PROP_FLASH_CURRENT_MAX,
+#ifdef CONFIG_LGE_PM_FACTORY_PSEUDO_BATTERY
+	POWER_SUPPLY_PROP_PSEUDO_BATT,
+#endif
+#ifdef CONFIG_LGE_PM_MAXIM_EVP_CONTROL
+	POWER_SUPPLY_PROP_ENABLE_EVP_CHG,
+#endif
+#ifdef CONFIG_MAXIM_EVP
+	POWER_SUPPLY_PROP_EVP_VOL,
+	POWER_SUPPLY_PROP_HVDCP_TYPE,
+	POWER_SUPPLY_PROP_EVP_DETECT_START,
+#endif
+#ifdef CONFIG_LGE_PM_FACTORY_PSEUDO_BATTERY
+	POWER_SUPPLY_PROP_SAFTETY_CHARGER_TIMER,
+#endif
+#ifdef CONFIG_LGE_PM_COMMON
+	POWER_SUPPLY_PROP_BATTERY_ID_CHECKER,
+	POWER_SUPPLY_PROP_EXT_PWR_CHECK,
+	POWER_SUPPLY_PROP_BATFET_EN,
+#endif
+#ifdef CONFIG_LGE_PM_EVP_TESTCMD_SUPPORT
+	POWER_SUPPLY_PROP_EVP_TESTCMD_SUPPORT,
+#endif
 	POWER_SUPPLY_PROP_UPDATE_NOW,
 	/* Local extensions of type int64_t */
 	POWER_SUPPLY_PROP_CHARGE_COUNTER_EXT,
+#ifdef CONFIG_LGE_PM_UNIFIED_WLC
+	POWER_SUPPLY_PROP_WIRELESS_CHARGER_SWITCH,
+#endif /*                         */
+#ifdef CONFIG_LGE_PM_UNIFIED_WLC_ALIGNMENT
+	POWER_SUPPLY_PROP_ALIGNMENT,
+#endif /*                                   */
 	/* Properties of type `const char *' */
 	POWER_SUPPLY_PROP_MODEL_NAME,
 	POWER_SUPPLY_PROP_MANUFACTURER,
 	POWER_SUPPLY_PROP_SERIAL_NUMBER,
 	POWER_SUPPLY_PROP_BATTERY_TYPE,
+#ifdef CONFIG_LGE_PM_PARALLEL_CHARGING
+	POWER_SUPPLY_PROP_FLOAT_VOLTAGE,
+#endif
 };
+
+#ifdef CONFIG_LGE_PM_UNIFIED_WLC
+enum power_supply_event_type{
+	POWER_SUPPLY_PROP_UNKNOWN,
+	POWER_SUPPLY_PROP_WIRELESS_DCIN_PRESENT,
+	POWER_SUPPLY_PROP_WIRELESS_USB_PRESENT,
+	POWER_SUPPLY_PROP_WIRELESS_CHARGE_ENABLED,
+	POWER_SUPPLY_PROP_WIRELESS_CHARGE_COMPLETED,
+	POWER_SUPPLY_PROP_WIRELESS_ONLINE,
+	POWER_SUPPLY_PROP_WIRELESS_ONLINE_OTG,
+	POWER_SUPPLY_PROP_WIRELESS_FAKE_OTG,
+	POWER_SUPPLY_PROP_WIRELESS_THERMAL_MITIGATION,
+	POWER_SUPPLY_PROP_ABNORMAL_TA,
+};
+#endif
 
 enum power_supply_type {
 	POWER_SUPPLY_TYPE_UNKNOWN = 0,
@@ -187,6 +233,7 @@ enum power_supply_type {
 	POWER_SUPPLY_TYPE_WIRELESS,	/* Accessory Charger Adapters */
 	POWER_SUPPLY_TYPE_BMS,		/* Battery Monitor System */
 	POWER_SUPPLY_TYPE_USB_PARALLEL,		/* USB Parallel Path */
+	POWER_SUPPLY_TYPE_FUELGAUGE,
 	POWER_SUPPLY_TYPE_WIPOWER,		/* Wipower */
 };
 
@@ -217,6 +264,14 @@ struct power_supply {
 	int (*set_property)(struct power_supply *psy,
 			    enum power_supply_property psp,
 			    const union power_supply_propval *val);
+#ifdef CONFIG_LGE_PM_UNIFIED_WLC
+	int (*get_event_property)(struct power_supply *psy,
+				enum power_supply_event_type psp,
+				union power_supply_propval *val);
+	int (*set_event_property)(struct power_supply *psy,
+				enum power_supply_event_type psp,
+				const union power_supply_propval *val);
+#endif
 	int (*property_is_writeable)(struct power_supply *psy,
 				     enum power_supply_property psp);
 	void (*external_power_changed)(struct power_supply *psy);

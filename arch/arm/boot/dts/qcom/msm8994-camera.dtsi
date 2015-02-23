@@ -194,6 +194,7 @@
 		interrupt-names = "ispif";
 		qcom,num-isps = <0x2>;
 		vdd-supply = <&gdsc_camss_top>;
+		vdd_vfe-supply = <&gdsc_vfe>;	//LGE_CHANGE
 		clocks = <&clock_mmss clk_camss_ispif_ahb_clk>,
 			<&clock_mmss clk_csi0_clk_src>,
 			<&clock_mmss clk_camss_csi0_clk>,

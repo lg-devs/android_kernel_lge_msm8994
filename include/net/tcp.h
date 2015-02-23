@@ -98,6 +98,11 @@ extern void tcp_time_wait(struct sock *sk, int state, int timeo);
 				 * 15 is ~13-30min depending on RTO.
 				 */
 
+/*                                                                            */
+//                                                                                                                                              
+#ifdef CONFIG_LGP_DATA_TCPIP_TCP_SYN_RETRY_CONFIG_UPLUS
+#define TCP_SYN_RETRIES	 4
+#else
 #define TCP_SYN_RETRIES	 6	/* This is how many retries are done
 				 * when active opening a connection.
 				 * RFC1122 says the minimum retry MUST
@@ -106,6 +111,8 @@ extern void tcp_time_wait(struct sock *sk, int state, int timeo);
 				 * 63secs of retransmission with the
 				 * current initial RTO.
 				 */
+#endif
+/*                                                                          */
 
 #define TCP_SYNACK_RETRIES 5	/* This is how may retries are done
 				 * when passive opening a connection.

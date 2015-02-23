@@ -30,6 +30,10 @@ struct panel_id {
 #define MDSS_DSI_RST_SEQ_LEN	10
 #define MDSS_MDP_MAX_FETCH 12
 
+#if defined (CONFIG_LGE_DYNAMIC_FPS_LUT)
+#define MDSS_FPS_LUT_SIZE 21
+#endif
+
 /* panel type list */
 #define NO_PANEL		0xffff	/* No Panel */
 #define MDDI_PANEL		1	/* MDDI */
@@ -44,6 +48,14 @@ struct panel_id {
 #define WRITEBACK_PANEL		10	/* Wifi display */
 #define LVDS_PANEL		11	/* LVDS */
 #define EDP_PANEL		12	/* LVDS */
+
+#if defined(CONFIG_LGE_MIPI_JDI_INCELL_QHD_CMD_PANEL)
+enum lcd_panel_type {
+	JDI_INCELL_CMD_PANEL,
+	JDI_INCELL_VIDEO_PANEL,
+	LGD_INCELL_CMD_PANEL
+};
+#endif
 
 static inline const char *mdss_panel2str(u32 panel)
 {
@@ -306,6 +318,9 @@ enum dynamic_fps_update {
 	DFPS_IMMEDIATE_CLK_UPDATE_MODE,
 	DFPS_IMMEDIATE_PORCH_UPDATE_MODE_VFP,
 	DFPS_IMMEDIATE_PORCH_UPDATE_MODE_HFP,
+#if defined (CONFIG_LGE_DYNAMIC_FPS_LUT)
+	DFPS_IMMEDIATE_PORCH_UPDATE_MODE_LUT,
+#endif
 };
 
 enum lvds_mode {
@@ -381,12 +396,25 @@ struct mdss_panel_info {
 	int pwm_pmic_gpio;
 	int pwm_lpg_chan;
 	int pwm_period;
+#if defined(CONFIG_Z2_LGD_POLED_PANEL)
+	int blmap_size;
+	char *blmap;
+	int plc_blmap_size;
+	char *plc_blmap;
+#elif defined(CONFIG_LGE_MIPI_JDI_INCELL_QHD_CMD_PANEL)
+	int blmap_size;
+	int *blmap;
+#endif
 	bool dynamic_fps;
 	bool ulps_feature_enabled;
 	bool ulps_suspend_enabled;
 	bool panel_ack_disabled;
 	bool esd_check_enabled;
 	char dfps_update;
+#if defined (CONFIG_LGE_DYNAMIC_FPS_LUT)
+	u32 dfps_lut[MDSS_FPS_LUT_SIZE];
+	u32 dfps_lut_size;
+#endif
 	int new_fps;
 	int panel_max_fps;
 	int panel_max_vtotal;
@@ -414,6 +442,10 @@ struct mdss_panel_info {
 	bool is_lpm_mode;
 	bool is_split_display;
 
+#if defined(CONFIG_LGE_MIPI_JDI_INCELL_QHD_CMD_PANEL)
+	int panel_type;
+	int jdi_cut;
+#endif
 	bool is_prim_panel;
 
 	char panel_name[MDSS_MAX_PANEL_LEN];

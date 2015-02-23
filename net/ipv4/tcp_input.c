@@ -4133,7 +4133,8 @@ static bool tcp_try_coalesce(struct sock *sk,
 
 	*fragstolen = false;
 
-	if (tcp_hdr(from)->fin)
+	//if (tcp_hdr(from)->fin)
+	if (tcp_hdr(from)->fin || tcp_hdr(to)->syn)
 		return false;
 
 	/* Its possible this segment overlaps with prior segment in queue */

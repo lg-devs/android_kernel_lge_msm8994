@@ -198,7 +198,8 @@ int32_t msm_camera_cci_i2c_write_table(
 	rc = v4l2_subdev_call(client->cci_client->cci_subdev,
 			core, ioctl, VIDIOC_MSM_CCI_CFG, &cci_ctrl);
 	if (rc < 0) {
-		pr_err("%s: line %d rc = %d\n", __func__, __LINE__, rc);
+		pr_err("%s: line %d rc = %d, sid =0x%x\n", __func__, __LINE__, rc,
+			client->cci_client->sid<<1);/*                      */
 		return rc;
 	}
 	rc = cci_ctrl.status;

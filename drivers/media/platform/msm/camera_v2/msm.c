@@ -747,6 +747,11 @@ int msm_post_event(struct v4l2_event *event, int timeout)
 			pr_err("%s: Timed out\n", __func__);
 			msm_print_event_error(event);
 			mutex_unlock(&session->lock);
+/*                                                                      */
+                        pr_err("%s: ===== Camera Recovery Start! ===== \n", __func__);
+                        dump_stack();
+                        send_sig(SIGKILL, current, 0);
+/*                                                                      */
 			return -ETIMEDOUT;
 		} else {
 			pr_err("%s: Error: No timeout but list empty!",

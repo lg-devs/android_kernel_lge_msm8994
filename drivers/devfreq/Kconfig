@@ -139,6 +139,14 @@ config DEVFREQ_GOV_SPDM_HYP
 
 comment "DEVFREQ Drivers"
 
+config LGE_DEVFREQ_DFPS
+    bool "LG Z2 Dynamic LCD Refresh Driver"
+    select ARCH_HAS_OPP
+    select DEVFREQ_GOV_SIMPLE_ONDEMAND
+	default y
+    help
+      This adds the DEVFREQ driver for LG Z2 display
+
 config ARM_EXYNOS4_BUS_DEVFREQ
 	bool "ARM Exynos4210/4212/4412 Memory Bus DEVFREQ Driver"
 	depends on CPU_EXYNOS4210 || CPU_EXYNOS4212 || CPU_EXYNOS4412

@@ -168,7 +168,9 @@ static struct smd_config smd_configs[] = {
 	{6, "APPS_RIVA_ANT_DATA", NULL, SMD_APPS_WCNSS},
 	{7, "DATA1", NULL, SMD_APPS_MODEM},
 	{8, "DATA4", NULL, SMD_APPS_MODEM},
+#ifndef CONFIG_LGE_DDM_TTY
 	{11, "DATA11", NULL, SMD_APPS_MODEM},
+#endif
 	{21, "DATA21", NULL, SMD_APPS_MODEM},
 	{27, "GPSNMEA", NULL, SMD_APPS_MODEM},
 	{36, "LOOPBACK", "LOOPBACK_TTY", SMD_APPS_MODEM},
@@ -191,7 +193,6 @@ static void buf_req_retry(unsigned long param)
 {
 	struct smd_tty_info *info = (struct smd_tty_info *)param;
 	unsigned long flags;
-
 	spin_lock_irqsave(&info->reset_lock_lha2, flags);
 	if (info->is_open) {
 		spin_unlock_irqrestore(&info->reset_lock_lha2, flags);
@@ -236,7 +237,6 @@ static ssize_t open_timeout_show(struct device *dev,
 {
 	unsigned int num_dev;
 	unsigned int open_wait;
-
 	if (dev == NULL) {
 		SMD_TTY_INFO("%s: Invalid Device passed", __func__);
 		return -EINVAL;
@@ -267,7 +267,6 @@ static void smd_tty_read(unsigned long param)
 	struct smd_tty_info *info = (struct smd_tty_info *)param;
 	struct tty_struct *tty = tty_port_tty_get(&info->port);
 	unsigned long flags;
-
 	if (!tty)
 		return;
 
@@ -334,7 +333,6 @@ static void smd_tty_notify(void *priv, unsigned event)
 	struct smd_tty_info *info = priv;
 	struct tty_struct *tty;
 	unsigned long flags;
-
 	switch (event) {
 	case SMD_EVENT_DATA:
 		spin_lock_irqsave(&info->reset_lock_lha2, flags);
@@ -403,7 +401,6 @@ static uint32_t is_modem_smsm_inited(void)
 {
 	uint32_t modem_state;
 	uint32_t ready_state = (SMSM_INIT | SMSM_SMDINIT);
-
 	modem_state = smsm_get_state(SMSM_MODEM_STATE);
 	return (modem_state & ready_state) == ready_state;
 }
@@ -411,7 +408,6 @@ static uint32_t is_modem_smsm_inited(void)
 static int smd_tty_dummy_probe(struct platform_device *pdev)
 {
 	int n;
-
 	for (n = 0; n < MAX_SMD_TTYS; ++n) {
 		if (!smd_tty[n].dev_name)
 			continue;
@@ -443,7 +439,6 @@ static int smd_tty_add_driver(struct smd_tty_info *info)
 	int r = 0;
 	struct smd_tty_pfdriver *smd_tty_pfdriverp;
 	struct smd_tty_pfdriver *item;
-
 	if (!info) {
 		pr_err("%s on a NULL device structure\n", __func__);
 		return -EINVAL;
@@ -502,7 +497,6 @@ static void smd_tty_remove_driver(struct smd_tty_info *info)
 {
 	struct smd_tty_pfdriver *smd_tty_pfdriverp;
 	bool found_item = false;
-
 	if (!info) {
 		pr_err("%s on a NULL device\n", __func__);
 		return;
@@ -546,7 +540,6 @@ static int smd_tty_port_activate(struct tty_port *tport,
 	unsigned int n = tty->index;
 	struct smd_tty_info *info;
 	const char *peripheral = NULL;
-
 	if (n >= MAX_SMD_TTYS || !smd_tty[n].ch_name)
 		return -ENODEV;
 
@@ -676,7 +669,6 @@ static void smd_tty_port_shutdown(struct tty_port *tport)
 	struct smd_tty_info *info;
 	struct tty_struct *tty = tty_port_tty_get(tport);
 	unsigned long flags;
-
 	info = tty->driver_data;
 	if (info == 0) {
 		tty_kref_put(tty);
@@ -711,14 +703,12 @@ static void smd_tty_port_shutdown(struct tty_port *tport)
 static int smd_tty_open(struct tty_struct *tty, struct file *f)
 {
 	struct smd_tty_info *info = smd_tty + tty->index;
-
 	return tty_port_open(&info->port, tty, f);
 }
 
 static void smd_tty_close(struct tty_struct *tty, struct file *f)
 {
 	struct smd_tty_info *info = smd_tty + tty->index;
-
 	tty_port_close(&info->port, tty, f);
 }
 
@@ -727,7 +717,6 @@ static int smd_tty_write(struct tty_struct *tty, const unsigned char *buf,
 {
 	struct smd_tty_info *info = tty->driver_data;
 	int avail;
-
 	/* if we're writing to a packet channel we will
 	** never be able to write more data than there
 	** is currently space for
@@ -767,7 +756,6 @@ static void smd_tty_unthrottle(struct tty_struct *tty)
 {
 	struct smd_tty_info *info = tty->driver_data;
 	unsigned long flags;
-
 	spin_lock_irqsave(&info->reset_lock_lha2, flags);
 	if (info->is_open) {
 		spin_unlock_irqrestore(&info->reset_lock_lha2, flags);
@@ -788,7 +776,6 @@ static int smd_tty_tiocmget(struct tty_struct *tty)
 	struct smd_tty_info *info = tty->driver_data;
 	unsigned long flags;
 	int tiocm;
-
 	tiocm = smd_tiocmget(info->ch);
 
 	spin_lock_irqsave(&info->reset_lock_lha2, flags);
@@ -808,7 +795,6 @@ static int smd_tty_tiocmset(struct tty_struct *tty,
 				unsigned int set, unsigned int clear)
 {
 	struct smd_tty_info *info = tty->driver_data;
-
 	if (info->in_reset)
 		return -ENETRESET;
 
@@ -888,7 +874,6 @@ static struct tty_driver *smd_tty_driver;
 static int smd_tty_register_driver(void)
 {
 	int ret;
-
 	smd_tty_driver = alloc_tty_driver(MAX_SMD_TTYS);
 	if (smd_tty_driver == 0) {
 		SMD_TTY_ERR("%s - Driver allocation failed", __func__);
@@ -923,7 +908,6 @@ static int smd_tty_register_driver(void)
 static void smd_tty_device_init(int idx)
 {
 	struct tty_port *port;
-
 	port = &smd_tty[idx].port;
 	tty_port_init(port);
 	port->ops = &smd_tty_port_ops;
@@ -948,7 +932,6 @@ static int smd_tty_core_init(void)
 	int ret;
 	int n;
 	int idx;
-
 	ret = smd_tty_register_driver();
 	if (ret) {
 		pr_err("%s: driver registration failed %d\n", __func__, ret);
@@ -968,7 +951,7 @@ static int smd_tty_core_init(void)
 			strlcpy(smd_tty[idx].dev_name, smd_configs[n].dev_name,
 							SMD_MAX_CH_NAME_LEN);
 		}
-
+		pr_err("%s: Debugging Code smd_configs :  %s\n", __func__, smd_configs[n].port_name);
 		smd_tty_device_init(idx);
 	}
 	INIT_DELAYED_WORK(&loopback_work, loopback_probe_worker);
@@ -990,7 +973,6 @@ static int smd_tty_devicetree_init(struct platform_device *pdev)
 	const char *dev_name;
 	const char *remote_ss;
 	struct device_node *node;
-
 	ret = smd_tty_register_driver();
 	if (ret) {
 		SMD_TTY_ERR("%s: driver registration failed %d\n",
@@ -1071,7 +1053,6 @@ out:
 static int msm_smd_tty_probe(struct platform_device *pdev)
 {
 	int ret;
-
 	if (pdev) {
 		if (pdev->dev.of_node) {
 			ret = smd_tty_devicetree_init(pdev);
@@ -1100,6 +1081,9 @@ static void smd_tty_probe_worker(struct work_struct *work)
 
 static struct of_device_id msm_smd_tty_match_table[] = {
 	{ .compatible = "qcom,smdtty" },
+#ifndef CONFIG_LGE_DDM_TTY
+	{ .compatible = "qcom,smdttyatnt" },
+#endif
 	{},
 };
 
@@ -1116,7 +1100,6 @@ static struct platform_driver msm_smd_tty_driver = {
 static int __init smd_tty_init(void)
 {
 	int rc;
-
 	smd_tty_log_init();
 	rc = platform_driver_register(&msm_smd_tty_driver);
 	if (rc) {

@@ -52,6 +52,10 @@
 
 #include <linux/msm-bus.h>
 
+#ifdef CONFIG_LGE_PM_USB_ID
+#include <soc/qcom/lge/board_lge.h>
+#endif
+
 #define MSM_USB_BASE	(motg->regs)
 #define MSM_USB_PHY_CSR_BASE (motg->phy_csr_regs)
 
@@ -1855,6 +1859,29 @@ static void msm_otg_notify_charger(struct msm_otg *motg, unsigned mA)
 	motg->cur_power = mA;
 }
 
+#ifdef CONFIG_MAXIM_EVP
+static int msm_otg_evp_connect(struct usb_phy *phy, bool connect)
+{
+	struct power_supply *batt_psy;
+	union power_supply_propval prop;
+
+	batt_psy = power_supply_get_by_name("battery");
+	if (!batt_psy) {
+		pr_err("%s battery psy get failed.\n", __func__);
+		return 0;
+	}
+
+	if (connect)
+		prop.intval = 1;
+	else
+		prop.intval = 0;
+
+	batt_psy->set_property(batt_psy, POWER_SUPPLY_PROP_ENABLE_EVP_CHG, &prop);
+	pr_info("%s EVP connected.\n", __func__);
+	return 0;
+}
+#endif
+
 static int msm_otg_set_power(struct usb_phy *phy, unsigned mA)
 {
 	struct msm_otg *motg = container_of(phy, struct msm_otg, phy);
@@ -2734,6 +2761,18 @@ static void msm_chg_detect_work(struct work_struct *w)
 	u32 line_state, dm_vlgc;
 	unsigned long delay;
 
+#ifdef CONFIG_LGE_PM_USB_ID
+	motg->vadc_dev_pm = qpnp_get_vadc(motg->phy.dev, "pm8994");
+
+	if (IS_ERR_OR_NULL(motg->vadc_dev_pm)) {
+		if (PTR_ERR(motg->vadc_dev_pm) == -EPROBE_DEFER) {
+			queue_delayed_work(system_nrt_wq, &motg->chg_work,
+					msecs_to_jiffies(1000));
+			return;
+		}
+	}
+#endif
+
 	dev_dbg(phy->dev, "chg detection work\n");
 
 	if (test_bit(MHL, &motg->inputs)) {
@@ -2825,6 +2864,9 @@ static void msm_chg_detect_work(struct work_struct *w)
 			motg->chg_state = USB_CHG_STATE_DETECTED;
 			delay = 0;
 		}
+#ifdef CONFIG_LGE_PM_USB_ID
+		lge_pm_read_cable_info(motg->vadc_dev_pm);
+#endif
 		break;
 	case USB_CHG_STATE_PRIMARY_DONE:
 		vout = msm_chg_check_secondary_det(motg);
@@ -2873,7 +2915,11 @@ static void msm_chg_detect_work(struct work_struct *w)
 	queue_delayed_work(system_nrt_wq, &motg->chg_work, delay);
 }
 
+#ifdef CONFIG_MACH_LGE
+#define VBUS_INIT_TIMEOUT	msecs_to_jiffies(15000)
+#else
 #define VBUS_INIT_TIMEOUT	msecs_to_jiffies(5000)
+#endif
 
 /*
  * We support OTG, Peripheral only and Host only configurations. In case
@@ -2930,8 +2976,13 @@ static void msm_otg_init_sm(struct msm_otg *motg)
 			ret = wait_for_completion_timeout(&pmic_vbus_init,
 							  VBUS_INIT_TIMEOUT);
 			if (!ret) {
+#ifdef CONFIG_MACH_LGE
+				dev_err(motg->phy.dev, "%s: timeout waiting for PMIC VBUS\n",
+					__func__);
+#else
 				dev_dbg(motg->phy.dev, "%s: timeout waiting for PMIC VBUS\n",
 					__func__);
+#endif
 				clear_bit(B_SESS_VLD, &motg->inputs);
 				pmic_vbus_init.done = 1;
 			}
@@ -2955,8 +3006,13 @@ static void msm_otg_init_sm(struct msm_otg *motg)
 			ret = wait_for_completion_timeout(&pmic_vbus_init,
 							  VBUS_INIT_TIMEOUT);
 			if (!ret) {
+#ifdef CONFIG_MACH_LGE
+				dev_err(motg->phy.dev, "%s: timeout waiting for PMIC VBUS\n",
+					__func__);
+#else
 				dev_dbg(motg->phy.dev, "%s: timeout waiting for PMIC VBUS\n",
 					__func__);
+#endif
 				clear_bit(B_SESS_VLD, &motg->inputs);
 				pmic_vbus_init.done = 1;
 			}
@@ -3064,6 +3120,16 @@ static void msm_otg_sm_work(struct work_struct *w)
 			case USB_CHG_STATE_DETECTED:
 				switch (motg->chg_type) {
 				case USB_DCP_CHARGER:
+#ifdef CONFIG_MAXIM_EVP
+					pr_info("%s, DCP charger, start peri for EVP\n", __func__);
+					msm_otg_notify_charger(motg,
+							IDEV_CHG_MAX);
+					msm_otg_start_peripheral(otg, 1);
+					otg->phy->state = OTG_STATE_B_PERIPHERAL;
+					otg->gadget->evp_sts |= EVP_STS_DCP;
+					work = 1;
+					break;
+#endif
 					/* fall through */
 				case USB_PROPRIETARY_CHARGER:
 					msm_otg_notify_charger(motg,
@@ -3210,6 +3276,9 @@ static void msm_otg_sm_work(struct work_struct *w)
 			msm_otg_notify_charger(motg, 0);
 			srp_reqd = otg->gadget->otg_srp_reqd;
 			msm_otg_start_peripheral(otg, 0);
+#ifdef CONFIG_MAXIM_EVP
+			otg->gadget->evp_sts &= ~EVP_STS_DCP;
+#endif
 			if (test_bit(ID_B, &motg->inputs))
 				clear_bit(ID_B, &motg->inputs);
 			clear_bit(B_BUS_REQ, &motg->inputs);
@@ -3798,11 +3867,19 @@ static void msm_otg_set_vbus_state(int online)
 	static bool init;
 
 	if (online) {
+#ifdef CONFIG_MACH_LGE
+		pr_info("PMIC: BSV set\n");
+#else
 		pr_debug("PMIC: BSV set\n");
+#endif
 		if (test_and_set_bit(B_SESS_VLD, &motg->inputs) && init)
 			return;
 	} else {
+#ifdef CONFIG_MACH_LGE
+		pr_info("PMIC: BSV clear\n");
+#else
 		pr_debug("PMIC: BSV clear\n");
+#endif
 		if (!test_and_clear_bit(B_SESS_VLD, &motg->inputs) && init)
 			return;
 	}
@@ -4174,7 +4251,11 @@ otg_get_prop_usbin_voltage_now(struct msm_otg *motg)
 	struct qpnp_vadc_result results;
 
 	if (IS_ERR_OR_NULL(motg->vadc_dev)) {
+#ifdef CONFIG_LGE_PM_COMMON
+		motg->vadc_dev = qpnp_get_vadc(motg->phy.dev, "pmi8994");
+#else
 		motg->vadc_dev = qpnp_get_vadc(motg->phy.dev, "usbin");
+#endif
 		if (IS_ERR(motg->vadc_dev))
 			return PTR_ERR(motg->vadc_dev);
 	}
@@ -4193,6 +4274,9 @@ static int otg_power_get_property_usb(struct power_supply *psy,
 				  union power_supply_propval *val)
 {
 	struct msm_otg *motg = container_of(psy, struct msm_otg, usb_psy);
+#if defined CONFIG_MAXIM_EVP && defined CONFIG_USB_G_LGE_FUNCTION_IO
+	struct usb_gadget *g = motg->phy.otg->gadget;
+#endif
 	switch (psp) {
 	case POWER_SUPPLY_PROP_SCOPE:
 		if (motg->host_mode)
@@ -4222,6 +4306,11 @@ static int otg_power_get_property_usb(struct power_supply *psy,
 	case POWER_SUPPLY_PROP_VOLTAGE_NOW:
 		val->intval = otg_get_prop_usbin_voltage_now(motg);
 		break;
+#if defined CONFIG_MAXIM_EVP && defined CONFIG_USB_G_LGE_FUNCTION_IO
+	case POWER_SUPPLY_PROP_EVP_VOL:
+		g->ops->gadget_func_io(g, "evp", &val->intval, false);
+		break;
+#endif
 	default:
 		return -EINVAL;
 	}
@@ -4233,6 +4322,10 @@ static int otg_power_set_property_usb(struct power_supply *psy,
 				  const union power_supply_propval *val)
 {
 	struct msm_otg *motg = container_of(psy, struct msm_otg, usb_psy);
+#if defined CONFIG_MAXIM_EVP && defined CONFIG_USB_G_LGE_FUNCTION_IO
+	struct usb_gadget *g = motg->phy.otg->gadget;
+	static int evp_vol;
+#endif
 
 	switch (psp) {
 	/* Process PMIC notification in PRESENT prop */
@@ -4279,6 +4372,12 @@ static int otg_power_set_property_usb(struct power_supply *psy,
 	case POWER_SUPPLY_PROP_HEALTH:
 		motg->usbin_health = val->intval;
 		break;
+#if defined CONFIG_MAXIM_EVP && defined CONFIG_USB_G_LGE_FUNCTION_IO
+	case POWER_SUPPLY_PROP_EVP_VOL:
+		evp_vol = val->intval;
+		g->ops->gadget_func_io(g, "evp", &evp_vol, true);
+		break;
+#endif
 	default:
 		return -EINVAL;
 	}
@@ -4871,6 +4970,14 @@ static int msm_otg_probe(struct platform_device *pdev)
 	void __iomem *tcsr;
 	int id_irq = 0;
 
+#if defined(CONFIG_MACH_MSM8994_Z2_SPR_US) \
+	&& defined(CONFIG_USB_DWC3_MSM) \
+	&& defined(CONFIG_USB_MSM_OTG)
+	if (lge_get_board_revno() != HW_REV_0) {
+		return -ENODEV;
+	}
+#endif
+
 	dev_info(&pdev->dev, "msm_otg probe\n");
 
 	motg = kzalloc(sizeof(struct msm_otg), GFP_KERNEL);
@@ -5119,6 +5226,24 @@ static int msm_otg_probe(struct platform_device *pdev)
 			}
 		}
 	}
+#ifdef CONFIG_MACH_LGE
+	else {
+		tcsr = devm_ioremap_nocache(&pdev->dev, 0xfd4ab000, 0x4);
+		if (!tcsr) {
+			dev_dbg(&pdev->dev, "tcsr ioremap failed\n");
+		} else {
+			/* Disable USB2 on secondary HSPHY. */
+			writel_relaxed(0x0, tcsr);
+			dev_info(&pdev->dev,
+					"Disable USB2 on secondary HSPHY\n");
+			/*
+			 * Ensure that TCSR write is completed before
+			 * USB registers initialization.
+			 */
+			mb();
+		}
+	}
+#endif
 
 	if (pdata->enable_sec_phy)
 		motg->usb_phy_ctrl_reg = USB_PHY_CTRL2;
@@ -5305,6 +5430,9 @@ static int msm_otg_probe(struct platform_device *pdev)
 	phy->init = msm_otg_reset;
 	phy->set_power = msm_otg_set_power;
 	phy->set_suspend = msm_otg_set_suspend;
+#ifdef CONFIG_MAXIM_EVP
+	phy->set_evp = msm_otg_evp_connect;
+#endif
 
 	phy->io_ops = &msm_otg_io_ops;
 
@@ -5445,7 +5573,6 @@ static int msm_otg_probe(struct platform_device *pdev)
 			goto remove_cdev;
 		}
 	}
-
 	motg->pm_notify.notifier_call = msm_otg_pm_notify;
 	register_pm_notifier(&motg->pm_notify);
 
