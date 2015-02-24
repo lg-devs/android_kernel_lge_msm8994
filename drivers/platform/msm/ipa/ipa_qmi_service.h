@@ -29,7 +29,7 @@
 #define SUBSYS_MODEM "modem"
 
 #define IPAWANDBG(fmt, args...) \
-	pr_debug(DEV_NAME " %s:%d " fmt, __func__, __LINE__, ## args)
+	pr_err(DEV_NAME " %s:%d " fmt, __func__, __LINE__, ## args) //lge_debug
 #define IPAWANERR(fmt, args...) \
 	pr_err(DEV_NAME " %s:%d " fmt, __func__, __LINE__, ## args)
 

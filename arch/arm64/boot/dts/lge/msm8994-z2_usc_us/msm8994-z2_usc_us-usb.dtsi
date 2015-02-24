@@ -11,3 +11,9 @@
  */
 
 #include "../msm8994-z2_common/msm8994-common-usb.dtsi"
+
+&hsphy0 {
+    status = "ok";
+    qcom,hsphy-init = <0x00D0F5A4>;
+};
+

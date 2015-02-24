@@ -516,6 +516,13 @@ config LGE_PM_UNIFIED_WLC_ALIGNMENT_IDT9025A
 	help
 	  wireless charger control driver
 
+config LGE_PM_UNIFIED_WLC_OTP
+	tristate "wireless charger control driver"
+	depends on LGE_PM_UNIFIED_WLC
+	default n
+	help
+	  wireless charger control driver
+
 config QPNP_FG
 	tristate "QPNP fuel gauge driver"
 	depends on SPMI

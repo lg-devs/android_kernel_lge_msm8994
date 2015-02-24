@@ -54,6 +54,9 @@ static struct batt_temp_table chg_temp_table[CHG_MAXIDX] = {
 static enum lge_charging_states charging_state;
 static enum lge_states_changes states_change;
 static int change_charger;
+#ifdef CONFIG_LGE_THERMALE_CHG_CONTROL_FOR_WLC
+static int change_charger_dc;
+#endif
 static int pseudo_chg_ui;
 
 #ifdef CONFIG_LGE_THERMALE_CHG_CONTROL
@@ -229,7 +232,18 @@ void lge_monitor_batt_temp(struct charging_info req, struct charging_rsp *res)
 			res->force_update = true;
 		} else
 			res->force_update = false;
-	} else {
+	}
+#ifdef CONFIG_LGE_THERMALE_CHG_CONTROL_FOR_WLC
+	else if (change_charger_dc ^ req.is_charger_dc) {
+		change_charger_dc = req.is_charger_dc;
+		if (req.is_charger_dc) {
+			charging_state = CHG_BATT_NORMAL_STATE;
+			res->force_update = true;
+		} else
+			res->force_update = false;
+	}
+#endif
+	else {
 		res->force_update = false;
 	}
 
@@ -245,7 +259,54 @@ void lge_monitor_batt_temp(struct charging_info req, struct charging_rsp *res)
 	res->disable_chg =
 		charging_state == CHG_BATT_STPCHG_STATE ? true : false;
 
+#ifdef CONFIG_LGE_THERMALE_CHG_CONTROL_FOR_WLC
+	pr_err("[WLC]req.is_charger_dc = %d\n", req.is_charger_dc);
+	pr_err("[WLC]req.is_charger = %d\n", req.is_charger);
+#endif
+
 #ifdef CONFIG_LGE_THERMALE_CHG_CONTROL
+#ifdef CONFIG_LGE_THERMALE_CHG_CONTROL_FOR_WLC
+	if(req.is_charger_dc && !req.is_charger){
+		if (charging_state == CHG_BATT_NORMAL_STATE) {
+			if (req.wlc_current_te <= req.wlc_current_ma)
+				res->dc_current = req.wlc_current_te;
+			else
+				res->dc_current = req.wlc_current_ma;
+		} else if (charging_state == CHG_BATT_DECCUR_STATE) {
+			if (req.wlc_current_te <= DC_IUSB_CURRENT)
+				res->dc_current = req.wlc_current_te;
+			else
+				res->dc_current = DC_IUSB_CURRENT;
+		} else {
+			res->dc_current = DC_CURRENT_DEF;
+		}
+
+		if(last_thermal_current ^ res->dc_current){
+			last_thermal_current = res->dc_current;
+			res->force_update = true;
+		}
+	}
+	else {
+		if (charging_state == CHG_BATT_NORMAL_STATE) {
+			if (req.chg_current_te <= req.chg_current_ma)
+				res->dc_current = req.chg_current_te;
+			else
+				res->dc_current = req.chg_current_ma;
+		} else if (charging_state == CHG_BATT_DECCUR_STATE) {
+			if (req.chg_current_te <= DC_IUSB_CURRENT)
+				res->dc_current = req.chg_current_te;
+			else
+				res->dc_current = DC_IUSB_CURRENT;
+		} else {
+			res->dc_current = DC_CURRENT_DEF;
+		}
+
+		if (last_thermal_current ^ res->dc_current) {
+			last_thermal_current = res->dc_current;
+			res->force_update = true;
+		}
+	}
+#else
 	if (charging_state == CHG_BATT_NORMAL_STATE) {
 		if (req.chg_current_te <= req.chg_current_ma)
 			res->dc_current = req.chg_current_te;
@@ -264,6 +325,7 @@ void lge_monitor_batt_temp(struct charging_info req, struct charging_rsp *res)
 		last_thermal_current = res->dc_current;
 		res->force_update = true;
 	}
+#endif  //                                       
 #else
 	res->dc_current =
 		charging_state ==

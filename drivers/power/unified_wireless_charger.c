@@ -98,29 +98,7 @@ int disconnection_cnt;
 
 static void wireless_inserted(struct unified_wlc_chip *chip);
 static void wireless_removed(struct unified_wlc_chip *chip);
-#if 0
-static int wlc_thermal_mitigation = -1;
 
-static int set_wlc_thermal_mitigation(const char *val, struct kernel_param *kp)
-{
-	int ret;
-
-	ret = param_set_int(val, kp);
-	if (ret) {
-		pr_err("error setting value %d\n", ret);
-		return ret;
-	}
-
-	if (!the_chip) {
-		pr_err("called before init\n");
-		return ret;
-	}
-
-	return 0;
-}
-module_param_call(wlc_thermal_mitigation, set_wlc_thermal_mitigation,
-	param_get_int, &wlc_thermal_mitigation, 0644);
-#endif
 int is_wireless_charger_plugged_internal(struct unified_wlc_chip *chip)
 {
 	bool ret = chip->wlc_state;

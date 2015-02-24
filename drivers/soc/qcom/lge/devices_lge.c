@@ -197,7 +197,8 @@ int lge_get_minios(void)
 	switch (lge_boot_mode) {
 	case LGE_BOOT_MODE_QEM_56K:
 	case LGE_BOOT_MODE_QEM_130K:
-	case LGE_BOOT_MODE_MINIOS:
+	case LGE_BOOT_MODE_QEM_910K:
+	case LGE_BOOT_MODE_PIF_910K:
 		res = 1;
 		break;
 	default:
@@ -429,7 +430,11 @@ static int __init lge_uart_mode(char *uart_mode)
 		 * Enabling uart log enabling by earjack debugger It is usefull during developing stage.
 		 * Becase uart log should be disabled on mass product version, it is disabled by default.
 		 */
-		/* lge_uart_console_set_config(UART_CONSOLE_ENABLE_ON_EARJACK_DEBUGGER); */
+#ifndef CONFIG_LGE_USER_MODE
+        lge_uart_console_set_config(UART_CONSOLE_ENABLE_ON_EARJACK_DEBUGGER);
+#else
+        ;
+#endif
 	}
 
 	lge_uart_console_set_enabled(lge_uart_console_should_enable_on_default() ? UART_CONSOLE_ENABLED : 0);

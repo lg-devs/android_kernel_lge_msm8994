@@ -29,8 +29,8 @@ endif
 
 ifdef CONFIG_TOUCHSCREEN_SYNAPTICS_FW_PATH
 fwpath := $(subst ",,$(CONFIG_TOUCHSCREEN_SYNAPTICS_FW_PATH))
-#synaptics_img_file := $(wildcard $(srctree)/firmware/synaptics/$(fwpath)/*.img)
-#synaptics_img_file += $(wildcard $(srctree)/firmware/synaptics/$(fwpath)/*.txt)
+synaptics_img_file := $(wildcard $(srctree)/firmware/synaptics/$(fwpath)/*.img)
+synaptics_img_file += $(wildcard $(srctree)/firmware/synaptics/$(fwpath)/*.txt)
 endif
 synaptics_firmware := $(subst $(srctree)/firmware/,,$(synaptics_img_file))
 

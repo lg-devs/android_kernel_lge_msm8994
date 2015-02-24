@@ -147,7 +147,7 @@
 		rebase_since_init = <3>;
 		rebase_since_rebase = <5>;
 		use_lpwg_all = <1>;
-		use_security_mode = <0>;
+		use_security_mode = <1>;
 		use_lcd_notifier_callback = <0>;
 		/*ghost_detection -E*/
 
@@ -173,7 +173,7 @@
 		ref_chk_option = <0 0 1 1>;
 
 		/* firmware & limits */
-		fw_image = "synaptics/z2/PLG349-V1.10-PR1809562-DS5.5.1.0.1066_5005518A.img";
+		fw_image = "synaptics/z2/PLG349-V1.11-PR1809562-DS5.5.1.0.1066_5005518B.img";
 		panel_spec = "synaptics/z2/z2_limit.txt";
 		panel_spec_mfts = "synaptics/z2/z2_limit_mfts.txt";
 	};
@@ -272,7 +272,7 @@
 		rebase_since_init = <3>;
 		rebase_since_rebase = <5>;
 		use_lpwg_all = <1>;
-		use_security_mode = <0>;
+		use_security_mode = <1>;
 		use_lcd_notifier_callback = <0>;
 		/*ghost_detection -E*/
 

@@ -270,6 +270,7 @@ int lgit_ois_calibration(int ver)
 
 	/* Cal. Dato to eeprom */
 	ois_i2c_e2p_write(0x0908, (uint16_t)(0xFFFF & gyro_offset_value_x), 2);
+	usleep(50 * 1000);
 	ois_i2c_e2p_write(0x090A, (uint16_t)(0xFFFF & gyro_offset_value_y), 2); /* gyro_offset_value_x -> gyro_offset_value_y로 수정함.(김형관) */
 
 	/* Cal. Data to OIS Driver */

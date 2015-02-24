@@ -62,6 +62,9 @@
 extern int lge_get_sbl_cable_type(void);
 static int firstboot_check = 1;
 #endif
+#ifdef CONFIG_SLIMPORT_ANX7812
+#include <linux/slimport.h>
+#endif
 
 /* cpu to fix usb interrupt */
 static int cpu_to_affin;
@@ -1536,18 +1539,20 @@ static void dwc3_cable_adc_work(struct work_struct *w)
 			chg_to_string(mdwc->charger.chg_type));
 	lge_pm_read_cable_info(mdwc->vadc_id_dev);
 
-    //If a 910K cable in qem boot, just reset here.
-    boot_mode = lge_get_boot_mode();
-    if(lge_pm_get_cable_type() == CABLE_910K &&
-      (boot_mode == LGE_BOOT_MODE_QEM_56K ||
-       boot_mode == LGE_BOOT_MODE_QEM_130K) &&
-      (lge_get_sbl_cable_type() != 11 || !firstboot_check) &&
-      !lge_get_laf_mode())
+	/* If a 910K cable in qem boot, just reset here. */
+	boot_mode = lge_get_boot_mode();
+	if (lge_pm_get_cable_type() == CABLE_910K &&
+		(boot_mode == LGE_BOOT_MODE_QEM_56K ||
+		 boot_mode == LGE_BOOT_MODE_QEM_130K) &&
+		(lge_get_sbl_cable_type() != 11 || !firstboot_check) &&
+		!lge_get_laf_mode()
+#ifdef CONFIG_SLIMPORT_ANX7812
+		&& !slimport_is_connected()
+#endif
+		)
 	{
 		pr_info("[FACTORY] Reset due to 910K cable fast pace, pm:%d, sbl:%d\n boot:%d",
 				lge_pm_get_cable_type(), lge_get_sbl_cable_type(), boot_mode);
-
-		//msleep(50);
 
 		/* write magic number for laf mode */
 		msm_set_restart_mode(RESTART_DLOAD);

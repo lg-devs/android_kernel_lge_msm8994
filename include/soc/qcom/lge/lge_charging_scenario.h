@@ -21,7 +21,7 @@
 #include <linux/kernel.h>
 
 #define CONFIG_LGE_THERMALE_CHG_CONTROL
-#if defined(CONFIG_CHARGER_UNIFIED_WLC)
+#if defined(CONFIG_LGE_PM_UNIFIED_WLC_OTP)
 #define CONFIG_LGE_THERMALE_CHG_CONTROL_FOR_WLC
 #endif
 
@@ -29,7 +29,7 @@
 #if defined(CONFIG_BQ24192_CHARGER)
 #define DC_IUSB_CURRENT  500
 #else
-#define DC_IUSB_CURRENT  450
+#define DC_IUSB_CURRENT  500
 #endif
 #define DC_CURRENT_DEF   -1
 
@@ -78,8 +78,9 @@ struct charging_info {
 	int     current_now;
 #ifdef CONFIG_LGE_THERMALE_CHG_CONTROL
 #ifdef CONFIG_LGE_THERMALE_CHG_CONTROL_FOR_WLC
-	int		input_current_ma;
-	int		input_current_te;
+	int		wlc_current_ma;
+	int		wlc_current_te;
+	int		is_charger_dc;
 #endif
 	int     chg_current_ma;
 	int     chg_current_te;

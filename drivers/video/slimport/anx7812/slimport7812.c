@@ -28,6 +28,8 @@
 #include <linux/async.h>
 #include <linux/slimport.h>
 #include <linux/ratelimit.h>
+#include <soc/qcom/lge/board_lge.h>
+#include <soc/qcom/smem.h>
 
 #include "slimport7812_tx_reg.h"
 #include "slimport7812_tx_drv.h"
@@ -82,7 +84,7 @@ struct anx7816_data {
 	bool slimport_connected;
 };
 
-//static unsigned int cable_smem_size;
+static unsigned int cable_smem_size;
 
 struct msm_hdmi_slimport_ops *hdmi_slimport_ops;
 
@@ -1402,12 +1404,11 @@ static int anx7816_parse_dt(
 }
 #endif
 
-/*
 int anx7816_get_sbl_cable_type(void)
 {
 	int cable_type = 0;
 	unsigned int *p_cable_type = (unsigned int *)
-		(smem_get_entry(SMEM_ID_VENDOR1, &cable_smem_size));
+		(smem_get_entry(SMEM_ID_VENDOR1, &cable_smem_size, 0, 0));
 
 	if (p_cable_type)
 		cable_type = *p_cable_type;
@@ -1416,7 +1417,7 @@ int anx7816_get_sbl_cable_type(void)
 
 	return cable_type;
 }
-*/
+
 static int anx7816_i2c_probe(struct i2c_client *client,
 			const struct i2c_device_id *id)
 {
@@ -1424,7 +1425,7 @@ static int anx7816_i2c_probe(struct i2c_client *client,
 	struct anx7816_data *anx7816;
 	struct anx7816_platform_data *pdata;
 	int ret = 0;
-	//int sbl_cable_type = 0;
+	int sbl_cable_type = 0;
 
 	pr_err("%s %s start\n", LOG_TAG, __func__);
 
@@ -1530,11 +1531,11 @@ static int anx7816_i2c_probe(struct i2c_client *client,
 				WAKE_LOCK_SUSPEND,
 				"slimport_wake_lock");
 
-	//sbl_cable_type = anx7816_get_sbl_cable_type();
+	sbl_cable_type = anx7816_get_sbl_cable_type();
 
-/*                                                
-                               */ 
-//	{
+	if ((lge_get_laf_mode() != LGE_LAF_MODE_LAF) &&
+		(sbl_cable_type != CBL_910K))
+	{
 
 		ret = request_threaded_irq(client->irq, NULL, anx7816_cbl_det_isr,
 						IRQF_TRIGGER_RISING
@@ -1559,11 +1560,11 @@ static int anx7816_i2c_probe(struct i2c_client *client,
 			pr_err("interrupt wake enable fail\n");
 			goto err3;
 		}
-/*	} else {
+	} else {
 		pr_err("%s %s : %s, Disable cbl det irq!!\n", LOG_TAG, __func__,
 			sbl_cable_type == CBL_910K ? "910K Cable Connected" : "Laf Mode");
 	}
-*/
+
 	ret = create_sysfs_interfaces(&client->dev);
 	if (ret < 0) {
 		pr_err("%s : sysfs register failed", __func__);
