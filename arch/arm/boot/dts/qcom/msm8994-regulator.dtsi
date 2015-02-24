@@ -572,6 +572,7 @@
 		qcom,corner-acc-map = <0 0 0 0>;
 		qcom,acc-sel-l1-bit-pos = <0>;
 		qcom,acc-sel-l1-bit-size = <1>;
+		status = "disabled";
 	};
 
 	mem_acc1_vreg_corner: mem-acc1-regulator {
@@ -604,8 +605,6 @@
 		qcom,vdd-mx-vmax = <7>;
 		qcom,vdd-mx-vmin-method = <4>;
 		vdd-mx-supply = <&pm8994_s2_corner_ao>;
-
-		mem-acc-supply = <&mem_acc0_vreg_corner>;
 
 		qcom,cpr-ref-clk = <19200>;
 		qcom,cpr-timer-delay = <5000>;
@@ -661,7 +660,7 @@
 					      1115000 1180000 1180000 1180000
 					      1180000>;
 		qcom,cpr-voltage-floor-override =
-				<0xFFFFFFFF 0 700000 700000 715000 725000
+				<0xFFFFFFFF 0 790000 790000 790000 790000
 					      790000 815000 835000 900000
 					      935000 940000 965000 990000
 					      1010000>;

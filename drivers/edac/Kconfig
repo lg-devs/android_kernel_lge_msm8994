@@ -389,6 +389,13 @@ config EDAC_CORTEX_ARM64_PANIC_ON_CE
 
 	   For production builds, you should definitely say 'N' here.
 
+config EDAC_CORTEX_ARM64_DBE_IRQ_ONLY
+	depends on EDAC_CORTEX_ARM64
+	bool "Only check for parity errors when an irq is generated"
+	default y
+	help
+	  Do not check for parity errors during abort paths.
+
 config EDAC_CORTEX_ARM64_PANIC_ON_UE
 	depends on EDAC_CORTEX_ARM64
 	bool "Panic on uncorrectable errors"

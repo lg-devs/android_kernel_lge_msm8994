@@ -617,8 +617,15 @@ static ssize_t proc_bt_preproto_write(struct file *file, const char __user *buf,
 	if (copy_from_user(&preproto, buf, 1))
 		return -EFAULT;
 
-	if (preproto == '1')
-		hsuart_power(1);
+	if (preproto == '1'){
+		if(bsi->uport == NULL){
+			BT_INFO("NULL");
+			bsi->uport = msm_hs_get_bt_uport(BT_PORT_NUM);
+		} else {
+			BT_INFO("NOT NULL");
+              }
+              hsuart_power(1);
+	}
 	/* claim that we wrote everything */
 	return length;
 
@@ -1318,7 +1325,7 @@ static int bluetooth_pm_probe(struct platform_device *pdev)
 		goto free_res;
 	}
 #ifdef UART_CONTROL_MSM
-	bsi->uport= msm_hs_get_bt_uport(BT_PORT_NUM);
+	bsi->uport = NULL;//msm_hs_get_bt_uport(BT_PORT_NUM);
 #endif/*UART_CONTROL_MSM*/
 
 #ifdef QOS_REQUEST_MSM

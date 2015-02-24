@@ -703,7 +703,7 @@ int32_t ois_i2c_write_table(struct msm_camera_i2c_reg_setting *write_setting)
 
 	cci_client = local_msm_ois_t->i2c_client.cci_client;
 	cci_client->sid =  local_msm_ois_t->sid_ois;
-	cci_client->retries = 3;
+	cci_client->retries = 0;
 	cci_client->id_map = 0;
 	cci_client->cci_i2c_master = local_msm_ois_t->cci_master;
 	local_msm_ois_t->i2c_client.addr_type = MSM_CAMERA_I2C_WORD_ADDR;
@@ -717,7 +717,7 @@ int32_t ois_i2c_write_seq_table(struct msm_camera_i2c_seq_reg_setting *write_set
 
 	cci_client = local_msm_ois_t->i2c_client.cci_client;
 	cci_client->sid = local_msm_ois_t->sid_ois;
-	cci_client->retries = 3;
+	cci_client->retries = 0;
 	cci_client->id_map = 0;
 	cci_client->cci_i2c_master = local_msm_ois_t->cci_master;
 	local_msm_ois_t->i2c_client.addr_type = MSM_CAMERA_I2C_WORD_ADDR;
@@ -733,7 +733,7 @@ int32_t ois_i2c_write(uint16_t addr, uint16_t data, enum msm_camera_i2c_data_typ
 
 	cci_client = local_msm_ois_t->i2c_client.cci_client;
 	cci_client->sid = local_msm_ois_t->sid_ois;
-	cci_client->retries = 3;
+	cci_client->retries = 0;
 	cci_client->id_map = 0;
 	cci_client->cci_i2c_master = local_msm_ois_t->cci_master;
 	local_msm_ois_t->i2c_client.addr_type = MSM_CAMERA_I2C_WORD_ADDR;
@@ -749,7 +749,7 @@ int32_t ois_i2c_read(uint16_t addr, uint16_t *data, enum msm_camera_i2c_data_typ
 
 	cci_client = local_msm_ois_t->i2c_client.cci_client;
 	cci_client->sid = local_msm_ois_t->sid_ois;
-	cci_client->retries = 3;
+	cci_client->retries = 0;
 	cci_client->id_map = 0;
 	cci_client->cci_i2c_master = local_msm_ois_t->cci_master;
 	local_msm_ois_t->i2c_client.addr_type = MSM_CAMERA_I2C_WORD_ADDR;
@@ -764,7 +764,7 @@ int32_t ois_i2c_write_seq(uint16_t addr, uint8_t *data, uint16_t num_byte)
 
 	cci_client = local_msm_ois_t->i2c_client.cci_client;
 	cci_client->sid = local_msm_ois_t->sid_ois;
-	cci_client->retries = 3;
+	cci_client->retries = 0;
 	cci_client->id_map = 0;
 	cci_client->cci_i2c_master = local_msm_ois_t->cci_master;
 	local_msm_ois_t->i2c_client.addr_type = MSM_CAMERA_I2C_WORD_ADDR;
@@ -779,7 +779,7 @@ int32_t ois_i2c_read_seq(uint16_t addr, uint8_t *data, uint16_t num_byte)
 
 	cci_client = local_msm_ois_t->i2c_client.cci_client;
 	cci_client->sid = local_msm_ois_t->sid_ois;
-	cci_client->retries = 3;
+	cci_client->retries = 0;
 	cci_client->id_map = 0;
 	cci_client->cci_i2c_master = local_msm_ois_t->cci_master;
 	local_msm_ois_t->i2c_client.addr_type = MSM_CAMERA_I2C_WORD_ADDR;
@@ -794,7 +794,7 @@ int32_t ois_i2c_e2p_write(uint16_t addr, uint16_t data, enum msm_camera_i2c_data
 
 	cci_client = local_msm_ois_t->i2c_client.cci_client;
 	cci_client->sid = 0xA0 >> 1;
-	cci_client->retries = 3;
+	cci_client->retries = 0;
 	cci_client->id_map = 0;
 	cci_client->cci_i2c_master = local_msm_ois_t->cci_master;
 	local_msm_ois_t->i2c_client.addr_type = MSM_CAMERA_I2C_WORD_ADDR;
@@ -810,7 +810,7 @@ int32_t ois_i2c_e2p_read(uint16_t addr, uint16_t *data, enum msm_camera_i2c_data
 
 	cci_client = local_msm_ois_t->i2c_client.cci_client;
 	cci_client->sid = 0xA0 >> 1;
-	cci_client->retries = 3;
+	cci_client->retries = 0;
 	cci_client->id_map = 0;
 	cci_client->cci_i2c_master = local_msm_ois_t->cci_master;
 	local_msm_ois_t->i2c_client.addr_type = MSM_CAMERA_I2C_WORD_ADDR;

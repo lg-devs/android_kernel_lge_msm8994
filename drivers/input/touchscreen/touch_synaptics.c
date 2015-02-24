@@ -124,6 +124,7 @@ bool wakeup_by_swipe;
 /* Interrupt Status */
 #define INTERRUPT_STATUS_REG		(ts->f01.dsc.data_base + 1)
 #define INTERRUPT_MASK_FLASH		0x01
+#define INTERRUPT_MASK_STATUS		0x02
 #define INTERRUPT_MASK_ABS0		0x04
 #define INTERRUPT_MASK_BUTTON		0x10
 #define INTERRUPT_MASK_CUSTOM		0x40
@@ -888,6 +889,12 @@ static int lpwg_control(struct synaptics_ts_data *ts, int mode)
 	case LPWG_SIGNATURE:
 		break;
 	case LPWG_DOUBLE_TAP:                         /* Only TCI-1 */
+		if (ts->ts_swipe_data.support_swipe > NO_SUPPORT_SWIPE) {
+			if (ts->lpwg_ctrl.qcover)
+				swipe_disable(ts);
+			else
+				swipe_enable(ts);
+		}
 		tci_control(ts, TCI_ENABLE_CTRL, 1);  /* Tci-1 enable */
 		tci_control(ts, TAP_COUNT_CTRL, 2);   /* tap count = 2 */
 		tci_control(ts, MIN_INTERTAP_CTRL, 6); /* min inter_tap
@@ -903,14 +910,14 @@ static int lpwg_control(struct synaptics_ts_data *ts, int mode)
 		if (!(strncmp(ts->fw_info.fw_product_id, "PLG349", 6)))  {
 			tci_control(ts, REPORT_MODE_CTRL, 1); /* wakeup_gesture_only */
 		}
+		break;
+	case LPWG_PASSWORD:                           /* TCI-1 and TCI-2 */
 		if (ts->ts_swipe_data.support_swipe > NO_SUPPORT_SWIPE) {
 			if (ts->lpwg_ctrl.qcover)
 				swipe_disable(ts);
 			else
 				swipe_enable(ts);
 		}
-		break;
-	case LPWG_PASSWORD:                           /* TCI-1 and TCI-2 */
 		tci_control(ts, TCI_ENABLE_CTRL, 1);  /* Tci-1 enable */
 		tci_control(ts, TAP_COUNT_CTRL, 2);   /* tap count = 2 */
 		tci_control(ts, MIN_INTERTAP_CTRL, 6); /* min inter_tap
@@ -937,21 +944,15 @@ static int lpwg_control(struct synaptics_ts_data *ts, int mode)
 		if (!(strncmp(ts->fw_info.fw_product_id, "PLG349", 6))) {
 			tci_control(ts, REPORT_MODE_CTRL, 1); /* wakeup_gesture_only */
 		}
-		if (ts->ts_swipe_data.support_swipe > NO_SUPPORT_SWIPE) {
-			if (ts->lpwg_ctrl.qcover)
-				swipe_disable(ts);
-			else
-				swipe_enable(ts);
-		}
 		break;
 	default:
+		if (ts->ts_swipe_data.support_swipe > NO_SUPPORT_SWIPE)
+			swipe_disable(ts);
 		tci_control(ts, TCI_ENABLE_CTRL, 0); /* Tci-1 disable */
 		tci_control(ts, TCI_ENABLE_CTRL2, 0); /* tci-2 disable */
 		if (!(strncmp(ts->fw_info.fw_product_id, "PLG349", 6))) {
 			tci_control(ts, REPORT_MODE_CTRL, 0); /* normal */
 		}
-		if (ts->ts_swipe_data.support_swipe > NO_SUPPORT_SWIPE)
-			swipe_disable(ts);
 		break;
 	}
 
@@ -4150,7 +4151,7 @@ static int get_swipe_info(struct synaptics_ts_data *ts)
 
 	if (swp->support_swipe > NO_SUPPORT_SWIPE) {
 		swp->swipe_min_distance = 10;
-		swp->swipe_ratio_threshold = 100;
+		swp->swipe_ratio_threshold = 200;
 		swp->swipe_ratio_check_period = 5;
 		swp->min_swipe_time_threshold = 0;
 		swp->max_swipe_time_threshold = 150;
@@ -4846,8 +4847,9 @@ enum error_type synaptics_ts_get_data(struct i2c_client *client,
 		} else if ((ts->ts_swipe_data.support_swipe == SWIPE_VER_2)
 				&& (status & ts->ts_swipe_data.swipe_gesture)) {
 			if (get_swipe_data(client) == 0) {
-				send_uevent_lpwg(client, LPWG_SWIPE_DOWN);
 				wakeup_by_swipe = true;
+				if (send_uevent_lpwg(client, LPWG_SWIPE_DOWN) == 0)
+					swipe_disable(ts);
 			}
 		} else {
 			TOUCH_DEBUG(DEBUG_BASE_INFO || DEBUG_LPWG,
@@ -4855,8 +4857,9 @@ enum error_type synaptics_ts_get_data(struct i2c_client *client,
 
 			if (ts->ts_swipe_data.support_swipe == SWIPE_VER_2) {
 				if (get_swipe_data(client) == 0) {
-					send_uevent_lpwg(client, LPWG_SWIPE_DOWN);
 					wakeup_by_swipe = true;
+					if (send_uevent_lpwg(client, LPWG_SWIPE_DOWN) == 0)
+						swipe_disable(ts);
 				}
 			}
 		}
@@ -4871,8 +4874,9 @@ enum error_type synaptics_ts_get_data(struct i2c_client *client,
 
 			if (swipe_buf == ts->ts_swipe_data.swipe_gesture) {
 				get_swipe_data(client);
-				send_uevent_lpwg(client, LPWG_SWIPE_DOWN);
 				wakeup_by_swipe = true;
+				if (send_uevent_lpwg(client, LPWG_SWIPE_DOWN) == 0)
+					swipe_disable(ts);
 				return IGNORE_EVENT;
 			}
 		}
@@ -5064,7 +5068,18 @@ enum error_type synaptics_ts_get_data(struct i2c_client *client,
 			return IGNORE_EVENT;
 		}
 	} else if (ts->ts_data.interrupt_status_reg & INTERRUPT_MASK_FLASH) {
+		TOUCH_ERR_MSG("%s: INTERRUPT_MASK_FLASH!\n", __func__);
 		return ERROR;
+	} else if (ts->ts_data.interrupt_status_reg & INTERRUPT_MASK_STATUS) {
+		TOUCH_INFO_MSG("%s: INTERRUPT_MASK_STATUS!\n", __func__);
+		TOUCH_INFO_MSG("(lpwg_mode:%d, screen:%d, power_state:%d)\n",
+				ts->lpwg_ctrl.lpwg_mode,
+				ts->lpwg_ctrl.screen, power_state);
+		if (ts->lpwg_ctrl.lpwg_mode && !ts->lpwg_ctrl.screen
+				&& (power_state != POWER_ON)) {
+			return ERROR;
+		}
+		return IGNORE_EVENT;
 	} else {
 		return IGNORE_EVENT;
 	}
@@ -5502,9 +5517,6 @@ enum error_type synaptics_ts_suspend(struct i2c_client *client)
 {
 	struct synaptics_ts_data *ts =
 		(struct synaptics_ts_data *)get_touch_handle(client);
-
-	if (ts->ts_swipe_data.support_swipe > NO_SUPPORT_SWIPE)
-		wakeup_by_swipe = false;
 
 	if (ts->pdata->role->use_hover_finger && prox_fhandler.inserted
 			&& prox_fhandler.initialized)

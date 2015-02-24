@@ -61,15 +61,29 @@ static int img_tune_mode = 1;	/* Default value */
 struct img_tune_cmds_desc {
 	struct dsi_panel_cmds img_tune_cmds[IMG_TUNE_COUNT];
 };
-static char *img_tune_dt[] = {
+static char *img_tune_dt_pv[] = {
 	"lgd,img-tune-cmds-cm0",	// Normal
 	"lgd,img-tune-cmds-cm0-plc60",	// Normal + PLC
-	"lgd,img-tune-cmds-cm2",	// Vivid
-	"lgd,img-tune-cmds-cm2-plc60",	// Vivid + PLC
-	"lgd,img-tune-cmds-cm1",	// Natural
-	"lgd,img-tune-cmds-cm1-plc60",	// Natural + PLC
-	"lgd,img-tune-cmds-cm3",
-	"lgd,img-tune-cmds-cm3-plc60",
+	"lgd,img-tune-cmds-cm1",	// Vivid
+	"lgd,img-tune-cmds-cm1-plc60",	// Vivid + PLC
+	"lgd,img-tune-cmds-cm2",	// Natural
+	"lgd,img-tune-cmds-cm2-plc60",	// Natural + PLC
+	"lgd,img-tune-cmds-cm3",	// Reddish reduce
+	"lgd,img-tune-cmds-cm3-plc60",	// Reddish reduce + PLC
+	"lgd,img-tune-cmds-cm4",
+	"lgd,img-tune-cmds-cm4-plc60",
+	"lgd,img-tune-cmds-plc-set",
+	"lgd,img-tune-cmds-plc-unset",
+};
+static char *img_tune_dt_mp[] = {
+	"lgd,img-tune-cmds-cm3",	// Reddish reduce
+	"lgd,img-tune-cmds-cm3-plc60",	// Reddish reduce + PLC
+	"lgd,img-tune-cmds-cm1",	// Vivid
+	"lgd,img-tune-cmds-cm1-plc60",	// Vivid + PLC
+	"lgd,img-tune-cmds-cm2",	// Natural
+	"lgd,img-tune-cmds-cm2-plc60",	// Natural + PLC
+	"lgd,img-tune-cmds-cm0",	// Normal
+	"lgd,img-tune-cmds-cm0-plc60",	// Normal + PLC
 	"lgd,img-tune-cmds-cm4",
 	"lgd,img-tune-cmds-cm4-plc60",
 	"lgd,img-tune-cmds-plc-set",
@@ -217,6 +231,10 @@ static void mdss_dsi_panel_cmds_send(struct mdss_dsi_ctrl_pdata *ctrl,
 	/*Panel ON/Off commands should be sent in DSI Low Power Mode*/
 	if (pcmds->link_state == DSI_LP_MODE)
 		cmdreq.flags  |= CMD_REQ_LP_MODE;
+#if defined(CONFIG_Z2_LGD_POLED_PANEL)
+	else if (pcmds->link_state == DSI_HS_VIDEO_MODE)
+		cmdreq.flags  |= CMD_REQ_HS_MODE;
+#endif
 
 	cmdreq.rlen = 0;
 	cmdreq.cb = NULL;
@@ -304,7 +322,7 @@ int mdss_dsi_panel_dimming_dcs(struct mdss_dsi_ctrl_pdata *ctrl, int enable)
 	switch(img_tune_mode) {
 	case 0:	// Normal
 	case 1:	// Normal + PLC
-		bc_dim[1] = (enable) ? 0x28 : 0x20;
+		bc_dim[1] = (enable) ? 0x2E : 0x26;
 		break;
 	case 2:	// Vivid
 	case 3:	// Vivid + PLC
@@ -1292,6 +1310,10 @@ static int mdss_dsi_parse_dcs_cmds(struct device_node *np,
 		data = of_get_property(np, link_key, NULL);
 		if (data && !strcmp(data, "dsi_hs_mode"))
 			pcmds->link_state = DSI_HS_MODE;
+#if defined(CONFIG_Z2_LGD_POLED_PANEL)
+		else if (data && !strcmp(data, "dsi_hs_video_mode"))
+			pcmds->link_state = DSI_HS_VIDEO_MODE;
+#endif
 		else
 			pcmds->link_state = DSI_LP_MODE;
 	}
@@ -2329,9 +2351,19 @@ static int mdss_panel_parse_dt(struct device_node *np,
 
 #if defined(CONFIG_Z2_LGD_POLED_PANEL)
 	img_tune_cmds_set = kzalloc(sizeof(struct img_tune_cmds_desc), GFP_KERNEL);
-	for (i = 0; i < IMG_TUNE_COUNT; i++)
-		mdss_dsi_parse_dcs_cmds(np, &img_tune_cmds_set->img_tune_cmds[i],
-				img_tune_dt[i], "qcom,img-tune-on-dsi-state");
+	for (i = 0; i < IMG_TUNE_COUNT; i++) {
+		if (lge_get_lgd_poled_ver()) {	// MP
+			mdss_dsi_parse_dcs_cmds(np, &img_tune_cmds_set->img_tune_cmds[i],
+				img_tune_dt_mp[i], "qcom,img-tune-on-dsi-state");
+		} else {			// Not MP (PP/DV/PV)
+			mdss_dsi_parse_dcs_cmds(np, &img_tune_cmds_set->img_tune_cmds[i],
+				img_tune_dt_pv[i], "qcom,img-tune-on-dsi-state");
+		}
+	}
+	pr_info("%s: lgd_poled_ver=%s std_cmd=0x%02X 0x%02X\n", __func__,
+		(lge_get_lgd_poled_ver() ? "MP" : "PV"),
+		img_tune_cmds_set->img_tune_cmds[0].cmds->payload[0],
+		img_tune_cmds_set->img_tune_cmds[0].cmds->payload[1]);
 
 	// for the API mdss_dsi_panel_img_tune_apply (the first lcd on time from lk)
 	if (pdata_base == NULL)

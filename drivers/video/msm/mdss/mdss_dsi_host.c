@@ -218,131 +218,6 @@ void mdss_dsi_disable_irq_nosync(struct mdss_dsi_ctrl_pdata *ctrl, u32 term)
 	spin_unlock(&ctrl->irq_lock);
 }
 
-#define DSI_0_PHY_DSIPHY_GLBL_DIGTOP_DEBUG_SEL	0x1D8
-#define DSI_0_PHY_DSIPHY_LN0_DEBUG_SEL		0x18
-#define DSI_0_PHY_DSIPHY_LN1_DEBUG_SEL		0x58
-#define DSI_0_PHY_DSIPHY_LN2_DEBUG_SEL		0x98
-#define DSI_0_PHY_DSIPHY_LN3_DEBUG_SEL		0xD8
-#define DSI_0_PHY_DSIPHY_GLBL_STATUS_DEBUG_BUS0	0x1F0
-#define DSI_0_PHY_DSIPHY_GLBL_STATUS_DEBUG_BUS1	0x1F4
-#define DSI_0_PHY_DSIPHY_GLBL_STATUS_DEBUG_BUS2	0x1F8
-#define DSI_0_PHY_DSIPHY_GLBL_STATUS_DEBUG_BUS3	0x1FC
-
-void mdss_dsi_get_phy_debug_bus_sub(struct mdss_dsi_ctrl_pdata *ctrl,
-	u32 off, char *off_name)
-{
-	u32 x0, x1, x2, x3;
-
-	MIPI_OUTP((ctrl->phy_io.base) + off, 0x19);
-	pr_err("write %s-> 0x19\n", off_name);
-	x0 = MIPI_INP((ctrl->phy_io.base) + DSI_0_PHY_DSIPHY_GLBL_STATUS_DEBUG_BUS0);
-	x1 = MIPI_INP((ctrl->phy_io.base) + DSI_0_PHY_DSIPHY_GLBL_STATUS_DEBUG_BUS1);
-	x2 = MIPI_INP((ctrl->phy_io.base) + DSI_0_PHY_DSIPHY_GLBL_STATUS_DEBUG_BUS2);
-	x3 = MIPI_INP((ctrl->phy_io.base) + DSI_0_PHY_DSIPHY_GLBL_STATUS_DEBUG_BUS3);
-	pr_err("STATUS_DEBUG Bus0  = %08x, Bus1 = %08x, bus2 = %08x, bus3 = %08x\n", x0, x1, x2, x3);
-
-	MIPI_OUTP((ctrl->phy_io.base) + off, 0x1A);
-	pr_err("write %s-> 0x1A\n", off_name);
-	x0 = MIPI_INP((ctrl->phy_io.base) + DSI_0_PHY_DSIPHY_GLBL_STATUS_DEBUG_BUS0);
-	x1 = MIPI_INP((ctrl->phy_io.base) + DSI_0_PHY_DSIPHY_GLBL_STATUS_DEBUG_BUS1);
-	x2 = MIPI_INP((ctrl->phy_io.base) + DSI_0_PHY_DSIPHY_GLBL_STATUS_DEBUG_BUS2);
-	x3 = MIPI_INP((ctrl->phy_io.base) + DSI_0_PHY_DSIPHY_GLBL_STATUS_DEBUG_BUS3);
-	pr_err("STATUS_DEBUG Bus0  = %08x, Bus1 = %08x, bus2 = %08x, bus3 = %08x\n", x0, x1, x2, x3);
-
-	MIPI_OUTP((ctrl->phy_io.base) + off, 0x1B);
-	pr_err("write %s-> 0x1B\n", off_name);
-	x0 = MIPI_INP((ctrl->phy_io.base) + DSI_0_PHY_DSIPHY_GLBL_STATUS_DEBUG_BUS0);
-	x1 = MIPI_INP((ctrl->phy_io.base) + DSI_0_PHY_DSIPHY_GLBL_STATUS_DEBUG_BUS1);
-	x2 = MIPI_INP((ctrl->phy_io.base) + DSI_0_PHY_DSIPHY_GLBL_STATUS_DEBUG_BUS2);
-	x3 = MIPI_INP((ctrl->phy_io.base) + DSI_0_PHY_DSIPHY_GLBL_STATUS_DEBUG_BUS3);
-	pr_err("STATUS_DEBUG Bus0  = %08x, Bus1 = %08x, bus2 = %08x, bus3 = %08x\n", x0, x1, x2, x3);
-
-	MIPI_OUTP((ctrl->phy_io.base) + off, 0x00);
-	pr_err("write %s-> 0x00\n", off_name);
-}
-
-void mdss_dsi_get_phy_debug_bus(struct mdss_dsi_ctrl_pdata *ctrl)
-{
-	if (ctrl == NULL) {
-		pr_err("%s: Invalid input data\n", __func__);
-		return;
-	}
-
-	pr_err("%s: Start+++++\n", __func__);
-
-	MIPI_OUTP((ctrl->phy_io.base) + DSI_0_PHY_DSIPHY_GLBL_DIGTOP_DEBUG_SEL, 0x07);
-	pr_err("write DIGTOP_DEBUG_SEL-> 0x07\n");
-
-	mdss_dsi_get_phy_debug_bus_sub(ctrl, DSI_0_PHY_DSIPHY_LN0_DEBUG_SEL,
-		"DSI_0_PHY_DSIPHY_LN0_DEBUG_SEL");
-
-	mdss_dsi_get_phy_debug_bus_sub(ctrl, DSI_0_PHY_DSIPHY_LN1_DEBUG_SEL,
-		"DSI_0_PHY_DSIPHY_LN1_DEBUG_SEL");
-
-	mdss_dsi_get_phy_debug_bus_sub(ctrl, DSI_0_PHY_DSIPHY_LN2_DEBUG_SEL,
-		"DSI_0_PHY_DSIPHY_LN2_DEBUG_SEL");
-
-	mdss_dsi_get_phy_debug_bus_sub(ctrl, DSI_0_PHY_DSIPHY_LN3_DEBUG_SEL,
-		"DSI_0_PHY_DSIPHY_LN3_DEBUG_SEL");
-
-	pr_err("%s: End----\n", __func__);
-}
-
-#define DSI0_DEBUG_BUS_CTRL	0x0124
-#define DSI0_DEBUG_BUS		0x0128
-
-void mdss_dsi_get_ctrl_debug_bus(struct mdss_dsi_ctrl_pdata *ctrl)
-{
-	int i;
-	u32 x0;
-
-	if (ctrl == NULL) {
-		pr_err("%s: Invalid input data\n", __func__);
-		return;
-	}
-
-	pr_err("%s: Start+++++\n", __func__);
-	for (i = 0; i < 3; i++) {
-		pr_err("Loop -> %d\n", i);
-		MIPI_OUTP((ctrl->ctrl_base) + DSI0_DEBUG_BUS_CTRL, 0xa1);
-		x0 = MIPI_INP(ctrl->ctrl_base + DSI0_DEBUG_BUS);
-		pr_err("write DSI0_DEBUG_BUS_CTRL-> 0xa1, DSI0_DEBUG_BUS = %08x\n", x0);
-
-		MIPI_OUTP((ctrl->ctrl_base) + DSI0_DEBUG_BUS_CTRL, 0xb1);
-		x0 = MIPI_INP(ctrl->ctrl_base + DSI0_DEBUG_BUS);
-		pr_err("write DSI0_DEBUG_BUS_CTRL-> 0xb1, DSI0_DEBUG_BUS = %08x\n", x0);
-
-		MIPI_OUTP((ctrl->ctrl_base) + DSI0_DEBUG_BUS_CTRL, 0xc1);
-		x0 = MIPI_INP(ctrl->ctrl_base + DSI0_DEBUG_BUS);
-		pr_err("write DSI0_DEBUG_BUS_CTRL-> 0xc1, DSI0_DEBUG_BUS = %08x\n", x0);
-
-		MIPI_OUTP((ctrl->ctrl_base) + DSI0_DEBUG_BUS_CTRL, 0xd1);
-		x0 = MIPI_INP(ctrl->ctrl_base + DSI0_DEBUG_BUS);
-		pr_err("write DSI0_DEBUG_BUS_CTRL-> 0xd1, DSI0_DEBUG_BUS = %08x\n", x0);
-
-		MIPI_OUTP((ctrl->ctrl_base) + DSI0_DEBUG_BUS_CTRL, 0xe1);
-		x0 = MIPI_INP(ctrl->ctrl_base + DSI0_DEBUG_BUS);
-		pr_err("write DSI0_DEBUG_BUS_CTRL-> 0xe1, DSI0_DEBUG_BUS = %08x\n", x0);
-
-		MIPI_OUTP((ctrl->ctrl_base) + DSI0_DEBUG_BUS_CTRL, 0xf1);
-		x0 = MIPI_INP(ctrl->ctrl_base + DSI0_DEBUG_BUS);
-		pr_err("write DSI0_DEBUG_BUS_CTRL-> 0xf1, DSI0_DEBUG_BUS = %08x\n", x0);
-
-		MIPI_OUTP((ctrl->ctrl_base) + DSI0_DEBUG_BUS_CTRL, 0x1c1);
-		x0 = MIPI_INP(ctrl->ctrl_base + DSI0_DEBUG_BUS);
-		pr_err("write DSI0_DEBUG_BUS_CTRL-> 0x1c1, DSI0_DEBUG_BUS = %08x\n", x0);
-
-		MIPI_OUTP((ctrl->ctrl_base) + DSI0_DEBUG_BUS_CTRL, 0x1d1);
-		x0 = MIPI_INP(ctrl->ctrl_base + DSI0_DEBUG_BUS);
-		pr_err("write DSI0_DEBUG_BUS_CTRL-> 0x1d1, DSI0_DEBUG_BUS = %08x\n", x0);
-
-		MIPI_OUTP((ctrl->ctrl_base) + DSI0_DEBUG_BUS_CTRL, 0x1e1);
-		x0 = MIPI_INP(ctrl->ctrl_base + DSI0_DEBUG_BUS);
-		pr_err("write DSI0_DEBUG_BUS_CTRL-> 0x1e1, DSI0_DEBUG_BUS = %08x\n", x0);
-	}
-	pr_err("%s: End------\n", __func__);
-}
-
 void mdss_dsi_video_test_pattern(struct mdss_dsi_ctrl_pdata *ctrl)
 {
 	int i;
@@ -356,21 +231,6 @@ void mdss_dsi_video_test_pattern(struct mdss_dsi_ctrl_pdata *ctrl)
 		msleep(20);
 	}
 	MIPI_OUTP((ctrl->ctrl_base) + 0x015c, 0x0);
-}
-
-void dsidumpreg(struct mdss_dsi_ctrl_pdata *ctrl){
-    u32 tmp0x0,tmp0x4, tmp0x8, tmp0xC;
-    int i;
-
-    pr_info("%s: ============= DSI DUMP ==============\n", __func__);
-    for(i=0; i< 122; i++){ //0x558/16 = 85
-        tmp0x0 = MIPI_INP(ctrl->ctrl_base + (i*16)+0x0);
-        tmp0x4 = MIPI_INP(ctrl->ctrl_base +(i*16)+0x4);
-        tmp0x8 = MIPI_INP(ctrl->ctrl_base +(i*16)+0x8);
-        tmp0xC = MIPI_INP(ctrl->ctrl_base +(i*16)+0xC);
-        pr_info("[DSI0 offset : %04x] : %08x  %08x  %08x  %08x\n",(u32)i*16, tmp0x0,tmp0x4, tmp0x8, tmp0xC);
-    }
-    pr_info("%s: ============= END ==============\n", __func__);
 }
 
 void mdss_dsi_cmd_test_pattern(struct mdss_dsi_ctrl_pdata *ctrl)
@@ -2286,9 +2146,6 @@ void mdss_dsi_fifo_status(struct mdss_dsi_ctrl_pdata *ctrl)
 	if (status & 0xcccc4489) {
 		MIPI_OUTP(base + 0x000c, status);
 		pr_err("%s: status=%x\n", __func__, status);
-        dsidumpreg(ctrl);
-        mdss_dsi_get_phy_debug_bus(ctrl);
-        mdss_dsi_get_ctrl_debug_bus(ctrl);
 
         schedule_work(&ctrl->fifo_underflow);
 		if (status & 0x44440000) {/* DLNx_HS_FIFO_OVERFLOW */

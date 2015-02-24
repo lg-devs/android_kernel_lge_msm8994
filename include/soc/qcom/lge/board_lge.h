@@ -74,6 +74,10 @@ char* lge_get_dsv_vendor(void);
 int lge_get_jdi_cut(void);
 #endif
 
+#if defined(CONFIG_Z2_LGD_POLED_PANEL)
+int lge_get_lgd_poled_ver(void);
+#endif
+
 #if defined(CONFIG_PRE_SELF_DIAGNOSIS)
 struct pre_selfd_platform_data {
 	int (*set_values) (int r, int g, int b);

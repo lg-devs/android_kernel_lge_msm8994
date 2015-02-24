@@ -232,7 +232,8 @@ END :
 
 }
 #else
-#define I2C_WRITE_MAX_BYTE 4
+//#define I2C_WRITE_MAX_BYTE 4
+#define I2C_WRITE_MAX_BYTE 128  // change value to avoid fail
 int32_t ois_i2c_bin_seq_write(uint16_t src_saddr, uint16_t src_eaddr, uint16_t dst_addr, uint8_t *ois_bin)
 {
 	uint16_t writen_byte = 0, cnt;

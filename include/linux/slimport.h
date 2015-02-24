@@ -76,6 +76,7 @@ void slimport_set_hdmi_hpd(int on);
 
 #ifdef CONFIG_SLIMPORT_COMMON
 bool slimport_is_connected(void);
+bool slimport_is_check(void);
 #else
 static inline bool slimport_is_connected(void)
 {

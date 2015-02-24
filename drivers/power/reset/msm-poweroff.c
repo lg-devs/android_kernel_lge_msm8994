@@ -80,6 +80,10 @@ static struct notifier_block panic_blk = {
 
 int scm_set_dload_mode(int arg1, int arg2)
 {
+    pr_info("skip to SCM_DLOAD_CMD"); // CN01871926
+    return 0;
+
+#if 0
 	struct scm_desc desc = {
 		.args[0] = arg1,
 		.args[1] = arg2,
@@ -89,12 +93,15 @@ int scm_set_dload_mode(int arg1, int arg2)
 	if (!scm_dload_supported)
 		return 0;
 
+    pr_err("scm_call: BOOT/SCM_DLOAD_CMD!");
+
 	if (!is_scm_armv8())
 		return scm_call_atomic2(SCM_SVC_BOOT, SCM_DLOAD_CMD, arg1,
 					arg2);
 
 	return scm_call2_atomic(SCM_SIP_FNID(SCM_SVC_BOOT, SCM_DLOAD_CMD),
 				&desc);
+#endif
 }
 
 static void set_dload_mode(int on)

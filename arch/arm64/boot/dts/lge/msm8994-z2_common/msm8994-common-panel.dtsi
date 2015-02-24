@@ -61,7 +61,7 @@
 			/* Step-up control */
 			39 01 00 00 00 00 09 E5 04 81 54 0A 81 82 82 82
 			/* Temp. sensor control off, delay 7-frames */
-			39 01 00 00 0A 00 03 F9 08 00
+			39 01 00 00 7B 00 03 F9 08 00
 			/* Display on */
 			05 01 00 00 00 00 01 29
 			];
@@ -76,37 +76,43 @@
 		qcom,mdss-dsi-h-sync-pulse = <0>;
 
 		/* Image tuning cmds set */
-		qcom,img-tune-on-dsi-state = "dsi_hs_mode";
+		qcom,img-tune-on-dsi-state = "dsi_hs_video_mode";
 		lgd,img-tune-cmds-cm0 = [
-			15 01 00 00 00 00 02 53 28
+			15 00 00 00 00 00 02 53 2E
+			39 00 00 00 00 00 19 D7 80 80 80 80 80 80 80 80 80 80 80 80 80 80 80 80 70 74 78 80 80 80 80 80
+			39 00 00 00 00 00 0D D8 7F 7F 7F 7F 7F 7F 7F 7F 7F 7F 7F 7F
+			39 01 00 00 00 00 0D D9 00 00 00 00 00 00 00 00 00 00 00 00
 			15 01 00 00 00 00 02 55 40
 		];
 		lgd,img-tune-cmds-cm0-plc60 = [
-			15 01 00 00 00 00 02 53 28
+			15 00 00 00 00 00 02 53 2E
+			39 00 00 00 00 00 19 D7 80 80 80 80 80 80 80 80 80 80 80 80 80 80 80 80 70 74 78 80 80 80 80 80
+			39 00 00 00 00 00 0D D8 7F 7F 7F 7F 7F 7F 7F 7F 7F 7F 7F 7F
+			39 01 00 00 00 00 0D D9 00 00 00 00 00 00 00 00 00 00 00 00
 			15 01 00 00 00 00 02 55 43
 		];
 		lgd,img-tune-cmds-cm1 = [
-			15 01 00 00 00 00 02 53 2C
+			15 01 00 00 00 00 02 53 AD
 			15 01 00 00 00 00 02 55 40
 		];
 		lgd,img-tune-cmds-cm1-plc60 = [
-			15 01 00 00 00 00 02 53 2C
+			15 01 00 00 00 00 02 53 AD
 			15 01 00 00 00 00 02 55 43
 		];
 		lgd,img-tune-cmds-cm2 = [
-			15 01 00 00 00 00 02 53 AD
+			15 01 00 00 00 00 02 53 2C
 			15 01 00 00 00 00 02 55 40
 		];
 		lgd,img-tune-cmds-cm2-plc60 = [
-			15 01 00 00 00 00 02 53 AD
+			15 01 00 00 00 00 02 53 2C
 			15 01 00 00 00 00 02 55 43
 		];
 		lgd,img-tune-cmds-cm3 = [
-			15 01 00 00 00 00 02 53 26
+			15 01 00 00 00 00 02 53 2E
 			15 01 00 00 00 00 02 55 40
 		];
 		lgd,img-tune-cmds-cm3-plc60 = [
-			15 01 00 00 00 00 02 53 26
+			15 01 00 00 00 00 02 53 2E
 			15 01 00 00 00 00 02 55 43
 		];
 		lgd,img-tune-cmds-cm4 = [
@@ -123,7 +129,6 @@
 		lgd,img-tune-cmds-plc-unset = [
 			15 01 00 00 00 00 02 55 40
 		];
-		qcom,img-tune-off-dsi-state = "dsi_hs_mode";
 
 		qcom,mdss-dsi-traffic-mode = "non_burst_sync_event";
 

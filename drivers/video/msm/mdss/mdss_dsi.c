@@ -828,7 +828,6 @@ int mdss_dsi_on(struct mdss_panel_data *pdata)
 	if (mipi->init_delay)
 		usleep(mipi->init_delay);
 
-#if !defined(CONFIG_Z2_LGD_POLED_PANEL)
 	if (mipi->force_clk_lane_hs) {
 		u32 tmp;
 
@@ -837,7 +836,6 @@ int mdss_dsi_on(struct mdss_panel_data *pdata)
 		MIPI_OUTP((ctrl_pdata->ctrl_base) + 0xac, tmp);
 		wmb();
 	}
-#endif
 
 	if (pdata->panel_info.type == MIPI_CMD_PANEL)
 		mdss_dsi_clk_ctrl(ctrl_pdata, DSI_ALL_CLKS, 0);
@@ -942,10 +940,6 @@ static int mdss_dsi_unblank(struct mdss_panel_data *pdata)
 		}
 		ctrl_pdata->ctrl_state |= CTRL_STATE_PANEL_INIT;
 	}
-
-#if defined(CONFIG_Z2_LGD_POLED_PANEL)
-	mdss_dsi_lane_config(pdata, 1);
-#endif
 
 	if ((pdata->panel_info.type == MIPI_CMD_PANEL) &&
 		mipi->vsync_enable && mipi->hw_vsync_mode) {

@@ -165,7 +165,7 @@ static int32 tunerbb_drv_convert_chnum_to_freq(uint32 ch_num);
 static uint32 tunerbb_drv_fc8080_get_viterbi_ber(void);
 static int8 tunerbb_drv_fc8080_get_sync_status(void);
 //static uint32 tunerbb_drv_fc8080_get_rs_ber(void);
-static int8 tunerbb_drv_fc8080_check_overrun(uint8 op_mode);
+//static int8 tunerbb_drv_fc8080_check_overrun(uint8 op_mode);
 void tunerbb_drv_fc8080_isr_control(fci_u8 onoff);
 #ifdef FEATURE_RSSI_DEBUG
 void tunerbb_drv_fc8080_get_dm(fci_u32 *mscber, fci_u32 *tp_err, fci_u16 *tpcnt, fci_u32 *vaber, fci_s8 *rssi);
@@ -588,7 +588,7 @@ int8	tunerbb_drv_fc8080_get_ber(struct broadcast_tdmb_sig_info *dmb_bb_info)
 		return FC8080_RESULT_SUCCESS;
 	}
 
-	tunerbb_drv_fc8080_check_overrun(fc8080_serviceType[0]);
+	//tunerbb_drv_fc8080_check_overrun(fc8080_serviceType[0]);
 
 #ifdef FEATURE_RSSI_DEBUG
 	tunerbb_drv_fc8080_get_dm(&dmb_bb_info->msc_ber, &tp_err_cnt, &nframe, &dmb_bb_info->va_ber, &rssi);
@@ -1502,7 +1502,7 @@ void tunerbb_drv_fc8080_process_polling_data()
 	bbm_com_write(hDevice, BBM_COM_STATUS_ENABLE, ENABLE_INT_MASK);
 }
 */
-
+#if 0
 static int8 tunerbb_drv_fc8080_check_overrun(uint8 op_mode)
 {
 	uint16 mfoverStatus;
@@ -1535,7 +1535,7 @@ static int8 tunerbb_drv_fc8080_check_overrun(uint8 op_mode)
 
 	return FC8080_RESULT_SUCCESS;
 }
-
+#endif
 void tunerbb_drv_fc8080_isr_control(fci_u8 onoff)
 {
 	if(onoff)

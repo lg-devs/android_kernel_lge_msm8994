@@ -20,7 +20,6 @@
 #include <linux/of.h>
 #include <linux/of_device.h>
 #include <linux/io.h>
-#include <linux/string.h>
 #include <linux/platform_device.h>
 #include <linux/regulator/driver.h>
 #include <linux/regulator/machine.h>
@@ -196,6 +195,11 @@ static void update_acc_sel(struct mem_acc_regulator *mem_acc_vreg, int corner)
 {
 	int i;
 	static int svs_flag = true, row_flag = true;
+	static unsigned int svs_settings[5];
+	static unsigned int row_settings[5];
+	static bool in_turbo = false;
+
+	static phys_addr_t acc_addr;
 
 	for (i = 0; i < MEMORY_MAX; i++) {
 		if (mem_acc_vreg->mem_acc_supported[i])
@@ -213,36 +217,44 @@ static void update_acc_sel(struct mem_acc_regulator *mem_acc_vreg, int corner)
 	 * device tree to pass in the register addresses as well as the register
 	 * values to write for all corners.
 	 */
-
 	if (corner <= 2) {
 		/* SVS2 and SVS corners */
+		in_turbo = false;
 		scm_io_write(0xF900D084, 0x02);
 		scm_io_write(0xF900D088, 0x02);
 		scm_io_write(0xF900D08C, 0x02);
 		scm_io_write(0xF900D090, 0x02);
-		scm_io_write(0xF900D094, 0x0A);
 
-		if (svs_flag) {
-			pr_info("SVS Info: 0xF900D084 = (0x%x), 0xF900D088 = (0x%x), 0xF900D08C = (0x%x),\
-				0xF900D090 = (0x%x), 0xF900D094 = (0x%x)\n", scm_io_read(0xF900D084),
-				scm_io_read(0xF900D088), scm_io_read(0xF900D08C), scm_io_read(0xF900D090),
-				scm_io_read(0xF900D094));
-			svs_flag = false;
+		acc_addr = 0xF900D084;
+
+		for (i  = 0; i < 5; i++) {
+			svs_settings[i] = scm_io_read(acc_addr);
+			acc_addr += 4;
 		}
 
+		if (svs_flag) {
+			pr_info("SVS Info: 0xF900D084 = (0x%x), 0xF900D088 = (0x%x), 0xF900D08C = (0x%x), 0xF900D090 = (0x%x), 0xF900D094 = (0x%x)\n",
+				svs_settings[0], svs_settings[1], svs_settings[2], svs_settings[3], svs_settings[4]);
+			svs_flag = false;
+		}
 	} else {
 		/* NOM and TURBO corners */
+		in_turbo = true;
 		scm_io_write(0xF900D084, 0x00);
 		scm_io_write(0xF900D088, 0x00);
 		scm_io_write(0xF900D08C, 0x00);
 		scm_io_write(0xF900D090, 0x00);
-		scm_io_write(0xF900D094, 0x0E);
+
+		acc_addr = 0xF900D084;
+
+		for (i  = 0; i < 5; i++) {
+			row_settings[i] = scm_io_read(acc_addr);
+			acc_addr += 4;
+		}
 
 		if (row_flag) {
-			pr_info("NOM/TURBO Info: 0xF900D084 = (0x%x), 0xF900D088 = (0x%x), 0xF900D08C = (0x%x),\
-				0xF900D090 = (0x%x), 0xF900D094 = (0x%x)\n", scm_io_read(0xF900D084),
-				scm_io_read(0xF900D088), scm_io_read(0xF900D08C), scm_io_read(0xF900D090),
-				scm_io_read(0xF900D094));
+			pr_info("NOM/TURBO Info: 0xF900D084 = (0x%x), 0xF900D088 = (0x%x), 0xF900D08C = (0x%x), 0xF900D090 = (0x%x), 0xF900D094 = (0x%x)\n",
+				row_settings[0], row_settings[1], row_settings[2], row_settings[3], row_settings[4]);
 			row_flag = false;
 		}
 	}

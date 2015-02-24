@@ -25,7 +25,7 @@
 #define NO_SET_RATE -1
 #define INIT_RATE -2
 /*                                                                                         */
-#define LGE_RTB_ENABLED
+//                       
 struct msm_gpio_set_tbl {
 	unsigned gpio;
 	unsigned long flags;

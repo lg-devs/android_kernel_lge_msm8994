@@ -86,6 +86,9 @@
 
 #define FW_READ_ATTEMPTS 15
 #define FW_READ_TIMEOUT 4000000
+#ifdef CONFIG_MACH_LGE
+#define CORRECT_SWCH_CHECK_FOR_BOOT 6000000
+#endif
 
 #define BUTTON_POLLING_SUPPORTED true
 
@@ -3341,6 +3344,13 @@ static void wcd9xxx_correct_swch_plug(struct work_struct *work)
 				wcd9xxx_report_plug(mbhc, 1,
 						    SND_JACK_HEADPHONE);
 			}
+#ifdef CONFIG_MACH_LGE
+			else if(mbhc->current_plug == PLUG_TYPE_HEADSET){
+				pr_info("[LGE MBHC]: Incorrect detection is occured during boot-up. Chang plug type from Headset to Headphone\n");
+				wcd9xxx_report_plug(mbhc, 1,
+						    SND_JACK_HEADPHONE);
+			}
+#endif
 			WCD9XXX_BCL_UNLOCK(mbhc->resmgr);
 		} else if (plug_type == PLUG_TYPE_HIGH_HPH) {
 			pr_debug("%s: High HPH detected, continue polling\n",
@@ -4477,7 +4487,26 @@ static int wcd9xxx_init_and_calibrate(struct wcd9xxx_mbhc *mbhc)
 
 	return ret;
 }
+#ifdef CONFIG_MACH_LGE
+static void wcd9xxx_mbhc_detect_boot(struct work_struct *work)
+{
+	struct delayed_work *dwork;
+	struct wcd9xxx_mbhc *mbhc;
 
+	dwork = to_delayed_work(work);
+	mbhc = container_of(dwork, struct wcd9xxx_mbhc, mbhc_detect_for_boot);
+
+	pr_debug("%s: start\n",__func__);
+
+	if (!wcd9xxx_swch_level_remove(mbhc) && (mbhc->current_plug == PLUG_TYPE_HEADSET)) {
+		pr_info("[LGE MBHC]: headset is inserted during boot up. Try correct plug switch\n");
+		WCD9XXX_BCL_LOCK(mbhc->resmgr);
+		wcd9xxx_schedule_hs_detect_plug(mbhc,&mbhc->correct_plug_swch);
+		WCD9XXX_BCL_UNLOCK(mbhc->resmgr);
+	}
+	pr_debug("%s: leave\n",__func__);
+}
+#endif
 static void wcd9xxx_mbhc_fw_read(struct work_struct *work)
 {
 	struct delayed_work *dwork;
@@ -4743,6 +4772,10 @@ int wcd9xxx_mbhc_start(struct wcd9xxx_mbhc *mbhc,
 	    (mbhc->mbhc_cfg->read_fw_bin && mbhc->mbhc_fw) ||
 	    (mbhc->mbhc_cfg->read_fw_bin && mbhc->mbhc_cal)) {
 		rc = wcd9xxx_init_and_calibrate(mbhc);
+#ifdef CONFIG_MACH_LGE
+		schedule_delayed_work(&mbhc->mbhc_detect_for_boot,
+			     usecs_to_jiffies(CORRECT_SWCH_CHECK_FOR_BOOT));
+#endif
 	} else {
 		if (!mbhc->mbhc_fw || !mbhc->mbhc_cal)
 			schedule_delayed_work(&mbhc->mbhc_firmware_dwork,
@@ -5617,6 +5650,10 @@ int wcd9xxx_mbhc_init(struct wcd9xxx_mbhc *mbhc, struct wcd9xxx_resmgr *resmgr,
 		INIT_DELAYED_WORK(&mbhc->mbhc_btn_dwork, wcd9xxx_btn_lpress_fn);
 		INIT_DELAYED_WORK(&mbhc->mbhc_insert_dwork,
 				  wcd9xxx_mbhc_insert_work);
+#ifdef CONFIG_MACH_LGE
+		INIT_DELAYED_WORK(&mbhc->mbhc_detect_for_boot,
+				  wcd9xxx_mbhc_detect_boot);
+#endif
 	}
 
 	mutex_init(&mbhc->mbhc_lock);

@@ -1,6 +1,7 @@
 &spmi_bus {
 	qcom,pm8994@0 {
 		qcom,power-on@800 {
+			qcom,s3-debounce = <128>;
 			qcom,pon_1 { /* KPD_PWR_N reset */
 				status = "ok";
 				qcom,support-reset = <0>;
@@ -42,10 +43,11 @@
 
 	lge,jeita-disabled;
 	lge,aicl-en = <1>;
+	lge,aicl-rerun;
 	qcom,fastchg-current-ma = <1800>;
 	qcom,parallel-usb-min-current-ma = <1000>;
 	qcom,parallel-usb-9v-min-current-ma = <700>;
-	qcom,parallel-allowed-lowering-ma = <100>;
+	qcom,parallel-allowed-lowering-ma = <200>;
 
 	lge,no-init-cable = <0 0 0>;
 	lge,cable-mhl-1k = <5000 500 500>;

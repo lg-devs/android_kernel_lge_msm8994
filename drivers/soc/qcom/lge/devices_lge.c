@@ -86,6 +86,11 @@ static int s_kswitch_flag;
 static char dsv_vendor[3];
 int jdi_cut;
 #endif
+
+#if defined(CONFIG_Z2_LGD_POLED_PANEL)
+int lgd_poled_ver;
+#endif
+
 static enum hw_rev_type lge_bd_rev = HW_REV_MAX;
 static int lge_fake_battery;
 
@@ -483,6 +488,23 @@ int lge_get_jdi_cut(void)
 }
 
 #endif
+
+#if defined(CONFIG_Z2_LGD_POLED_PANEL)
+static int __init display_lgd_poled_setup(char *lgd_poled_cmd)
+{
+	sscanf(lgd_poled_cmd, "%d", &lgd_poled_ver);
+	pr_info("lgd poled ver is %d\n", lgd_poled_ver);
+
+	return 1;
+}
+__setup("lge.lgd_poled_ver=", display_lgd_poled_setup);
+
+int lge_get_lgd_poled_ver(void)
+{
+	return lgd_poled_ver;
+}
+#endif
+
 /*
    for download complete using LAF image
    return value : 1 --> right after laf complete & reset

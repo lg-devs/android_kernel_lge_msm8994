@@ -18,6 +18,9 @@
 /* Default constants for DevFreq-Simple-Ondemand (DFSO) */
 #define DFSO_UPTHRESHOLD	(90)
 #define DFSO_DOWNDIFFERENCTIAL	(5)
+#ifdef CONFIG_Z2_LGD_POLED_PANEL
+#define DFSO_KEEP_THRESHOLD	(20)
+#endif
 static int devfreq_simple_ondemand_func(struct devfreq *df,
 					unsigned long *freq,
 					u32 *flag)
@@ -29,6 +32,9 @@ static int devfreq_simple_ondemand_func(struct devfreq *df,
 #endif
 	unsigned int dfso_upthreshold = DFSO_UPTHRESHOLD;
 	unsigned int dfso_downdifferential = DFSO_DOWNDIFFERENCTIAL;
+#ifdef CONFIG_Z2_LGD_POLED_PANEL
+	unsigned int dfso_keep_threshold = DFSO_KEEP_THRESHOLD;
+#endif
 	struct devfreq_simple_ondemand_data *data = df->data;
 	unsigned long max = (df->max_freq) ? df->max_freq : UINT_MAX;
 	unsigned long min = (df->min_freq) ? df->min_freq : 0;
@@ -49,7 +55,14 @@ static int devfreq_simple_ondemand_func(struct devfreq *df,
 	if(stat.busy_time > dfso_upthreshold){
 		*freq = max;
 	}else if(stat.busy_time < dfso_downdifferential){
+#ifdef CONFIG_Z2_LGD_POLED_PANEL
+		if(dfso_keep_threshold < stat.busy_time)
+			*freq = min;
+		else
+			*freq = stat.current_frequency;
+#else
 		*freq = min;
+#endif
 	}else{
 		*freq = stat.current_frequency;
 	}

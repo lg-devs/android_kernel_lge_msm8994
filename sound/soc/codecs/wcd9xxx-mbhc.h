@@ -350,7 +350,9 @@ struct wcd9xxx_mbhc {
 	struct firmware_cal *mbhc_cal;
 
 	struct delayed_work mbhc_insert_dwork;
-
+#ifdef CONFIG_MACH_LGE
+	struct delayed_work mbhc_detect_for_boot;
+#endif
 	u8 current_plug;
 	struct work_struct correct_plug_swch;
 	/*

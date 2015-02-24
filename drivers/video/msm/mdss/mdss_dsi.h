@@ -116,6 +116,9 @@ enum dsi_panel_status_mode {
 enum dsi_ctrl_op_mode {
 	DSI_LP_MODE,
 	DSI_HS_MODE,
+#if defined(CONFIG_Z2_LGD_POLED_PANEL)
+	DSI_HS_VIDEO_MODE,
+#endif
 };
 
 enum dsi_lane_map_type {

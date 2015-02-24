@@ -769,7 +769,7 @@ void touch_driver_unregister(void);
 void set_touch_handle(struct i2c_client *client, void *h_touch);
 void *get_touch_handle(struct i2c_client *client);
 void send_uevent(struct device *dev, char *string[2]);
-void send_uevent_lpwg(struct i2c_client *client, int type);
+int send_uevent_lpwg(struct i2c_client *client, int type);
 int touch_i2c_read(struct i2c_client *client, u8 reg, int len, u8 *buf);
 int touch_i2c_write(struct i2c_client *client, u8 reg, int len, u8 *buf);
 int touch_i2c_write_byte(struct i2c_client *client, u8 reg, u8 data);

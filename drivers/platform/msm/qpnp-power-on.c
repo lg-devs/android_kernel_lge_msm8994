@@ -303,6 +303,7 @@ int qpnp_pon_system_pwr_off(enum pon_power_off_type type)
 {
 	int rc;
 	u8 reg;
+	u8 val;
 	u16 rst_en_reg;
 	struct qpnp_pon *pon = sys_reset_dev;
 
@@ -329,6 +330,17 @@ int qpnp_pon_system_pwr_off(enum pon_power_off_type type)
 			"Unable to write to addr=%hx, rc(%d)\n",
 			rst_en_reg, rc);
 
+#ifdef CONFIG_LGE_PM
+	if (type == PON_POWER_OFF_SHUTDOWN) {
+		val = 0;
+		rc = spmi_ext_register_writel(pon->spmi->ctrl, 2, rst_en_reg, &val, 1);
+		if (rc) {
+			dev_err(&pon->spmi->dev,
+				"Unable to write PMI8994 to addr=%hx, rc(%d)\n",
+				rst_en_reg, rc);
+		}
+	}
+#endif
 	/*
 	 * We need 10 sleep clock cycles here. But since the clock is
 	 * internally generated, we need to add 50% tolerance to be
@@ -350,6 +362,26 @@ int qpnp_pon_system_pwr_off(enum pon_power_off_type type)
 			"Unable to write to addr=%hx, rc(%d)\n",
 			rst_en_reg, rc);
 
+#ifdef CONFIG_LGE_PM
+	if (type == PON_POWER_OFF_SHUTDOWN) {
+		val = PON_POWER_OFF_SHUTDOWN;
+		rc = spmi_ext_register_writel(pon->spmi->ctrl, 2,
+			QPNP_PON_PS_HOLD_RST_CTL(pon->base), &val, 1);
+		if (rc) {
+			dev_err(&pon->spmi->dev,
+				"Unable to write PMI8994 to addr=%x, rc(%d)\n",
+				QPNP_PON_PS_HOLD_RST_CTL(pon->base), rc);
+		}
+
+		val = QPNP_PON_RESET_EN;
+		rc = spmi_ext_register_writel(pon->spmi->ctrl, 2, rst_en_reg, &val, 1);
+		if (rc) {
+			dev_err(&pon->spmi->dev,
+				"Unable to PMI8994 write to addr=%hx, rc(%d)\n",
+				rst_en_reg, rc);
+		}
+	}
+#endif
 	dev_dbg(&pon->spmi->dev, "power off type = 0x%02X\n", type);
 
 	return rc;

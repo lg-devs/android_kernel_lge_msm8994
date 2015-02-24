@@ -29,7 +29,10 @@
 #include <linux/slimport.h>
 #include <linux/ratelimit.h>
 #include <soc/qcom/lge/board_lge.h>
+
+#if 0 // sbl_cable_type will be not used anymore.
 #include <soc/qcom/smem.h>
+#endif
 
 #include "slimport7816_tx_reg.h"
 #include "slimport7816_tx_drv.h"
@@ -83,7 +86,9 @@ struct anx7816_data {
 	bool slimport_connected;
 };
 
+#if 0 // sbl_cable_type will be not used anymore.
 static unsigned int cable_smem_size;
+#endif
 
 struct msm_hdmi_slimport_ops *hdmi_slimport_ops;
 
@@ -150,6 +155,22 @@ bool slimport_is_connected(void)
 	return result;
 }
 EXPORT_SYMBOL(slimport_is_connected);
+
+bool slimport_is_check(void)
+{
+	struct anx7816_platform_data *pdata =NULL;
+
+	if (!anx7816_client)
+		return false;
+
+	pdata = anx7816_client->dev.platform_data;
+
+	if (!pdata)
+		return false;
+
+	return pdata->check_slimport_connection;
+}
+EXPORT_SYMBOL(slimport_is_check);
 
 /*            
                 
@@ -978,6 +999,8 @@ void sp_tx_hardware_poweron(void)
 	pdata->dvdd_power(1);
 	msleep(1);
 
+	pdata->check_slimport_connection = true;
+
 	gpio_set_value(pdata->gpio_reset, 1);
 
 	pr_err("%s %s: anx7816 power on\n", LOG_TAG, __func__);
@@ -1001,6 +1024,8 @@ void sp_tx_hardware_powerdown(void)
 
 	pdata->dvdd_power(0);
 	msleep(2);
+
+	pdata->check_slimport_connection = false;
 
 	gpio_set_value(pdata->gpio_p_dwn, 1);
 	msleep(1);
@@ -1381,6 +1406,7 @@ static int anx7816_parse_dt(
 }
 #endif
 
+#if 0 // sbl_cable_type will be not used anymore.
 int anx7816_get_sbl_cable_type(void)
 {
 	int cable_type = 0;
@@ -1394,6 +1420,7 @@ int anx7816_get_sbl_cable_type(void)
 
 	return cable_type;
 }
+#endif
 
 static int anx7816_i2c_probe(struct i2c_client *client,
 			const struct i2c_device_id *id)
@@ -1402,7 +1429,9 @@ static int anx7816_i2c_probe(struct i2c_client *client,
 	struct anx7816_data *anx7816;
 	struct anx7816_platform_data *pdata;
 	int ret = 0;
+#if 0 // sbl_cable_type will be not used anymore.
 	int sbl_cable_type = 0;
+#endif
 
 	pr_info("%s %s start\n", LOG_TAG, __func__);
 
@@ -1508,12 +1537,17 @@ static int anx7816_i2c_probe(struct i2c_client *client,
 				WAKE_LOCK_SUSPEND,
 				"slimport_wake_lock");
 
+#if 0 // sbl_cable_type will be not used anymore.
 	sbl_cable_type = anx7816_get_sbl_cable_type();
 
 	if ((lge_get_laf_mode() != LGE_LAF_MODE_LAF) &&
 		(sbl_cable_type != CBL_910K))
 	{
-
+#else
+	if ((lge_get_boot_mode() != LGE_BOOT_MODE_QEM_910K) &&
+		(lge_get_boot_mode() != LGE_BOOT_MODE_PIF_910K))
+	{
+#endif
 		ret = request_threaded_irq(client->irq, NULL, anx7816_cbl_det_isr,
 						IRQF_TRIGGER_RISING
 						| IRQF_TRIGGER_FALLING
@@ -1538,8 +1572,12 @@ static int anx7816_i2c_probe(struct i2c_client *client,
 			goto err3;
 		}
 	} else {
+#if 0 // sbl_cable_type will be not used anymore.
 		pr_err("%s %s : %s, Disable cbl det irq!!\n", LOG_TAG, __func__,
 			sbl_cable_type == CBL_910K ? "910K Cable Connected" : "Laf Mode");
+#else
+		pr_err("%s %s: 910K Cable Connected. Disable cbl det irq!!\n", LOG_TAG, __func__);
+#endif
 	}
 
 	ret = create_sysfs_interfaces(&client->dev);

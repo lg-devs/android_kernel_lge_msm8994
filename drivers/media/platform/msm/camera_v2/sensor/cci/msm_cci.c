@@ -447,6 +447,8 @@ static int32_t msm_cci_i2c_read(struct v4l2_subdev *sd,
 			__LINE__, read_words, exp_words);
 		memset(read_cfg->data, 0, read_cfg->num_byte);
 		rc = -EINVAL;
+		/*                              */
+		msm_cci_flush_queue(cci_dev, master);
 		goto ERROR;
 	}
 	index = 0;

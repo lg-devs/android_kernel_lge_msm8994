@@ -156,7 +156,7 @@ static char *lpwg_uevent[VALID_LPWG_UEVENT_SIZE][2] = {
 	{"TOUCH_GESTURE_WAKEUP=SWIPE", NULL}
 };
 
-void send_uevent_lpwg(struct i2c_client *client, int type)
+int send_uevent_lpwg(struct i2c_client *client, int type)
 {
 	struct lge_touch_data *ts = i2c_get_clientdata(client);
 
@@ -165,9 +165,17 @@ void send_uevent_lpwg(struct i2c_client *client, int type)
 	if (type > 0 && type <= VALID_LPWG_UEVENT_SIZE
 			&& atomic_read(&ts->state.uevent_state)
 			== UEVENT_IDLE) {
+		if (type == LPWG_SWIPE_DOWN && atomic_read(&ts->state.power_state) == POWER_ON) {
+			wakeup_by_swipe = false;
+			TOUCH_INFO_MSG("drop LPWG_SWIPE_DOWN event\n");
+			return -1;
+		}
+
 		atomic_set(&ts->state.uevent_state, UEVENT_BUSY);
 		send_uevent(&client->dev, lpwg_uevent[type-1]);
 	}
+
+	return 0;
 }
 
 /* touch_i2c_read / touch_i2c_write
@@ -967,8 +975,10 @@ void release_all_touch_event(struct lge_touch_data *ts)
 	}
 
 	memset(&ts->ts_curr_data, 0, sizeof(struct touch_data));
-	if (ts->ts_prev_data.total_num)
+	if (ts->ts_prev_data.total_num) {
 		report_event(ts);
+		ts->ts_prev_data.total_num = 0;
+	}
 	if (ts->pdata->caps->button_support)
 		key_event(ts);
 
@@ -1060,6 +1070,7 @@ static int interrupt_control(struct lge_touch_data *ts, int on_off)
 static void safety_reset(struct lge_touch_data *ts)
 {
 	u32 ret = 0;
+	int prev_power_state = atomic_read(&ts->state.power_state);
 	TOUCH_TRACE();
 
 	TOUCH_INFO_MSG("safety_reset start\n");
@@ -1089,6 +1100,10 @@ static void safety_reset(struct lge_touch_data *ts)
 		msleep(ts->pdata->role->reset_delay);
 		DO_SAFE(power_control(ts, POWER_ON), error);
 		msleep(ts->pdata->role->booting_delay);
+
+		if (prev_power_state != POWER_ON)
+			DO_SAFE(power_control(ts, prev_power_state), error);
+
 		break;
 	default:
 		break;
@@ -3260,13 +3275,13 @@ static int touch_suspend(struct device *dev)
 	cancel_delayed_work_sync(&ts->work_trigger_handle);
 
 	atomic_set(&ts->state.uevent_state, UEVENT_IDLE);
+	mutex_lock(&ts->pdata->thread_lock);
 	touch_device_func->suspend(ts->client);
 	power_control(ts, ts->pdata->role->use_sleep_mode
 			? POWER_SLEEP : POWER_OFF);
 
 	if ((quick_cover_status == QUICKCOVER_CLOSE)
 			&& (atomic_read(&ts->state.power_state) != POWER_OFF)) {
-		mutex_lock(&ts->pdata->thread_lock);
 		touch_device_func->lpwg(ts->client,
 				LPWG_ACTIVE_AREA_X1,
 				ts->pdata->role->quickcover_filter->X1, NULL);
@@ -3279,8 +3294,8 @@ static int touch_suspend(struct device *dev)
 		touch_device_func->lpwg(ts->client,
 				LPWG_ACTIVE_AREA_Y2,
 				ts->pdata->role->quickcover_filter->Y2, NULL);
-		mutex_unlock(&ts->pdata->thread_lock);
 	}
+	mutex_unlock(&ts->pdata->thread_lock);
 
 	TOUCH_INFO_MSG("%s : touch_suspend done\n", __func__);
 	return 0;
