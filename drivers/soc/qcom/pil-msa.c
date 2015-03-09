@@ -50,6 +50,8 @@
 #define RMB_PMI_META_DATA		0x10
 #define RMB_PMI_CODE_START		0x14
 #define RMB_PMI_CODE_LENGTH		0x18
+#define RMB_PROTOCOL_VERSION		0x1C 
+#define RMB_MBA_DEBUG_INFORMATION	0x20 
 
 #define POLL_INTERVAL_US		50
 
@@ -86,7 +88,10 @@ static void modem_log_rmb_regs(void __iomem *base)
 				readl_relaxed(base + RMB_PMI_CODE_START));
 	pr_err("RMB_PMI_CODE_LENGTH: %08x\n",
 				readl_relaxed(base + RMB_PMI_CODE_LENGTH));
-
+	pr_err("RMB_PROTOCOL_VERSION: %08x\n", 
+				readl_relaxed(base + RMB_PROTOCOL_VERSION)); 
+	pr_err("RMB_MBA_DEBUG_INFORMATION: %08x\n", 
+				readl_relaxed(base + RMB_MBA_DEBUG_INFORMATION)); 
 }
 
 static int pil_mss_power_up(struct q6v5_data *drv)
@@ -599,6 +604,10 @@ static int pil_msa_mba_auth(struct pil_desc *pil)
 
 	if (ret)
 		modem_log_rmb_regs(drv->rmb_base);
+
+	if (status < 0)
+		panic("pil image load fail");
+
 	if (q6_drv->ahb_clk_vote)
 		clk_disable_unprepare(q6_drv->ahb_clk);
 

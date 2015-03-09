@@ -29,7 +29,7 @@
 #include <linux/msm-bus-board.h>
 #include <linux/netdevice.h>
 #include <linux/delay.h>
-#if defined(CONFIG_LGE_CEC_US)
+#if defined(CONFIG_LGE_CEC_US) || defined(CONFIG_MACH_MSM8994_Z2_GLOBAL_COM)
 #include <soc/qcom/subsystem_restart.h>
 #include <soc/qcom/subsystem_notif.h>
 #endif
@@ -2483,10 +2483,8 @@ static void ipa_start_tag_process(struct work_struct *work)
 	IPADBG("starting TAG process\n");
 	/* close aggregation frames on all pipes */
 	res = ipa_tag_aggr_force_close(-1);
-	if (res) {
+	if (res)
 		IPAERR("ipa_tag_aggr_force_close failed %d\n", res);
-		return;
-	}
 
 	ipa_dec_client_disable_clks();
 
@@ -2776,7 +2774,7 @@ void ipa_suspend_handler(enum ipa_irq_type interrupt,
 static void ipa_sps_process_irq_schedule_rel(void)
 {
 	ipa_ctx->sps_pm.res_rel_in_prog = true;
-	queue_delayed_work(ipa_ctx->power_mgmt_wq,
+	queue_delayed_work(ipa_ctx->sps_power_mgmt_wq,
 			   &ipa_dec_clients_delayed_work,
 			   msecs_to_jiffies(IPA_SPS_PROD_TIMEOUT_MSEC));
 }
@@ -2893,7 +2891,7 @@ static void sps_event_cb(enum sps_callback_case event, void *param)
 				ipa_ctx->sps_pm.res_granted = true;
 				*ready = true;
 			} else {
-				queue_work(ipa_ctx->power_mgmt_wq,
+				queue_work(ipa_ctx->sps_power_mgmt_wq,
 					   &ipa_sps_process_irq_work);
 				*ready = false;
 			}
@@ -2910,7 +2908,7 @@ static void sps_event_cb(enum sps_callback_case event, void *param)
 
 	spin_unlock_irqrestore(&ipa_ctx->sps_pm.lock, flags);
 }
-#if defined(CONFIG_LGE_CEC_US)
+#if defined(CONFIG_LGE_CEC_US) || defined(CONFIG_MACH_MSM8994_Z2_GLOBAL_COM)
 static int ssr_notifier_cb(struct notifier_block *this,
 			   unsigned long code,
 			   void *data)
@@ -3083,13 +3081,20 @@ static int ipa_init(const struct ipa_plat_drv_res *resource_p,
 	spin_lock_init(&ipa_ctx->ipa_active_clients.spinlock);
 	ipa_ctx->ipa_active_clients.cnt = 1;
 
-	/* Create workqueue for power management */
+	/* Create workqueues for power management */
 	ipa_ctx->power_mgmt_wq =
 		create_singlethread_workqueue("ipa_power_mgmt");
 	if (!ipa_ctx->power_mgmt_wq) {
-		IPAERR("failed to create wq\n");
+		IPAERR("failed to create power mgmt wq\n");
 		result = -ENOMEM;
 		goto fail_init_hw;
+	}
+	ipa_ctx->sps_power_mgmt_wq =
+		create_singlethread_workqueue("sps_ipa_power_mgmt");
+	if (!ipa_ctx->sps_power_mgmt_wq) {
+		IPAERR("failed to create sps power mgmt wq\n");
+		result = -ENOMEM;
+		goto fail_create_sps_wq;
 	}
 
 	spin_lock_init(&ipa_ctx->sps_pm.lock);
@@ -3413,7 +3418,7 @@ static int ipa_init(const struct ipa_plat_drv_res *resource_p,
 	ipa_ctx->q6_proxy_clk_vote_valid = true;
 
 	ipa_register_panic_hdlr();
-#if defined(CONFIG_LGE_CEC_US)
+#if defined(CONFIG_LGE_CEC_US) || defined(CONFIG_MACH_MSM8994_Z2_GLOBAL_COM)
 	subsys_notif_register_notifier("modem", &ssr_notifier);
 #endif
 	pr_info("IPA driver initialization was successful.\n");
@@ -3470,6 +3475,8 @@ fail_rt_rule_cache:
 fail_flt_rule_cache:
 	sps_deregister_bam_device(ipa_ctx->bam_handle);
 fail_register_bam_device:
+	destroy_workqueue(ipa_ctx->sps_power_mgmt_wq);
+fail_create_sps_wq:
 	destroy_workqueue(ipa_ctx->power_mgmt_wq);
 fail_init_hw:
 	iounmap(ipa_ctx->mmio);

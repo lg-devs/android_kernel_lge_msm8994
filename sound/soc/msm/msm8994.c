@@ -64,7 +64,9 @@ enum pinctrl_pin_state {
 	STATE_DISABLE = 0,   /* All pins are in sleep state */
 	STATE_AUXPCM_ACTIVE, /* Aux PCM = active, MI2S = sleep */
 	STATE_MI2S_ACTIVE,   /* Aux PCM = sleep, MI2S = active */
+#ifdef CONFIG_SND_USE_QUAT_MI2S
 	STATE_QUAT_MI2S_ACTIVE,   /* Aux PCM = sleep, MI2S = active */
+#endif
 	STATE_ACTIVE         /* All pins are in active state */
 };
 
@@ -1410,7 +1412,7 @@ static int msm_set_pinctrl(struct msm_pinctrl_info *pinctrl_info,
 			goto err;
 		}
 		break;
-
+#ifdef CONFIG_SND_USE_QUAT_MI2S
     case STATE_QUAT_MI2S_ACTIVE:
         ret = pinctrl_select_state(pinctrl_info->pinctrl,
            pinctrl_info->quat_mi2s_active);
@@ -1421,7 +1423,7 @@ static int msm_set_pinctrl(struct msm_pinctrl_info *pinctrl_info,
             goto err;
         }
         break;
-
+#endif
 	case STATE_ACTIVE:
 		ret = pinctrl_select_state(pinctrl_info->pinctrl,
 					   pinctrl_info->active);
@@ -1486,6 +1488,7 @@ static int msm_reset_pinctrl(struct msm_pinctrl_info *pinctrl_info,
 			goto err;
 		}
 		break;
+#ifdef CONFIG_SND_USE_QUAT_MI2S
     case STATE_QUAT_MI2S_ACTIVE:
         ret = pinctrl_select_state(pinctrl_info->pinctrl,
                        pinctrl_info->quat_mi2s_active);
@@ -1496,6 +1499,7 @@ static int msm_reset_pinctrl(struct msm_pinctrl_info *pinctrl_info,
             goto err;
         }
         break;
+#endif
 	case STATE_DISABLE:
 		ret = pinctrl_select_state(pinctrl_info->pinctrl,
 					   pinctrl_info->disable);
@@ -2305,7 +2309,7 @@ static void *def_codec_mbhc_cal(void)
 #undef S
 #define S(X, Y) ((WCD9XXX_MBHC_CAL_PLUG_TYPE_PTR(codec_cal)->X) = (Y))
 	S(v_no_mic, 30);
-	S(v_hs_max, 2400);
+	S(v_hs_max, 2500);
 #undef S
 #define S(X, Y) ((WCD9XXX_MBHC_CAL_BTN_DET_PTR(codec_cal)->X) = (Y))
 	S(c[0], 62);

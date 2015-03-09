@@ -54,6 +54,12 @@ void dwc_dcp_check_work(struct work_struct *w)
 	struct usb_phy *phy = dotg->otg.phy;
 	struct dwc3_charger *charger = dotg->charger;
 
+	if (dwc && dwc->err_evt_seen) {
+		dbg_event(0xFF, "Flush BR", 0);
+		flush_work(dwc->usb_block_reset_work);
+		dwc->err_evt_seen = 0;
+	}
+
 	pr_info("%s %s connected.\n",
 				__func__, (dwc->gadget.evp_sts & EVP_STS_EVP) ? "EVP" : "DCP");
 	if (dwc->gadget.evp_sts & EVP_STS_EVP) {
@@ -575,7 +581,12 @@ static int dwc3_otg_set_power(struct usb_phy *phy, unsigned mA)
 	if (dotg->charger->charging_disabled)
 		return 0;
 
+#ifdef CONFIG_LGE_PM_USB_ID
+	if (dotg->charger->chg_type == DWC3_SDP_CHARGER ||
+			dotg->charger->chg_type == DWC3_FLOATED_CHARGER)
+#else
 	if (dotg->charger->chg_type == DWC3_SDP_CHARGER)
+#endif
 		power_supply_type = POWER_SUPPLY_TYPE_USB;
 	else if (dotg->charger->chg_type == DWC3_CDP_CHARGER)
 		power_supply_type = POWER_SUPPLY_TYPE_USB_CDP;
@@ -592,13 +603,14 @@ static int dwc3_otg_set_power(struct usb_phy *phy, unsigned mA)
 #endif
 #ifdef CONFIG_LGE_PM_USB_ID
 	if (mA > 2 && lge_pm_get_cable_type() != NO_INIT_CABLE) {
-		if (dotg->charger->chg_type == DWC3_SDP_CHARGER) {
+		if (dotg->charger->chg_type == DWC3_SDP_CHARGER ||
+				dotg->charger->chg_type == DWC3_FLOATED_CHARGER) {
 			if (dotg->dwc->gadget.speed == USB_SPEED_SUPER)
 				mA = DWC3_USB30_CHG_CURRENT;
 			else
 				mA = lge_pm_get_usb_current();
 		} else if (dotg->charger->chg_type == DWC3_DCP_CHARGER ||
-				dotg->charger->chg_type == DWC3_FLOATED_CHARGER) {
+				dotg->charger->chg_type == DWC3_PROPRIETARY_CHARGER) {
 			mA = lge_pm_get_ta_current();
 		}
 	}
@@ -888,9 +900,16 @@ static void dwc3_otg_sm_work(struct work_struct *w)
 					 */
 					if (dotg->charger_retry_count ==
 						max_chgr_retry_count) {
+#ifdef CONFIG_LGE_PM_USB_ID
+						dwc3_otg_set_power(phy, 100);
+						dwc3_otg_start_peripheral(&dotg->otg, 1);
+						phy->state = OTG_STATE_B_PERIPHERAL;
+						work = 1;
+#else
 						dwc3_otg_set_power(phy, 0);
 						dbg_event(0xFF, "FLCHG put", 0);
 						pm_runtime_put_sync(phy->dev);
+#endif
 						break;
 					}
 					charger->start_detection(dotg->charger,

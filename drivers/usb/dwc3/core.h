@@ -919,8 +919,9 @@ struct dwc3 {
 	unsigned                bh_handled_evt_cnt[MAX_INTR_STATS];
 	unsigned                bh_dbg_index;
 #ifdef CONFIG_MAXIM_EVP
-	struct delayed_work		dcp_check_work;
-	unsigned int			evp_usbctrl_err_cnt;
+	struct delayed_work	dcp_check_work;
+	unsigned int		evp_usbctrl_err_cnt;
+	struct work_struct	*usb_block_reset_work;
 #endif
 	ktime_t			irq_start_time[MAX_INTR_STATS];
 	unsigned                irq_completion_time[MAX_INTR_STATS];

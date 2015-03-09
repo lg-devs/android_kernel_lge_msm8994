@@ -34,7 +34,7 @@
 			label = "hall_ic";
 			gpios = <&msm_gpio 75 0x1>;
 			linux,input-type = <5>;
-			linux,code = <0>;
+			linux,code = <222>;
 			gpio-key,wakeup;
 			debounce-interval = <15>;
 		};
@@ -173,7 +173,7 @@
 		ref_chk_option = <0 0 1 1>;
 
 		/* firmware & limits */
-		fw_image = "synaptics/z2/PLG349-V1.11-PR1809562-DS5.5.1.0.1066_5005518B.img";
+		fw_image = "synaptics/z2/PLG349-V1.12-PR1809562-DS5.5.1.0.1066_5005518C.img";
 		panel_spec = "synaptics/z2/z2_limit.txt";
 		panel_spec_mfts = "synaptics/z2/z2_limit_mfts.txt";
 	};
@@ -298,7 +298,7 @@
 		ref_chk_option = <0 0 1 1>;
 
 		/* firmware & limits */
-		fw_image = "synaptics/z2/PLG349-V1.11-PR1809562-DS5.5.1.0.1066_5005518B.img";
+		fw_image = "synaptics/z2/PLG349-V1.12-PR1809562-DS5.5.1.0.1066_5005518C.img";
 		panel_spec = "synaptics/z2/z2_limit.txt";
 		panel_spec_mfts = "synaptics/z2/z2_limit_mfts.txt";
 	};

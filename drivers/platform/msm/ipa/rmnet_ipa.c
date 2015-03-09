@@ -1012,6 +1012,7 @@ static void apps_ipa_tx_complete_notify(void *priv,
 		return;
 	}
 	atomic_dec(&wwan_ptr->outstanding_pkts);
+	__netif_tx_lock_bh(netdev_get_tx_queue(dev, 0)); //CR 791968 for UL Stall
 	if (netif_queue_stopped(wwan_ptr->net) &&
 		atomic_read(&wwan_ptr->outstanding_pkts) <
 					(wwan_ptr->outstanding_low)) {
@@ -1020,6 +1021,7 @@ static void apps_ipa_tx_complete_notify(void *priv,
 		netif_wake_queue(wwan_ptr->net);
 	}
 	dev_kfree_skb_any(skb);
+	__netif_tx_unlock_bh(netdev_get_tx_queue(dev, 0)); //CR 791968 for UL Stall
 	ipa_rm_inactivity_timer_release_resource(
 		IPA_RM_RESOURCE_WWAN_0_PROD);
 	return;
@@ -1578,8 +1580,11 @@ void q6_deinitialize_rm(void)
 
 static void wake_tx_queue(struct work_struct *work)
 {
-	if (ipa_netdevs[0])
+	if (ipa_netdevs[0]){
+		__netif_tx_lock_bh(netdev_get_tx_queue(ipa_netdevs[0], 0)); //CR 791968 for UL Stall
 		netif_wake_queue(ipa_netdevs[0]);
+		__netif_tx_unlock_bh(netdev_get_tx_queue(ipa_netdevs[0], 0)); //CR 791968 for UL Stall
+	}
 }
 
 /**
@@ -1816,7 +1821,7 @@ static int ipa_wwan_probe(struct platform_device *pdev)
 		goto config_err;
 	}
 	atomic_set(&is_initialized, 1);
-#if defined(CONFIG_LGE_CEC_US)
+#if defined(CONFIG_LGE_CEC_US) || defined(CONFIG_MACH_MSM8994_Z2_GLOBAL_COM)
 	if (!atomic_read(&is_ssr)) {
 		/* HACK for offline charging mode */
 		ipa_q6_init_done();

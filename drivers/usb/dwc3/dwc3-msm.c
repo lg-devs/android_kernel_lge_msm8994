@@ -97,7 +97,11 @@ module_param(override_phy_init, int, S_IRUGO|S_IWUSR);
 MODULE_PARM_DESC(override_phy_init, "Override HSPHY Init Seq");
 
 /* Enable Proprietary charger detection */
+#ifdef CONFIG_LGE_PM_USB_ID
+static bool prop_chg_detect = true;
+#else
 static bool prop_chg_detect;
+#endif
 module_param(prop_chg_detect, bool, S_IRUGO | S_IWUSR);
 MODULE_PARM_DESC(prop_chg_detect, "Enable Proprietary charger detection");
 
@@ -2424,6 +2428,8 @@ static void dwc3_evp_status(struct dwc3_charger *charger, unsigned evp_sts)
 	}
 
 	mdwc->evp_sts = hvdcp_type;
+
+	power_supply_changed(&mdwc->usb_psy);
 }
 
 #endif
@@ -3590,6 +3596,10 @@ static int dwc3_msm_probe(struct platform_device *pdev)
 		dev_err(&pdev->dev, "Failed to get dwc3 device\n");
 		goto put_dwc3;
 	}
+
+#ifdef CONFIG_MAXIM_EVP
+	dwc->usb_block_reset_work = &mdwc->usb_block_reset_work;
+#endif
 
 	dwc->vbus_active = of_property_read_bool(node, "qcom,vbus-present");
 

@@ -429,7 +429,7 @@ static void __ref try_hotplug(struct cpu_hp *data)
 
 	mutex_lock(&managed_cpus_lock);
 	if (num_online_managed(data->cpus) > data->max_cpu_request) {
-		for (i = num_present_cpus() - 1; i >= 0; i--) {
+		for (i = num_present_cpus() - 1; i >= 0 && i < num_present_cpus(); i--) {
 			if (!cpumask_test_cpu(i, data->cpus) ||	!cpu_online(i))
 				continue;
 
@@ -524,6 +524,7 @@ static int __ref msm_performance_cpu_callback(struct notifier_block *nfb,
 		if (i_hp->max_cpu_request <=
 					num_online_managed(i_hp->cpus)) {
 			pr_debug("msm_perf: Prevent CPU%d onlining\n", cpu);
+			cpumask_set_cpu(cpu, i_hp->offlined_cpus);
 			return NOTIFY_BAD;
 		}
 		cpumask_clear_cpu(cpu, i_hp->offlined_cpus);

@@ -1609,7 +1609,6 @@ static int mmc_blk_err_check(struct mmc_card *card,
                                         
   */
 	if(mmc_card_sd(card) && !mmc_gpio_get_cd(card->host)) {
-		printk(KERN_INFO "[LGE][MMC][%-18s( )] sd-no-exist, skip next\n", __func__);
 		return MMC_BLK_NOMEDIUM;
 	}
 #endif

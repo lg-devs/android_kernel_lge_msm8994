@@ -191,5 +191,8 @@ extern int lge_get_kswitch_status(void);
 #endif
 
 extern int lge_get_bootreason(void);
+#ifdef CONFIG_LGE_LCD_OFF_DIMMING
+extern int lge_get_bootreason_with_lcd_dimming(void);
+#endif
 
 #endif

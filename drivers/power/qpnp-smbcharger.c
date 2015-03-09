@@ -149,6 +149,17 @@ struct ilim_map {
 	struct ilim_entry	*entries;
 };
 
+#ifdef CONFIG_LGE_PM_VZW_REQ
+typedef enum vzw_chg_state {
+	VZW_NO_CHARGER,
+	VZW_NORMAL_CHARGING,
+	VZW_NOT_CHARGING,
+	VZW_UNDER_CURRENT_CHARGING,
+	VZW_USB_DRIVER_UNINSTALLED,
+	VZW_CHARGER_STATUS_MAX,
+} chg_state;
+#endif
+
 struct smbchg_chip {
 	struct device			*dev;
 	struct spmi_device		*spmi;
@@ -187,6 +198,10 @@ struct smbchg_chip {
 	int				aicl_enabled;
 	bool				aicl_rerun;
 	int				target_vfloat_mv;
+#endif
+#ifdef CONFIG_LGE_PM_VZW_REQ
+	chg_state			vzw_chg_mode;
+	struct delayed_work	set_vzw_chg_mode_work;
 #endif
 	bool				chg_enabled;
 	bool				low_icl_wa_on;
@@ -294,7 +309,12 @@ struct smbchg_chip {
 #ifdef CONFIG_LGE_PM_COMMON
 	struct qpnp_vadc_chip           *vadc_usbin_dev;
 	int				batfet_en;
+	bool			check_aicl_complete;
+	int			aicl_done_current_ma;
 	struct delayed_work		usb_insert_work;
+	struct delayed_work		usb_remove_work;
+	struct delayed_work		usbin_suspend_for_flash_work;
+	struct delayed_work		usbin_enable_for_flash_work;
 #endif
 #ifdef CONFIG_LGE_PM
 	struct wake_lock                chg_wake_lock;
@@ -340,8 +360,6 @@ struct smbchg_chip {
 	bool				chg_state; // 1: limited, 0: default
 	bool				enable_polling;
 	int				polling_cnt;
-	struct delayed_work		usb_remove_work;
-	bool				check_aicl_complete;
 	int 				is_parallel_chg_dis_by_taper;
 	bool				is_weak_charger;
 #endif
@@ -872,6 +890,9 @@ static enum power_supply_property smbchg_battery_properties[] = {
 #endif
 #ifdef CONFIG_LGE_PM_EVP_TESTCMD_SUPPORT
 	POWER_SUPPLY_PROP_EVP_TESTCMD_SUPPORT,
+#endif
+#ifdef CONFIG_LGE_PM_VZW_REQ
+	POWER_SUPPLY_PROP_VZW_CHG,
 #endif
 };
 
@@ -1455,6 +1476,35 @@ static struct power_supply *get_parallel_psy(struct smbchg_chip *chip)
 	return chip->parallel.psy;
 }
 
+#ifdef CONFIG_LGE_PM_VZW_REQ
+#define VZW_CHG_MAX_CURRENT	1800
+#define VZW_CHG_MIN_CURRENT	400
+static void smbchg_set_vzw_chg_mode_work(struct work_struct *work)
+{
+	struct smbchg_chip *chip = container_of(work,
+				struct smbchg_chip,
+				set_vzw_chg_mode_work.work);
+
+	/*to do : Incompatible charger*/
+
+	if (chip->aicl_done_current_ma <= VZW_CHG_MIN_CURRENT) {
+		chip->vzw_chg_mode = VZW_UNDER_CURRENT_CHARGING;
+	} else if (chip->aicl_done_current_ma > VZW_CHG_MIN_CURRENT &&
+			chip->aicl_done_current_ma <= VZW_CHG_MAX_CURRENT) {
+		chip->vzw_chg_mode = VZW_NORMAL_CHARGING;
+	} else {
+		chip->vzw_chg_mode = VZW_NOT_CHARGING;
+		pr_smb(PR_LGE, "Can's set VZW_CHG_STATE\n");
+		return;
+	}
+	pr_smb(PR_LGE, "Set VZW_CHG_STATE = %d :"\
+			" 0=NO_CHAGER,1=NORMAL, 2=NOT, 3=UNDER_CURRENT\n",
+			 chip->vzw_chg_mode);
+	power_supply_changed(&chip->batt_psy);
+	return;
+
+}
+#endif
 static void smbchg_usb_update_online_work(struct work_struct *work)
 {
 	struct smbchg_chip *chip = container_of(work,
@@ -1595,7 +1645,7 @@ out:
 #define USB51_100MA		0
 #define USB51_500MA		BIT(1)
 
-#ifdef CONFIG_LGE_PM_PARALLEL_CHARGING
+#ifdef CONFIG_LGE_PM_COMMON
 #define USB_AICL_CFG		0xF3
 #define AICL_EN_BIT		BIT(2)
 #define ICL_STS_1_REG		0x7
@@ -1620,7 +1670,7 @@ static int smbchg_set_high_usb_chg_current(struct smbchg_chip *chip,
 {
 	int i, rc;
 	u8 usb_cur_val;
-#ifdef CONFIG_LGE_PM_PARALLEL_CHARGING
+#ifdef CONFIG_LGE_PM_COMMON
 	u8 reg;
 #endif
 	for (i = ARRAY_SIZE(usb_current_table) - 1; i >= 0; i--) {
@@ -1659,7 +1709,7 @@ static int smbchg_set_high_usb_chg_current(struct smbchg_chip *chip,
 	if (rc < 0)
 		dev_err(chip->dev, "Couldn't write cfg 5 rc = %d\n", rc);
 
-#ifdef CONFIG_LGE_PM_PARALLEL_CHARGING
+#ifdef CONFIG_LGE_PM_COMMON
 	rc |= smbchg_read(chip, &reg, chip->usb_chgpth_base + USB_AICL_CFG, 1);
 	if (reg & AICL_EN_BIT) {
 		bool aicl_complete;
@@ -3612,6 +3662,11 @@ static int smbchg_battery_get_property(struct power_supply *psy,
 		val->intval = store_is_enable_evp_chg;
 		break;
 #endif
+#ifdef CONFIG_LGE_PM_VZW_REQ
+	case POWER_SUPPLY_PROP_VZW_CHG:
+		val->intval = chip->vzw_chg_mode;
+		break;
+#endif
 	default:
 		return -EINVAL;
 	}
@@ -3912,24 +3967,53 @@ struct regulator_ops smbchg_otg_reg_ops = {
 };
 
 #ifdef CONFIG_LGE_PM
-void usbin_suspend_for_flash_led(bool suspend)
-{
+#define USBIN_SUSPEND_FOR_FLASH_DELAY_MS	100
+static void smbchg_usbin_suspend_for_flash_work(struct work_struct *work) {
 	bool changed;
 	int rc = 0;
-	NULL_CHECK_VOID(the_chip);
+
+	struct smbchg_chip *chip =
+		container_of(work, struct smbchg_chip, usbin_suspend_for_flash_work.work);
+
+	pr_smb(PR_LGE, "usbin_suspend_for_flash_led suspend = 1\n");
+
+	rc = smbchg_primary_usb_en(chip, false, REASON_USER, &changed);
+	if (rc < 0) {
+		pr_smb(PR_LGE, "failed to set usb suspend for flash led\n");
+	}
+}
+
+static void smbchg_usbin_enable_for_flash_work(struct work_struct *work) {
+	bool changed;
+        int rc = 0;
+
+        struct smbchg_chip *chip =
+                container_of(work, struct smbchg_chip, usbin_enable_for_flash_work.work);
+
+        pr_smb(PR_LGE, "usbin_suspend_for_flash_led suspend = 0\n");
+
+        rc = smbchg_primary_usb_en(chip, true, REASON_USER, &changed);
+        if (rc < 0) {
+                pr_smb(PR_LGE, "failed to set usb suspend for flash led\n");
+        }
+}
+
+void usbin_suspend_for_flash_led(bool suspend)
+{
+	if (IS_ERR_OR_NULL(the_chip))
+		return;
+
+	if (!is_usb_present(the_chip))
+		return;
 
 	if (is_factory_cable())
 		return;
 
-	if (!suspend)
-		msleep(100);
-
-	pr_smb(PR_LGE, "usbin_suspend_for_flash_led suspend = %d\n", suspend);
-
-	rc = smbchg_primary_usb_en(the_chip, suspend ? false:true, REASON_USER, &changed);
-	if (rc < 0) {
-		pr_smb(PR_LGE, "failed to set usb suspend for flash led\n");
-	}
+	if (suspend)
+		schedule_delayed_work(&the_chip->usbin_suspend_for_flash_work, 0);
+	else
+		schedule_delayed_work(&the_chip->usbin_enable_for_flash_work, 
+				msecs_to_jiffies(USBIN_SUSPEND_FOR_FLASH_DELAY_MS));
 }
 EXPORT_SYMBOL(usbin_suspend_for_flash_led);
 #endif
@@ -4857,6 +4941,9 @@ static void handle_usb_removal(struct smbchg_chip *chip)
 	chip->is_parallel_chg_dis_by_otp = 0;
 	chip->is_parallel_chg_changed_by_taper = 0;
 #endif
+#ifdef CONFIG_LGE_PM_VZW_REQ
+	chip->vzw_chg_mode = VZW_NO_CHARGER;
+#endif
 }
 
 static void handle_usb_insertion(struct smbchg_chip *chip)
@@ -4987,7 +5074,7 @@ static irqreturn_t usbin_uv_handler(int irq, void *_chip)
 			chip->usb_present, usb_present);
 #endif
 
-#ifdef CONFIG_LGE_PM_PARALLEL_CHARGING
+#ifdef CONFIG_LGE_PM_COMMON
 	if (chip->usb_present && chip->check_aicl_complete) {
 		pr_smb(PR_LGE, "aicl done is not triggered. skipping...\n");
 		return IRQ_HANDLED;
@@ -5127,12 +5214,15 @@ static irqreturn_t aicl_done_handler(int irq, void *_chip)
 	struct smbchg_chip *chip = _chip;
 	bool usb_present = is_usb_present(chip);
 
-#ifdef CONFIG_LGE_PM_PARALLEL_CHARGING
+#ifdef CONFIG_LGE_PM_COMMON
+	chip->aicl_done_current_ma = smbchg_get_aicl_level_ma(chip);
 	pr_smb(PR_INTERRUPT, "aicl_done triggered: %d\n",
-		smbchg_get_aicl_level_ma(chip));
-#else
-	pr_smb(PR_INTERRUPT, "aicl_done triggered\n");
+			 chip->aicl_done_current_ma);
+#ifdef CONFIG_LGE_PM_VZW_REQ
+	schedule_delayed_work(&chip->set_vzw_chg_mode_work, 0);
 #endif
+#endif
+
 	if (usb_present)
 		smbchg_parallel_usb_check_ok(chip);
 	return IRQ_HANDLED;
@@ -7217,11 +7307,17 @@ static int smbchg_probe(struct spmi_device *spmi)
 		dev_err(&spmi->dev, "Unable to allocate memory\n");
 		return -ENOMEM;
 	}
-
+#ifdef CONFIG_LGE_PM_VZW_REQ
+	INIT_DELAYED_WORK(&chip->set_vzw_chg_mode_work,
+			 smbchg_set_vzw_chg_mode_work);
+#endif
 	INIT_WORK(&chip->usb_set_online_work, smbchg_usb_update_online_work);
 	INIT_WORK(&chip->batt_soc_work, smbchg_adjust_batt_soc_work);
 #ifdef CONFIG_LGE_PM_COMMON
 	INIT_DELAYED_WORK(&chip->usb_insert_work, smbchg_usb_insert_work);
+	INIT_DELAYED_WORK(&chip->usb_remove_work, smbchg_usb_remove_work);
+	INIT_DELAYED_WORK(&chip->usbin_suspend_for_flash_work, smbchg_usbin_suspend_for_flash_work);
+	INIT_DELAYED_WORK(&chip->usbin_enable_for_flash_work, smbchg_usbin_enable_for_flash_work);
 #endif
 #ifdef CONFIG_LGE_PM_CHARGING_TEMP_SCENARIO
 	wake_lock_init(&chip->lcs_wake_lock,
@@ -7234,7 +7330,6 @@ static int smbchg_probe(struct spmi_device *spmi)
 #endif
 #endif
 #ifdef CONFIG_LGE_PM_PARALLEL_CHARGING
-	INIT_DELAYED_WORK(&chip->usb_remove_work, smbchg_usb_remove_work);
 	INIT_DELAYED_WORK(&chip->iusb_change_work, smbchg_iusb_change_worker);
 	chip->chg_state = false;
 	chip->fb_state = true;

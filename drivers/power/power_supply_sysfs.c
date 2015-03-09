@@ -279,6 +279,9 @@ static struct device_attribute power_supply_attrs[] = {
 	POWER_SUPPLY_ATTR(usb_otg),
 	POWER_SUPPLY_ATTR(charge_enabled),
 	POWER_SUPPLY_ATTR(flash_current_max),
+#ifdef CONFIG_LGE_PM_VZW_REQ
+	POWER_SUPPLY_ATTR(vzw_chg),
+#endif
 #ifdef CONFIG_LGE_PM_FACTORY_PSEUDO_BATTERY
 	PSEUDO_BATT_ATTR(pseudo_batt),
 #endif

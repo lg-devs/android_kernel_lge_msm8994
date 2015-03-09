@@ -352,7 +352,7 @@ static int qpnp_hap_play(struct qpnp_hap *hap, int on)
 			QPNP_HAP_PLAY_REG(hap->base));
 	if (rc < 0)
 		return rc;
-    printk("[LGE VIBRATOR] qpnp_hap_play play : %d voltage : %d \n", on  , hap->vmax_mv);
+    pr_debug("[LGE VIBRATOR] qpnp_hap_play play : %d voltage : %d \n", on  , hap->vmax_mv);
 	hap->reg_play = val;
 
 	return 0;
@@ -1192,14 +1192,20 @@ static void qpnp_hap_td_enable(struct timed_output_dev *dev, int value)
 {
 	struct qpnp_hap *hap = container_of(dev, struct qpnp_hap,
 					 timed_dev);
-	printk("[LGE VIBRATOR] qpnp_hap_td_enable timeout_ms : %d , voltage : %d\n",value , hap->vmax_mv);
+	pr_debug("[LGE VIBRATOR] qpnp_hap_td_enable timeout_ms : %d , voltage : %d\n",value , hap->vmax_mv);
 
 	mutex_lock(&hap->lock);
 	hrtimer_cancel(&hap->hap_timer);
 
-	if (value == 0)
+	if (value == 0) {
+		/*                                                              */
+		if(hap->state == 0)	{
+			mutex_unlock(&hap->lock);
+			return;
+		}
+		/*                                                              */
 		hap->state = 0;
-	else {
+	} else {
 		value = (value > hap->timeout_ms ?
 				 hap->timeout_ms : value);
 		hap->state = 1;

@@ -239,7 +239,8 @@ int ecryptfs_initialize_file(struct dentry *ecryptfs_dentry,
 #if 1 /* FEATURE_SDCARD_ENCRYPTION */
 	struct ecryptfs_mount_crypt_stat *mount_crypt_stat =
 		&ecryptfs_superblock_to_private(
-			ecryptfs_dentry->d_sb)->mount_crypt_stat;
+            ecryptfs_dentry->d_sb)->mount_crypt_stat;
+    char dentry_name[MAX_FILE_NAME_LENGTH] = {0,};
 #endif
 	int rc = 0;
 
@@ -249,16 +250,17 @@ int ecryptfs_initialize_file(struct dentry *ecryptfs_dentry,
 		goto out;
 	}
 #if defined (FEATURE_SDCARD_MEDIAEXN_SYSTEMCALL_ENCRYPTION)
-	if (getMediaProperty() == 1) {
-		if (ecryptfs_mediaFileSearch(ecryptfs_dentry->d_name.name)) {
-			crypt_stat->flags &= ~(ECRYPTFS_ENCRYPTED);
-			goto out;
-		}
-	}
+memcpy (dentry_name, ecryptfs_dentry->d_name.name, ecryptfs_dentry->d_name.len);
+    if (getMediaProperty() == 1) {
+        if(ecryptfs_mediaFileSearch(dentry_name)) {
+            crypt_stat->flags &= ~(ECRYPTFS_ENCRYPTED);
+            goto out;
+        }
+    }
 
-    if (ecryptfs_asecFileSearch(ecryptfs_dentry->d_name.name)) {
-		crypt_stat->flags &= ~(ECRYPTFS_ENCRYPTED);
-		goto out;
+    if(ecryptfs_asecFileSearch(dentry_name)) {
+        crypt_stat->flags &= ~(ECRYPTFS_ENCRYPTED);
+        goto out;
     }
 #endif /* FEATURE_SDCARD_MEDIAEXN_SYSTEMCALL_ENCRYPTION */
 #if 1 /* FEATURE_SDCARD_ENCRYPTION */

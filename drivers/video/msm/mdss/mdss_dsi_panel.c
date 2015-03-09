@@ -56,6 +56,10 @@ DEFINE_LED_TRIGGER(bl_led_trigger);
 struct mdss_panel_data *pdata_base;
 #endif
 
+#ifdef CONFIG_LGE_LCD_OFF_DIMMING
+extern bool fb_blank_called;
+#endif
+
 #if defined(CONFIG_Z2_LGD_POLED_PANEL)
 static int img_tune_mode = 1;	/* Default value */
 struct img_tune_cmds_desc {
@@ -260,6 +264,15 @@ static void mdss_dsi_panel_bklt_dcs(struct mdss_dsi_ctrl_pdata *ctrl, int level)
 	}
 
 	led_pwm1[1] = (unsigned char)level;
+#ifdef CONFIG_LGE_LCD_OFF_DIMMING
+if (lge_get_bootreason_with_lcd_dimming() && !fb_blank_called) {
+	led_pwm1[1] = 5;
+	pr_info("%s: lcd dimming mode. level=%d set_min_brightness=%d\n",
+		__func__, level, led_pwm1[1]);
+	goto skip_mapping;
+}
+#endif
+
 #if defined(CONFIG_Z2_LGD_POLED_PANEL)
 	if (cur_plc_status == PLC_UNSET) {
 		if (ctrl->panel_data.panel_info.blmap)
@@ -283,6 +296,8 @@ static void mdss_dsi_panel_bklt_dcs(struct mdss_dsi_ctrl_pdata *ctrl, int level)
 #else
 	pr_info("%s: level=%d blmap=%d\n", __func__, level, led_pwm1[1]);
 #endif
+
+skip_mapping:
 
 #if defined(CONFIG_Z2_LGD_POLED_PANEL)
 	if (led_pwm1[1] != 0x0 && !is_dimming_on) {

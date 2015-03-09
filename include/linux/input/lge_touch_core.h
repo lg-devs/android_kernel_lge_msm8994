@@ -182,6 +182,7 @@ struct touch_platform_data {
 	u32 fw_ver_addr_list[4];
 	u32 fw_pid_addr;
 	u32 fw_pid_addr_list[4];
+	u8 swipe_pwr_ctrl_stage;
 };
 
 struct t_data {
@@ -664,6 +665,13 @@ enum{
 	BL_VER_LOWER = 	0,
 	BL_VER_HIGHER = 1 << 1,
 	NO_NEED_BL =	1 << 2,
+};
+
+enum {
+	WAIT_SWIPE_WAKEUP,
+	SKIP_POWER_CONTROL,
+	WAIT_TOUCH_PRESS,
+	WAIT_TOUCH_RELEASE,
 };
 
 #define LGE_TOUCH_NAME		"lge_touch"

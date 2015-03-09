@@ -90,7 +90,7 @@ extern int pp_set_dmb_status(int flag);
 #endif /*               */
 
 #ifdef CONFIG_LGE_LCD_OFF_DIMMING
-static bool fb_blank_called;
+bool fb_blank_called;
 #endif
 static struct msm_mdp_interface *mdp_instance;
 
@@ -229,14 +229,6 @@ static void mdss_fb_set_bl_brightness(struct led_classdev *led_cdev,
 
 	if (value > mfd->panel_info->brightness_max)
 		value = mfd->panel_info->brightness_max;
-
-#ifdef CONFIG_LGE_LCD_OFF_DIMMING
-	if (((lge_get_bootreason() == 0x77665560) || (lge_get_bootreason() == 0x77665561))
-			&& !fb_blank_called) {
-		pr_info("%s : lcd dimming mode! minimum brightness.\n",__func__);
-		value = 10;
-	}
-#endif
 
 #if defined(CONFIG_LGE_MIPI_JDI_INCELL_QHD_CMD_PANEL)
 	if (mfd->panel_info->blmap)

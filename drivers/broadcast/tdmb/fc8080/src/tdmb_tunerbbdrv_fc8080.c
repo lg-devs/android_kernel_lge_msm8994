@@ -37,7 +37,7 @@
 #define	CH_LOW_NUM		71		/* 7A index 71 for UI */
 
 #define	CH_UPPER_NUM		133		/* 13C index 131 for UI*/
-
+#define FEATURE_ISR_REPAIR
 #ifdef FREQ_SEARCH_IN_TABLE
 
 #define	MAX_KOREABAND_FULL_CHANNEL	21
@@ -64,6 +64,8 @@
 #define NOT_MSCDATA_MULTIPLE_MEMCPY
 uint32 	tp_total_cnt=0;
 
+uint32 	tp_lock_flag = FALSE;
+
 /*                                                          */
 #define START_SYNC_CNT 3
 #define MAX_ANT_BUFF_CNT 2
@@ -74,6 +76,9 @@ uint32 	tp_total_cnt=0;
   2. STREAM_SLAVE_PARALLEL_UPLOAD : HOST Interface between MSM and FC8080 is EBI2
   3. STREAM_SPI_UPLOAD : HOST Interface between MSM and FC8080 is SPI
   ------------------------------------------------------------------------- */
+#ifdef FEATURE_ISR_REPAIR
+uint32 isr_status = 1;
+#endif
 
 /*============================================================
 **    2.   External Variables
@@ -643,6 +648,22 @@ int8	tunerbb_drv_fc8080_get_ber(struct broadcast_tdmb_sig_info *dmb_bb_info)
 		// initialize information
 		tp_total_cnt = 0;
 		//dmb_bb_info->va_ber = tunerbb_drv_fc8080_get_rs_ber();
+
+		if(tp_lock_flag == FALSE)
+		{
+			if(dmb_bb_info->tp_lock == 1)
+			{
+				printk("[FC8080] tp_lock = %d, tp_err_cnt = %d, va_ber = %d\n", dmb_bb_info->tp_lock, tp_err_cnt, dmb_bb_info->va_ber);
+				tp_lock_flag = TRUE;
+			}
+		}
+		else {
+			if(dmb_bb_info->tp_lock == 0)
+			{
+				printk("[FC8080] tp_lock = %d, tp_err_cnt = %d, va_ber = %d\n", dmb_bb_info->tp_lock, tp_err_cnt, dmb_bb_info->va_ber);
+				tp_lock_flag = FALSE;
+			}
+		}
 	}
 	else
 	{
@@ -702,7 +723,10 @@ int8	tunerbb_drv_fc8080_get_ber(struct broadcast_tdmb_sig_info *dmb_bb_info)
 
 	dmb_bb_info->antenna_level = calAntLevel;
 	/*                                                          */
-
+#ifdef FEATURE_ISR_REPAIR
+	if (isr_status)
+        bbm_com_write(0, BBM_MD_INT_EN, BBM_MF_INT);
+#endif
 #if 0
 	//채널은 잡았으나 (sync_status == 0x3f) frame이 들어오지 않는 경우(nframe == 0) - MBN V-Radio
 	if((sync_status==0x3f)&&(nframe==0))
@@ -1528,6 +1552,7 @@ static int8 tunerbb_drv_fc8080_check_overrun(uint8 op_mode)
 		if(mfoverStatus & mask)
 		{
 			bbm_com_word_write(NULL, BBM_BUF_OVERRUN, mfoverStatus);
+			bbm_com_word_write(NULL, BBM_BUF_OVERRUN, 0);
 
 			printk("======== FC8080  OvernRun and Buffer Reset Done mask (0x%X) over (0x%X) =======\n", mask,mfoverStatus );
 		}
@@ -1538,10 +1563,13 @@ static int8 tunerbb_drv_fc8080_check_overrun(uint8 op_mode)
 #endif
 void tunerbb_drv_fc8080_isr_control(fci_u8 onoff)
 {
+#ifdef FEATURE_ISR_REPAIR
+	isr_status = onoff;
 	if(onoff)
 		bbm_com_write(0, BBM_MD_INT_EN, BBM_MF_INT);
 	else
 		bbm_com_write(0, BBM_MD_INT_EN, 0);
+#endif
 }
 
 /*                                                              */

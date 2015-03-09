@@ -93,9 +93,6 @@ DECLARE_DELAYED_WORK(sleep_workqueue, bluetooth_pm_sleep_work);
 
 /* Macros for handling sleep work */
 #define bluetooth_pm_rx_busy()         schedule_delayed_work(&sleep_workqueue, 0)
-//BT_S : [CONBT-966] Fix to HCI command timeout
-#define bluetooth_pm_rx_busy_delay()   schedule_delayed_work(&sleep_workqueue, 20)
-//BT_E : [CONBT-966] Fix to HCI command timeout
 #define bluetooth_pm_tx_busy()         schedule_delayed_work(&sleep_workqueue, 0)
 #define bluetooth_pm_rx_idle()         schedule_delayed_work(&sleep_workqueue, 0)
 #define bluetooth_pm_tx_idle()         schedule_delayed_work(&sleep_workqueue, 0)
@@ -277,19 +274,9 @@ static void bluetooth_pm_hostwake_task(unsigned long data)
 	if(gpio_get_value(bsi->host_wake) == ASSERT)
 	{
 		printk("%s, hostwake GPIO ASSERT(Low)\n", __func__);
-//BT_S : [CONBT-966] Fix to HCI command timeout
-        if (msm_hs_get_pm_state_active(bsi->uport) == CLOCK_REQUEST_UNAVAILABLE)
-        {
-            printk("%s, delay 200ms because not standby msm hs \n", __func__);
-            bluetooth_pm_rx_busy_delay();
-        }
-        else
-		{
-            bluetooth_pm_rx_busy();
-        }
-//BT_E : [CONBT-966] Fix to HCI command timeout
+		bluetooth_pm_rx_busy();
 
-		mod_timer(&tx_timer, jiffies + (TX_TIMER_INTERVAL * HZ));		
+		mod_timer(&tx_timer, jiffies + (TX_TIMER_INTERVAL * HZ));
 	}
 	else
 	{

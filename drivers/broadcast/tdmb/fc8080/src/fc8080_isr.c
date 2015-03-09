@@ -26,6 +26,7 @@
 
 #include "../inc/fci_types.h"
 #include "../inc/fci_hal.h"
+#include "../inc/fci_oal.h"
 #include "../inc/fc8080_regs.h"
 #include "../inc/fc8080_isr.h"
 
@@ -102,6 +103,7 @@ void fc8080_isr(HANDLE handle)
 	} else {
 		bbm_word_read(handle, BBM_BUF_OVERRUN, &buf_int_status);
 		if (buf_int_status) {
+			print_log(0, "======= FC8080 OverRun and Buffer Reset =======\n");
 			bbm_word_write(handle, BBM_BUF_OVERRUN, buf_int_status);
 			bbm_word_write(handle, BBM_BUF_OVERRUN, 0);
 			fc8080_data(handle, buf_int_status);

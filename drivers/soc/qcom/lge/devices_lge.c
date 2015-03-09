@@ -736,3 +736,19 @@ int lge_get_bootreason(void)
 {
 	return lge_boot_reason;
 }
+
+#ifdef CONFIG_LGE_LCD_OFF_DIMMING
+int lge_get_bootreason_with_lcd_dimming(void)
+{
+	int ret = 0;
+
+	if (lge_get_bootreason() == 0x77665560)
+		ret = 1;
+	else if (lge_get_bootreason() == 0x77665561)
+		ret = 2;
+	else if (lge_get_bootreason() == 0x77665562)
+		ret = 3;
+
+	return ret;
+}
+#endif

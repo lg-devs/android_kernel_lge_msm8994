@@ -77,8 +77,6 @@ int thermal_status = 0;
 extern int touch_thermal_mode;*/
 extern int touch_ta_status;
 
-bool wakeup_by_swipe;
-
 /* Register Map & Register bit mask
  * - Please check "One time" this map before using this device driver
  */
@@ -343,9 +341,23 @@ void write_firmware_version_log(struct synaptics_ts_data *ts)
 {
 	char *version_string = NULL;
 	int ver_outbuf = 0;
+	int rc = 0;
 
 	version_string = kzalloc(448 * sizeof(char), GFP_KERNEL);
 
+	if (mfts_enable) {
+		mutex_lock(&ts->pdata->thread_lock);
+		read_page_description_table(ts->client);
+		rc = get_ic_info(ts);
+		mutex_unlock(&ts->pdata->thread_lock);
+
+		if (rc < 0) {
+			ver_outbuf += snprintf(version_string+ver_outbuf, 448-ver_outbuf, "-1\n");
+			ver_outbuf += snprintf(version_string+ver_outbuf, 448-ver_outbuf,
+					"Read Fail Touch IC Info\n");
+			return;
+		}
+	}
 	ver_outbuf += snprintf(version_string+ver_outbuf, 448-ver_outbuf,
 			"===== Firmware Info =====\n");
 
@@ -388,6 +400,8 @@ void write_firmware_version_log(struct synaptics_ts_data *ts)
 	msleep(30);
 
 	kfree(version_string);
+
+	return;
 }
 
 
@@ -974,7 +988,6 @@ void synaptics_ts_prox_function(struct synaptics_ts_exp_fn *prox_fn, bool insert
 	prox_fhandler.inserted = insert;
 
 	if (insert) {
-		prox_fhandler.exp_fn = kzalloc(sizeof(prox_fhandler.exp_fn), GFP_KERNEL);
 		prox_fhandler.exp_fn = prox_fn;
 	} else {
 		prox_fhandler.exp_fn = NULL;
@@ -988,7 +1001,6 @@ void synaptics_ts_rmidev_function(struct synaptics_ts_exp_fn *rmidev_fn, bool in
 	rmidev_fhandler.inserted = insert;
 
 	if (insert) {
-		rmidev_fhandler.exp_fn = kzalloc(sizeof(rmidev_fhandler.exp_fn), GFP_KERNEL);
 		rmidev_fhandler.exp_fn = rmidev_fn;
 	} else {
 		rmidev_fhandler.exp_fn = NULL;
@@ -4404,6 +4416,11 @@ static int lpwg_update_all(struct synaptics_ts_data *ts, bool irqctrl)
 			if (!(strncmp(ts->fw_info.fw_product_id, "PLG349", 6)))
 				set_doze_param(ts, 3);
 		}
+
+		if (ts->pdata->swipe_pwr_ctrl_stage != SKIP_POWER_CONTROL)
+			ts->pdata->swipe_pwr_ctrl_stage = WAIT_SWIPE_WAKEUP;
+		TOUCH_INFO_MSG("%s : swipe_pwr_ctrl_stage = %d\n", __func__,
+				ts->pdata->swipe_pwr_ctrl_stage);
 	}
 
 	if (ts->lpwg_ctrl.screen) { /* ON(1) */
@@ -4847,7 +4864,7 @@ enum error_type synaptics_ts_get_data(struct i2c_client *client,
 		} else if ((ts->ts_swipe_data.support_swipe == SWIPE_VER_2)
 				&& (status & ts->ts_swipe_data.swipe_gesture)) {
 			if (get_swipe_data(client) == 0) {
-				wakeup_by_swipe = true;
+				ts->pdata->swipe_pwr_ctrl_stage = SKIP_POWER_CONTROL;
 				if (send_uevent_lpwg(client, LPWG_SWIPE_DOWN) == 0)
 					swipe_disable(ts);
 			}
@@ -4857,7 +4874,7 @@ enum error_type synaptics_ts_get_data(struct i2c_client *client,
 
 			if (ts->ts_swipe_data.support_swipe == SWIPE_VER_2) {
 				if (get_swipe_data(client) == 0) {
-					wakeup_by_swipe = true;
+					ts->pdata->swipe_pwr_ctrl_stage = SKIP_POWER_CONTROL;
 					if (send_uevent_lpwg(client, LPWG_SWIPE_DOWN) == 0)
 						swipe_disable(ts);
 				}
@@ -4874,7 +4891,7 @@ enum error_type synaptics_ts_get_data(struct i2c_client *client,
 
 			if (swipe_buf == ts->ts_swipe_data.swipe_gesture) {
 				get_swipe_data(client);
-				wakeup_by_swipe = true;
+				ts->pdata->swipe_pwr_ctrl_stage = SKIP_POWER_CONTROL;
 				if (send_uevent_lpwg(client, LPWG_SWIPE_DOWN) == 0)
 					swipe_disable(ts);
 				return IGNORE_EVENT;
@@ -5123,9 +5140,9 @@ enum error_type synaptics_ts_power(struct i2c_client *client, int power_ctrl)
 
 	TOUCH_TRACE();
 
-	if (wakeup_by_swipe) {
-		TOUCH_INFO_MSG("%s : Skip power_control (wakeup_by_swipe = %d)\n",
-				__func__, wakeup_by_swipe);
+	if (ts->pdata->swipe_pwr_ctrl_stage == SKIP_POWER_CONTROL) {
+		TOUCH_INFO_MSG("%s : Skip power_control (swipe_pwr_ctrl_stage = %d)\n",
+				__func__, ts->pdata->swipe_pwr_ctrl_stage);
 
 		power_state = power_ctrl;
 		TOUCH_INFO_MSG("%s : power_state[%d]\n", __func__, power_state);
@@ -5478,6 +5495,7 @@ enum error_type synaptics_ts_fw_upgrade(struct i2c_client *client,
 		/* it will be reset and initialized
 		 * automatically by lge_touch_core. */
 	}
+	release_firmware(fw_entry);
 	return NO_UPGRADE;
 
 firmware_up:

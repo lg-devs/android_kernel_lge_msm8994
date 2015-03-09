@@ -84,8 +84,6 @@ static struct lge_touch_data *ts_data = NULL;
 extern bool i2c_suspended;
 #endif
 
-extern bool wakeup_by_swipe;
-
 extern void touch_enable_irq(unsigned int irq);
 extern void touch_disable_irq(unsigned int irq);
 /* Debug mask value
@@ -166,8 +164,9 @@ int send_uevent_lpwg(struct i2c_client *client, int type)
 			&& atomic_read(&ts->state.uevent_state)
 			== UEVENT_IDLE) {
 		if (type == LPWG_SWIPE_DOWN && atomic_read(&ts->state.power_state) == POWER_ON) {
-			wakeup_by_swipe = false;
-			TOUCH_INFO_MSG("drop LPWG_SWIPE_DOWN event\n");
+			ts->pdata->swipe_pwr_ctrl_stage = WAIT_SWIPE_WAKEUP;
+			TOUCH_INFO_MSG("drop LPWG_SWIPE_DOWN event (swipe_pwr_ctrl_stage = %d)\n",
+					ts->pdata->swipe_pwr_ctrl_stage);
 			return -1;
 		}
 
@@ -1080,7 +1079,7 @@ static void safety_reset(struct lge_touch_data *ts)
 		TOUCH_INFO_MSG("SOFT_RESET\n");
 		release_all_touch_event(ts);
 		DO_IF(touch_device_func->ic_ctrl(ts->client, IC_CTRL_RESET, 0x01, &ret) != 0, error);
-		msleep(ts->pdata->role->booting_delay);
+		msleep(ts->pdata->role->reset_delay);
 		break;
 	case PIN_RESET:
 		TOUCH_INFO_MSG("PIN_RESET\n");
@@ -1851,6 +1850,7 @@ irqreturn_t touch_thread_irq_handler(int irq, void *dev_id)
 	struct lge_touch_data *ts = (struct lge_touch_data *)dev_id;
 	enum error_type ret = NO_ERROR;
 	enum ghost_error_type ghost_alg_ret = NO_ACTION;
+	u8 prev_reset_control = ts->pdata->pwr->reset_control;
 
 	TOUCH_TRACE();
 	mutex_lock(&ts->pdata->thread_lock);
@@ -1888,6 +1888,22 @@ do_not_filter:
 		queue_delayed_work(touch_wq,
 				&ts_data->work_thermal, msecs_to_jiffies(0));
 	}
+
+	if (ts->ts_report_data.total_num) {
+		if (ts->pdata->swipe_pwr_ctrl_stage == WAIT_TOUCH_PRESS) {
+			TOUCH_INFO_MSG("%s : Touch pressed! (swipe_pwr_ctrl_stage = %d)\n",
+					__func__, ts->pdata->swipe_pwr_ctrl_stage);
+			ts->pdata->swipe_pwr_ctrl_stage = WAIT_TOUCH_RELEASE;
+		}
+	} else {
+		if (ts->pdata->swipe_pwr_ctrl_stage == WAIT_TOUCH_RELEASE) {
+			TOUCH_INFO_MSG("%s : Touch released! goto do_soft_reset! (swipe_pwr_ctrl_stage = %d)\n",
+					__func__, ts->pdata->swipe_pwr_ctrl_stage);
+			ts->pdata->swipe_pwr_ctrl_stage = WAIT_SWIPE_WAKEUP;
+			goto do_soft_reset;
+		}
+	}
+
 do_not_report:
 	memcpy(&ts->ts_prev_data, &ts->ts_curr_data, sizeof(struct touch_data));
 do_reset_curr_data:
@@ -1903,6 +1919,13 @@ do_init:
 	mutex_unlock(&ts->pdata->thread_lock);
 	return IRQ_HANDLED;
 
+do_soft_reset:
+	ts->pdata->pwr->reset_control = SOFT_RESET;
+	safety_reset(ts);
+	ts->pdata->pwr->reset_control = prev_reset_control;
+	touch_ic_init(ts, 0);
+	mutex_unlock(&ts->pdata->thread_lock);
+	return IRQ_HANDLED;
 error:
 	TOUCH_ERR_MSG("%s error\n", __func__);
 	safety_reset(ts);
@@ -3340,10 +3363,10 @@ static int touch_resume(struct device *dev)
 	TOUCH_INFO_MSG("%s : touch_resume done\n", __func__);
 	mutex_unlock(&ts->pdata->thread_lock);
 
-	if (wakeup_by_swipe) {
-		TOUCH_INFO_MSG("%s : Initialize without booting_delay (wakeup_by_swipe = %d)\n",
-				__func__, wakeup_by_swipe);
-		wakeup_by_swipe = false;
+	if (ts->pdata->swipe_pwr_ctrl_stage == SKIP_POWER_CONTROL) {
+		TOUCH_INFO_MSG("%s : Initialize without booting_delay (swipe_pwr_ctrl_stage = %d)\n",
+				__func__, ts->pdata->swipe_pwr_ctrl_stage);
+		ts->pdata->swipe_pwr_ctrl_stage = WAIT_TOUCH_PRESS;
 		mod_delayed_work(touch_wq, &ts->work_init, msecs_to_jiffies(0));
 	} else {
 		mod_delayed_work(touch_wq, &ts->work_init,
