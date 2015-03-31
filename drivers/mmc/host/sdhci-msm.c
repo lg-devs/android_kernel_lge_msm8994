@@ -3285,11 +3285,11 @@ static int sdhci_msm_probe(struct platform_device *pdev)
 	msm_host->mmc->caps2 |= MMC_CAP2_CORE_PM;
 #ifdef CONFIG_MACH_LGE
 #if defined (CONFIG_LGE_MMC_BKOPS_ENABLE) && defined(CONFIG_MMC_SDHCI_MSM)
-	/*           
-                                                               
-                                                                                               
-                                        
-  */
+	/* LGE_CHANGE
+	 * Enable BKOPS feature since it has been disabled by default.
+	 * If you want to use bkops, you have to set Y in kernel/arch/arm/configs/XXXX_defconfig file.
+	 * 2014-09-01, Z2G4-BSP-FileSys@lge.com
+	 */
 	msm_host->mmc->caps2 |= MMC_CAP2_INIT_BKOPS;
 #endif
 #endif

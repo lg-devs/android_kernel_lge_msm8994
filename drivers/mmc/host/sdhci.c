@@ -1514,7 +1514,7 @@ static int sdhci_enable(struct mmc_host *mmc)
 					host->cpu_dma_latency_us);
 	if (host->ops->platform_bus_voting)
 		host->ops->platform_bus_voting(host, 1);
-	/*                                                                      */
+	/* LGE_CHANGE_S, [WiFi][hayun.kim@lge.com], 2013-06-12, dma qos control */
 /*
 #if defined(CONFIG_BCMDHD) || defined (CONFIG_BCMDHD_MODULE)
 	{
@@ -1525,7 +1525,7 @@ static int sdhci_enable(struct mmc_host *mmc)
 	}
 #endif
 */
-	/*                                                                      */
+	/* LGE_CHANGE_S, [WiFi][hayun.kim@lge.com], 2013-06-12, dma qos control */
 
 	return 0;
 }

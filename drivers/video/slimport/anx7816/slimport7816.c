@@ -39,9 +39,9 @@
 #ifdef CONFIG_SLIMPORT_DYNAMIC_HPD
 #include "../../msm/mdss/mdss_hdmi_slimport.h"
 #endif
-/*            
-                                                          
-                                   
+/* LGE NOTICE,
+ * Use device tree structure data when defined "CONFIG_OF"
+ * 2012-10-17, jihyun.seong@lge.com
  */
 #include <linux/of_gpio.h>
 #include <linux/of_platform.h>
@@ -58,11 +58,11 @@ int external_block_en = 0;
 /* to access global platform data */
 static struct anx7816_platform_data *g_pdata;
 
-/*            
-                                          
-                                             
-                                                                      
-                                   
+/* LGE_CHANGE,
+ * to apply High voltage to HDMI_SWITCH_EN
+ * which can select MHL or SlimPort on LGPS11
+ * this feature should be enable only when board has hdmi switch chip.
+ * 2012-10-31, jihyun.seong@lge.com
  */
 /* #define USE_HDMI_SWITCH */
 #define TRUE 1
@@ -172,9 +172,9 @@ bool slimport_is_check(void)
 }
 EXPORT_SYMBOL(slimport_is_check);
 
-/*            
-                
-                                   
+/* LGE_CHANGE,
+ * power control
+ * 2012-10-17, jihyun.seong@lge.com
  */
 #if 0
 static int slimport7816_avdd_power(unsigned int onoff)

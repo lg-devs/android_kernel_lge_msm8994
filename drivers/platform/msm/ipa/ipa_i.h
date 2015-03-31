@@ -942,10 +942,10 @@ struct ipa_context {
 
 	struct ipa_uc_ctx uc_ctx;
 
-//                                                                                                            
+// LGE_UPDATE_S : IPA debug patch @CN01774246, Subject:Kernel Panic in r1023.3 version (kernel BUG ipa.c 1542)
 	struct ipa_hw_pkt_status status[128];
 	u32 status_wr_idx;
-//             
+// LGE_UPDATE_E
 };
 
 /**

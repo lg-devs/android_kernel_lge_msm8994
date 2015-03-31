@@ -286,6 +286,11 @@ static void msm_hs_bus_voting(struct msm_hs_port *msm_uport, unsigned int vote);
 static struct msm_hs_port *msm_hs_get_hs_port(int port_index);
 static void msm_hs_queue_rx_desc(struct msm_hs_port *msm_uport);
 
+//BT_S : [CONBT-968] Manage PM_state when callbacks are disabled
+static int msm_hs_pm_resume(struct device *dev);
+//BT_E : [CONBT-968] Manage PM_state when callbacks are disabled
+
+
 #define UARTDM_TO_MSM(uart_port) \
 	container_of((uart_port), struct msm_hs_port, uport)
 
@@ -2258,6 +2263,15 @@ void msm_hs_request_clock_on(struct uart_port *uport)
 	struct msm_hs_port *msm_uport = UARTDM_TO_MSM(uport);
 	msm_hs_resource_vote(UARTDM_TO_MSM(uport));
 
+//BT_S : [CONBT-968] Manage PM_state when callbacks are disabled
+    if (msm_uport->pm_state != MSM_HS_PM_ACTIVE) {
+        MSM_HS_WARN("%s(): %p runtime PM callback not invoked",
+            __func__, uport->dev);
+            msm_hs_pm_resume(uport->dev);
+    }
+//BT_E : [CONBT-968] Manage PM_state when callbacks are disabled
+
+
 	/* Clear the flag */
 	if (msm_uport->obs)
 		atomic_set(&msm_uport->client_req_state, 0);
@@ -2945,9 +2959,9 @@ int msm_hs_get_pm_state_active(struct uart_port *uport)
 EXPORT_SYMBOL(msm_hs_get_pm_state_active);
 //BT_E : [CONBT-966] Fix to HCI command timeout
 
-#endif /*                      */
-/*                                                                 */
-/*                                                        */
+#endif /* CONFIG_LGE_BLUESLEEP */
+/* LG_BTUI : chanha.park@lge.com : Added bluesleep interface - [E] */
+/* LGE_CHANGE_E, [BT][younghyun.kwon@lge.com], 2013-04-10 */
 
 
 /**
@@ -3086,6 +3100,10 @@ static int msm_hs_pm_resume(struct device *dev)
 
 	if (!msm_uport)
 		goto err_resume;
+//BT_S : [CONBT-968] Manage PM_state when callbacks are disabled
+    if (msm_uport->pm_state == MSM_HS_PM_ACTIVE)
+    return 0;
+//BT_E : [CONBT-968] Manage PM_state when callbacks are disabled
 	if (!atomic_read(&msm_uport->client_req_state))
 		toggle_wakeup_interrupt(msm_uport);
 	msm_hs_clk_bus_vote(msm_uport);
@@ -3108,6 +3126,9 @@ static int msm_hs_pm_sys_suspend_noirq(struct device *dev)
 
 	if (IS_ERR_OR_NULL(msm_uport))
 		return -ENODEV;
+//BT_S : [CONBT-968] Manage PM_state when callbacks are disabled
+    MSM_HS_DBG("%s(): suspending", __func__);
+//BT_E : [CONBT-968] Manage PM_state when callbacks are disabled
 
 	prev_pwr_state = msm_uport->pm_state;
 	uport	= &(msm_uport->uport);

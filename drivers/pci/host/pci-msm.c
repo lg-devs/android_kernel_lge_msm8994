@@ -2235,7 +2235,7 @@ static int msm_pcie_gpio_init(struct msm_pcie_dev_t *dev)
 		}
 
 		if (info->out) {
-			/*                                      */
+			/* LGE change : do NOT set gp 35 output */
 #ifdef CONFIG_LGE_PM
 			rc = gpio_direction_input(info->num);
 #else

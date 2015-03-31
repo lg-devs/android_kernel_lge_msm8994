@@ -1398,7 +1398,7 @@ static struct msm_camera_i2c_fn_t msm_sensor_qup_func_tbl = {
 	.i2c_write_conf_tbl = msm_camera_qup_i2c_write_conf_tbl,
 };
 
-static uint8_t main_sensor_probe_succeed = 0;/*                                */
+static uint8_t main_sensor_probe_succeed = 0;/* LGE for one binary two sensors */
 int32_t msm_sensor_platform_probe(struct platform_device *pdev,
 				  const void *data)
 {
@@ -1420,7 +1420,7 @@ int32_t msm_sensor_platform_probe(struct platform_device *pdev,
 	}
 	pr_err("%s sensor name %s\n", __func__,
 		s_ctrl->sensordata->sensor_name);
-/*                                */
+/* LGE for one binary two sensors */
 	if (strcmp(s_ctrl->sensordata->sensor_name, "imx135") == 0 ||
 		strcmp(s_ctrl->sensordata->sensor_name, "imx214") == 0) {
 		if (main_sensor_probe_succeed == 1) {
@@ -1475,7 +1475,7 @@ int32_t msm_sensor_platform_probe(struct platform_device *pdev,
 
 	pr_err("%s %s probe succeeded\n", __func__,
 		s_ctrl->sensordata->sensor_name);
-/*                                */
+/* LGE for one binary two sensors */
 	if (strcmp(s_ctrl->sensordata->sensor_name, "imx135") == 0 || 
 		strcmp(s_ctrl->sensordata->sensor_name, "imx214") == 0) {
 		 	CDBG("main sensor %s probe succeeded !!", s_ctrl->sensordata->sensor_name);

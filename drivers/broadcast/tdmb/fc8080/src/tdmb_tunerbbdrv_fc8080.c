@@ -32,7 +32,7 @@
 #undef FEATURE_FIC_BER
 #undef FEATURE_RSSI_DEBUG
 
-//        
+// LGE ADD
 #define	FREQ_SEARCH_IN_TABLE		/* Freq conversion in Table Searching */
 #define	CH_LOW_NUM		71		/* 7A index 71 for UI */
 
@@ -50,7 +50,7 @@
 #define	CH_GAP_FREQ 		1728	/* Channel Center frequency interval between channel number */
 #define	TDMB_ENS_NUM		7		/* Korea TDMB Ensemble Number 7 ~ 13 */
 #endif
-//        
+// LGE ADD
 
 #define MAX_MSC_BER			20000
 #define MAX_VA_BER			20000
@@ -66,10 +66,10 @@ uint32 	tp_total_cnt=0;
 
 uint32 	tp_lock_flag = FALSE;
 
-/*                                                          */
+/* LGE_ADD_S, [hyun118.shin@lge.com], TDMB Antenna Leveling */
 #define START_SYNC_CNT 3
 #define MAX_ANT_BUFF_CNT 2
-/*                                                          */
+/* LGE_ADD_E, [hyun118.shin@lge.com], TDMB Antenna Leveling */
 /* -----------------------------------------------------------------------
 < HOST Interface FEATURE Usage>
   1. STREAM_TS_UPLOAD  : HOST Interface between MSM and FC8080 is TSIF(I2C)
@@ -141,7 +141,7 @@ fci_u8 msc_multi_data[188*8*8];
 /*============================================================
 **    7.   Static Variables
 *============================================================*/
-//       
+//LGE ADD
 #ifdef FREQ_SEARCH_IN_TABLE
 
 	static int32 gKOREnsembleFullFreqTbl[MAX_KOREABAND_FULL_CHANNEL][2] =
@@ -157,12 +157,12 @@ static uint16 is_tdmb_probe = 0;
 
 //static uint16 data_sequence_count = 0;
 
-/*                                                          */
+/* LGE_ADD_S, [hyun118.shin@lge.com], TDMB Antenna Leveling */
 static uint32	antBuffIdx = 0;
 static uint16	antBuff[MAX_ANT_BUFF_CNT] = {0, };
 static uint8	calAntLevel = 0;
 static uint8	syncLockCnt = 0;
-/*                                                          */
+/* LGE_ADD_E, [hyun118.shin@lge.com], TDMB Antenna Leveling */
 /*============================================================
 **    8.   Local Function Prototype
 *============================================================*/
@@ -178,9 +178,9 @@ void tunerbb_drv_fc8080_get_dm(fci_u32 *mscber, fci_u32 *tp_err, fci_u16 *tpcnt,
 void tunerbb_drv_fc8080_get_dm(fci_u32 *mscber, fci_u32 *tp_err, fci_u16 *tpcnt, fci_u32 *vaber);
 #endif
 
-/*                                                          */
+/* LGE_ADD_S, [hyun118.shin@lge.com], TDMB Antenna Leveling */
 void tunerbb_drv_fc8080_init_antlevel_val(void);
-/*                                                          */
+/* LGE_ADD_E, [hyun118.shin@lge.com], TDMB Antenna Leveling */
 
 int8 tunerbb_drv_fc8080_power_on(void)
 {
@@ -214,9 +214,9 @@ int8 tunerbb_drv_fc8080_set_channel(int32 freq_num, uint8 subch_id, uint8 op_mod
 {
 	int8 ret_val;
 
-	/*                                                          */
+	/* LGE_ADD_S, [hyun118.shin@lge.com], TDMB Antenna Leveling */
 	tunerbb_drv_fc8080_init_antlevel_val();
-	/*                                                         */
+	/*LGE_ADD_E, [hyun118.shin@lge.com], TDMB Antenna Leveling */
 
 	ret_val = tunerbb_drv_fc8080_multi_set_channel(freq_num, 1, &subch_id, &op_mode);
 
@@ -233,7 +233,7 @@ int tunerbb_drv_fc8080_is_on(void)
 	return tdmb_fc8080_tdmb_is_on();
 }
 
-//        
+// LGE ADD
 static int32	tunerbb_drv_convert_chnum_to_freq(uint32 ch_num)
 {
 #ifdef FREQ_SEARCH_IN_TABLE
@@ -271,7 +271,7 @@ static int32	tunerbb_drv_convert_chnum_to_freq(uint32 ch_num)
 #endif
 }
 
-//        
+// LGE ADD
 #if !defined(STREAM_TS_UPLOAD)
 /*=======================================================
     Function 		: tunerbb_drv_fc8080_fic_cb
@@ -570,7 +570,7 @@ int8	tunerbb_drv_fc8080_get_ber(struct broadcast_tdmb_sig_info *dmb_bb_info)
 
 	uint16 nframe = 0;
 
-	/*                                                          */
+	/* LGE_ADD_S, [hyun118.shin@lge.com], TDMB Antenna Leveling */
 	uint8 loop;
 	uint16 antTable[4][2] =
 	{
@@ -582,7 +582,7 @@ int8	tunerbb_drv_fc8080_get_ber(struct broadcast_tdmb_sig_info *dmb_bb_info)
 
 	uint16 avgBER;
 	uint8 refAntLevel;
-	/*                                                          */
+	/* LGE_ADD_E, [hyun118.shin@lge.com], TDMB Antenna Leveling */
 
 	if(is_tdmb_probe == 0)
 	{
@@ -674,7 +674,7 @@ int8	tunerbb_drv_fc8080_get_ber(struct broadcast_tdmb_sig_info *dmb_bb_info)
 
 	dmb_bb_info->fic_ber = 0;
 
-	/*                                                          */
+	/* LGE_ADD_S, [hyun118.shin@lge.com], TDMB Antenna Leveling */
 	antBuff[antBuffIdx++ %MAX_ANT_BUFF_CNT] = dmb_bb_info->msc_ber;
 
 	for(loop = 0, avgBER = 0; loop < MAX_ANT_BUFF_CNT; loop++)
@@ -722,7 +722,7 @@ int8	tunerbb_drv_fc8080_get_ber(struct broadcast_tdmb_sig_info *dmb_bb_info)
 		calAntLevel = refAntLevel;
 
 	dmb_bb_info->antenna_level = calAntLevel;
-	/*                                                          */
+	/* LGE_ADD_E, [hyun118.shin@lge.com], TDMB Antenna Leveling */
 #ifdef FEATURE_ISR_REPAIR
 	if (isr_status)
         bbm_com_write(0, BBM_MD_INT_EN, BBM_MF_INT);
@@ -1010,31 +1010,31 @@ int8	tunerbb_drv_fc8080_read_data(uint8* buffer, uint32* buffer_size)
 	return retval;
 }
 #endif
-/*                                                                                     
-                                                                                                                   
-                                                                                                                           
-                                                                                        
-                      
-                     
-                                                                 
-                  
-                               
-                                           
-                                
-                                                                                                                             
-                                 
-                                             
-                                      
-                                                                     
+/*-------------------------------------------------------------------------------------
+int8 tunerbb_drv_fc8080_process_multi_data(uint8 subch_cnt, uint8* input_buf, uint32 input_size, uint32* read_size)
+    (1)   Process Multi or Single Service Data. The Driver must process multi or single data and stroe them in other buffer
+           for supplying data requested by tunerbb_drv_fc8080_get_multi_data( ) function
+    (2)   Return Value
+           Sucess : 1
+           Fail : 0 or negative interger (If there is error code)
+    (3)   Argument
+           uint8 subch_cnt (IN)
+                - Service Sub-Channel Count
+           uint8* input_buf (IN)
+               - The buffer pointer  containing Multi or Single Data(FIC/DMB/DAB or Mixed data) read from TSIF or EBI2 buffer
+           uint32 input_size (IN)
+              - input_buf has input_size data
+           uint32* read_size (IN /OUT)
+             - data size + subch_id header size supply to Application
 
-                
-                                                                     
-                                          
-                            
-                                                                                            
-                                                  
-                                                                                                                        
-                                                                                        */
+        <notice>
+             (1) read_size is the mulit or single data + header size.
+             (2) LGE supply the headr type
+             (3) For example
+                 - DMB Single Service case : read_size = DMB MSC Data size + dmb_header size
+                 - FIC + DMB + PACKET multi case :
+                       read_size FIC data size + dmb_header + DMB data size + dmb_header + Packet data size + dmb_header
+--------------------------------------------------------------------------------------- */
 #ifdef STREAM_TS_UPLOAD
 int8	tunerbb_drv_fc8080_process_multi_data(uint8 subch_cnt, uint8* input_buf, uint32 input_size, uint32* read_size)
 {
@@ -1572,7 +1572,7 @@ void tunerbb_drv_fc8080_isr_control(fci_u8 onoff)
 #endif
 }
 
-/*                                                              */
+/* LGE_CHANGE_S, [hyun118.shin@lge.com], TDMB Antennal Leveling */
 void tunerbb_drv_fc8080_init_antlevel_val(void)
 {
 	uint8 i = 0;
@@ -1585,4 +1585,4 @@ void tunerbb_drv_fc8080_init_antlevel_val(void)
 	antBuffIdx = 0;
 	calAntLevel = 0;
 }
-/*                                                              */
+/* LGE_CHANGE_E, [hyun118.shin@lge.com], TDMB Antennal Leveling */

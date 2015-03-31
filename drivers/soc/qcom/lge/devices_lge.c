@@ -157,11 +157,11 @@ int __init lge_boot_mode_init(char *s)
 		lge_boot_mode = LGE_BOOT_MODE_PIF_130K;
 	else if (!strcmp(s, "pif_910k"))
 		lge_boot_mode = LGE_BOOT_MODE_PIF_910K;
-	/*                            */
+	/* LGE_UPDATE_S for MINIOS2.0 */
 	else if (!strcmp(s, "miniOS"))
 		lge_boot_mode = LGE_BOOT_MODE_MINIOS;
 	pr_info("ANDROID BOOT MODE : %d %s\n", lge_boot_mode, s);
-	/*                            */
+	/* LGE_UPDATE_E for MINIOS2.0 */
 
 	return 1;
 }
@@ -456,7 +456,7 @@ static int __init lge_uart_mode(char *uart_mode)
 }
 
 __setup("lge.uart=", lge_uart_mode);
-#endif /*                             */
+#endif /* CONFIG_LGE_EARJACK_DEBUGGER */
 
 #if defined(CONFIG_LGE_MIPI_JDI_INCELL_QHD_CMD_PANEL)
 static int __init display_dsv_setup(char *dsv_cmd)
@@ -678,7 +678,7 @@ int  lge_get_kswitch_status()
 {
 	return s_kswitch_flag;
 }
-#endif	/*                    */
+#endif	/* CONFIG_LGE_KSWITCH */
 
 #ifdef CONFIG_LGE_DIAG_USB_ACCESS_LOCK
 static struct platform_device lg_diag_cmd_device = {

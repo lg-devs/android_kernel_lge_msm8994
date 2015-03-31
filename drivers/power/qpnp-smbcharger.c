@@ -1748,7 +1748,7 @@ static int smbchg_set_usb_current_max(struct smbchg_chip *chip,
 	bool changed;
 
 #ifdef CONFIG_LGE_PM_COMMON
-	//                                                                                       
+	//LGE shuold set input current limit even if battery is absent for factory cable booting.
 #else
 	if (!chip->batt_present) {
 		pr_info_ratelimited("Ignoring usb current->%d, battery is absent\n",
@@ -7407,10 +7407,10 @@ static int smbchg_probe(struct spmi_device *spmi)
 #else
 	chip->chg_current_te = chip->target_fastchg_current_ma;
 	smbchg_thermal_fastchg_current_ma = chip->target_fastchg_current_ma;
-#endif /*                             */
+#endif /*CONFIG_LGE_PM_UNIFIED_WLC_OTP*/
 	chip->otp_ibat_current = chip->target_fastchg_current_ma;
-#endif /*                               */
-#endif /*                                    */
+#endif /*CONFIG_LGE_PM_PARALLEL_CHARGING*/
+#endif /*CONFIG_LGE_PM_CHARGING_TEMP_SCENARIO*/
 
 	rc = determine_initial_status(chip);
 	if (rc < 0) {

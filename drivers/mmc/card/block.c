@@ -1541,7 +1541,7 @@ static int mmc_blk_issue_flush(struct mmc_queue *mq, struct request *req)
 			}
 		}
 		timeout_count++;
-#endif /*                              */
+#endif /* CONFIG_LGE_MMC_RESET_IF_HANG */
 		spin_lock_irq(q->queue_lock);
 		blk_requeue_request(q, req);
 		spin_unlock_irq(q->queue_lock);
@@ -1604,10 +1604,10 @@ static int mmc_blk_err_check(struct mmc_card *card,
 	int ecc_err = 0, gen_err = 0;
 
 #ifdef CONFIG_MACH_LGE
-	/*           
-                                                        
-                                        
-  */
+	/* LGE_CHANGE
+	 * When uSD is not inserted, return proper error-value.
+	 * 2014-09-01, Z2G4-BSP-FileSys@lge.com
+	 */
 	if(mmc_card_sd(card) && !mmc_gpio_get_cd(card->host)) {
 		return MMC_BLK_NOMEDIUM;
 	}
@@ -2897,7 +2897,7 @@ static int mmc_blk_reset_if_hang(struct mmc_queue *mq, struct mmc_card *card)
 
 	return 0;
 }
-#endif /*                              */
+#endif /* CONFIG_LGE_MMC_RESET_IF_HANG */
 
 static int mmc_blk_issue_rq(struct mmc_queue *mq, struct request *req)
 {

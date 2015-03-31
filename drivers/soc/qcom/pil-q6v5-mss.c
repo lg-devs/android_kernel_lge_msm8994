@@ -38,7 +38,7 @@
 
 #include <linux/time.h>
 
-/*                                                                     */
+/* Added getting MSM chip version info, 2014-12-21, secheol.pyo@lge.com*/
 #define FEATURE_LGE_MODEM_CHIPVER_INFO
 #ifdef FEATURE_LGE_MODEM_CHIPVER_INFO
 typedef struct modem_chip_info {
@@ -48,7 +48,7 @@ typedef struct modem_chip_info {
 } lg_chip_info;
 #endif
 
-/*                                                            */
+/* FEATURE_LGE_MODEM_DEBUG_INFO, 2014-08-18, jin.park@lge.com */
 #define FEATURE_LGE_MODEM_DEBUG_INFO
 #ifdef FEATURE_LGE_MODEM_DEBUG_INFO
 #include <asm/uaccess.h>
@@ -60,7 +60,7 @@ typedef struct modem_chip_info {
 #define MAX_SSR_REASON_LEN	81U
 #define STOP_ACK_TIMEOUT_MS	1000
 
-/*                                                */
+/* LGE_MODEM_RESET, 2013-12-17, wj1208.jo@lge.com */
 struct lge_hw_smem_id2_type {
 	uint32_t sbl_log_meta_info;
 	uint32_t sbl_delta_time;

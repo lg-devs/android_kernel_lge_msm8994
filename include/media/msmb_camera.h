@@ -55,9 +55,9 @@
 #define MSM_CAMERA_SUBDEV_SENSOR_INIT  14
 #define MSM_CAMERA_SUBDEV_OIS          15
 #define MSM_CAMERA_SUBDEV_FLASH        16
-/*                                                        */
+/* LGE_CHANGE_S, proxy, 2014-09-16, byungsoo.moon@lge.com */
 #define MSM_CAMERA_SUBDEV_PROXY        17
-/*                                                        */
+/* LGE_CHANGE_E, proxy, 2014-09-16, byungsoo.moon@lge.com */
 #define MSM_MAX_CAMERA_SENSORS  5
 
 /* The below macro is defined to put an upper limit on maximum

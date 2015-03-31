@@ -120,7 +120,7 @@
 #define QPNP_HAP_MAX_RETRIES		5
 #define QPNP_HAP_CYCLS			5
 
-/*                                                        */
+/* LGE Add DIRECT MODE Over Drive , Reverse Brake voltage */
 #define QPNP_HAP_OV_RB_MV 3016
 
 /* haptic debug register set */
@@ -251,7 +251,7 @@ struct qpnp_hap {
 	bool sup_brake_pat;
 };
 
-/*                                                                                        */
+/* LGE add qpnp_hap_vmax_config function for Overdrive and reverse braking in Direct MODE */
 static int qpnp_hap_vmax_config(struct qpnp_hap *hap ,int odrb );
 
 /* helper to read a pmic register */
@@ -337,12 +337,12 @@ static int qpnp_hap_play(struct qpnp_hap *hap, int on)
 	if (hap->play_mode == QPNP_HAP_DIRECT) {
 		if (!on) {
 
-			/*                        */
+			/* LGE don't use 2 x VMAX */
 #if 0
 			/* 2 x VMAX reverse braking */
 			hap->vmax_mv = hap->vmax_mv_orig * 2;
 #endif
-			/*                                         */
+			/* LGE set Reverse braking tunning voltage */
 			hap->vmax_mv = QPNP_HAP_OV_RB_MV;
 			qpnp_hap_vmax_config(hap,1);
 		}
@@ -562,7 +562,7 @@ static int qpnp_hap_vmax_config(struct qpnp_hap *hap , int odrb)
 		hap->vmax_mv = QPNP_HAP_VMAX_MIN_MV;
 	else if (hap->vmax_mv > QPNP_HAP_VMAX_MAX_MV)
 	{
-	/*                           */
+	/* LGE add QPNP_HAP_OV_RB_MV */
 	/* When Over drive or Reverse braking occur , odrb = 1 */
 	 if(odrb)
 		hap->vmax_mv = QPNP_HAP_OV_RB_MV;
@@ -1198,12 +1198,12 @@ static void qpnp_hap_td_enable(struct timed_output_dev *dev, int value)
 	hrtimer_cancel(&hap->hap_timer);
 
 	if (value == 0) {
-		/*                                                              */
+		/* LGE_S : to skip unnecessary function call. TD 176078, 176094 */
 		if(hap->state == 0)	{
 			mutex_unlock(&hap->lock);
 			return;
 		}
-		/*                                                              */
+		/* LGE_E : to skip unnecessary function call. TD 176078, 176094 */
 		hap->state = 0;
 	} else {
 		value = (value > hap->timeout_ms ?
@@ -1235,18 +1235,18 @@ static void qpnp_hap_worker(struct work_struct *work)
 				return;
 
 			if ((reg & QPNP_HAP_STATUS_BUSY) == 0) {
-				/*                        */
+				/* LGE don't use 2 x VMAX */
 #if 0
 				/* Over Drive : 2 vmax */
 				hap->vmax_mv = hap->vmax_mv_orig * 2;
 #endif
-				/*                                    */
+				/* LGE set Over Drive tunning voltage */
 				hap->vmax_mv =QPNP_HAP_OV_RB_MV;
 
 				qpnp_hap_vmax_config(hap ,1);
 
 				qpnp_hap_set(hap, 1);
-				/*                             */
+				/* LGE add Over Drive time rate*/
 				usleep(2*hap->wave_play_rate_us);
 
 				/* recover original vmax */

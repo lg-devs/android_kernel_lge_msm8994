@@ -233,7 +233,7 @@ static void msm_restart_prepare(const char *cmd)
 
 	/* Hard reset the PMIC unless memory contents must be maintained. */
 #if defined(CONFIG_MACH_LGE)
-	/*                                                                          */
+	/* LGE_CHANGE : there's no reason to forcing a hard reset on reboot request */
 	if (cmd != NULL && !strncmp(cmd, "oem-90466252", 12)) {
 		pr_info("%s: PON_POWER_OFF_HARD_RESET\n", __func__);
 		qpnp_pon_system_pwr_off(PON_POWER_OFF_HARD_RESET);

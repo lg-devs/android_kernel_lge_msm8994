@@ -235,15 +235,15 @@ static const char fsg_string_interface[] = "Mass Storage";
 
 #ifdef CONFIG_USB_G_LGE_ANDROID_AUTORUN
 
-/*                                       
-                                  
-                                   
+/* Belows are LGE-customized SCSI cmd and
+ * sub-cmd for autorun processing.
+ * 2011-03-09, hyunhui.park@lge.com
  */
 #define SC_LGE_SPE              0xF1
 #define SUB_CODE_MODE_CHANGE    0x01
 #define SUB_CODE_GET_VALUE      0x02
 #define SUB_CODE_PROBE_DEV      0xff
-/*                                          */
+/* def CONFIG_USB_G_LGE_ANDROID_AUTORUN_VZW */
 #if 0
 #define SUB_CODE_SET_VALUE	0x05
 #endif
@@ -269,7 +269,7 @@ static const char fsg_string_interface[] = "Mass Storage";
 #ifdef CONFIG_USB_G_LGE_MULTIPLE_CONFIGURATION_VZW
 #define TYPE_MOD_CHG2_TO_MUL    0x8A
 #endif
-/*                                          */
+/* def CONFIG_USB_G_LGE_ANDROID_AUTORUN_VZW */
 #if 0
 #define TYPE_SET_VAL_USB_DRV_INSTALLED		0x30
 #define TYPE_SET_VAL_USB_DRV_UNINSTALLED	0x31
@@ -294,7 +294,7 @@ static const char fsg_string_interface[] = "Mass Storage";
 #define SUB_ACK_STATUS_MUL      0x07
 #endif
 
-#endif /*                                  */
+#endif /* CONFIG_USB_G_LGE_ANDROID_AUTORUN */
 
 #include "storage_common.c"
 
@@ -308,9 +308,9 @@ static int csw_hack_sent;
 struct fsg_dev;
 struct fsg_common;
 #ifdef CONFIG_USB_G_LGE_ANDROID_AUTORUN
-/*                                             
-                                     
-                                   
+/* Belows are uevent string to communicate with
+ * android framework and application.
+ * 2011-03-09, hyunhui.park@lge.com
  */
 static char *envp_ack[2] = {"AUTORUN=ACK", NULL};
 
@@ -468,7 +468,7 @@ struct fsg_common {
 	 */
 	char inquiry_string[8 + 16 + 4 + 1];
 #ifdef CONFIG_USB_G_LGE_ANDROID_AUTORUN
-	/*                         */
+	/* LGE-customized USB mode */
 	enum chg_mode_state mode_state;
 #endif
 #ifdef CONFIG_USB_G_LGE_ANDROID_AUTORUN_VZW
@@ -1379,8 +1379,8 @@ static int do_inquiry(struct fsg_common *common, struct fsg_buffhd *bh)
 	return 36;
 }
 #ifdef CONFIG_USB_G_LGE_ANDROID_AUTORUN
-/*                                                           
-                                   
+/* Add function which handles LGE-customized command from PC.
+ * 2011-03-09, hyunhui.park@lge.com
  */
 static int do_ack_status(struct fsg_common *common, struct fsg_buffhd *bh, u8 ack)
 {
@@ -2429,7 +2429,7 @@ static int do_scsi_command(struct fsg_common *common)
 			common->mode_state = MODE_STATE_PROBE_DEV;
 			reply = 0;
 			break;
-/*                                          */
+/* def CONFIG_USB_G_LGE_ANDROID_AUTORUN_VZW */
 #if 0
 		case SUB_CODE_SET_VALUE:
 			switch (common->cmnd[2]) {
@@ -2457,7 +2457,7 @@ static int do_scsi_command(struct fsg_common *common)
 			break;
 		} /* switch (common->cmnd[1]) */
 		break;
-#endif /*                                  */
+#endif /* CONFIG_USB_G_LGE_ANDROID_AUTORUN */
 
 	case MODE_SELECT:
 		common->data_size_from_cmnd = common->cmnd[4];

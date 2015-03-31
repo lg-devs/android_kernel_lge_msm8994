@@ -78,7 +78,7 @@ static struct msm_sensor_power_setting imx214_power_setting[] = {
 		.delay = 2,
 	},
 };
-/*                                   */
+/*LGE add for sequence of power down */
 static struct msm_sensor_power_setting imx214_power_down_setting[] = {
 	{
 		.seq_type = SENSOR_I2C_MUX,
@@ -221,10 +221,10 @@ static struct msm_sensor_ctrl_t imx214_s_ctrl = {
 	.sensor_i2c_client = &imx214_sensor_i2c_client,
 	.power_setting_array.power_setting = imx214_power_setting,
 	.power_setting_array.size = ARRAY_SIZE(imx214_power_setting),
-/*                                   */
+/*LGE add for sequence of power down */
 	.power_setting_array.power_down_setting= imx214_power_down_setting,
 	.power_setting_array.size_down = ARRAY_SIZE(imx214_power_down_setting),
-/*                                   */
+/*LGE add for sequence of power down */
 	.msm_sensor_mutex = &imx214_mut,
 	.sensor_v4l2_subdev_info = imx214_subdev_info,
 	.sensor_v4l2_subdev_info_size = ARRAY_SIZE(imx214_subdev_info),

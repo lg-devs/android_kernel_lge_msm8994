@@ -199,7 +199,7 @@ int32_t msm_camera_cci_i2c_write_table(
 			core, ioctl, VIDIOC_MSM_CCI_CFG, &cci_ctrl);
 	if (rc < 0) {
 		pr_err("%s: line %d rc = %d, sid =0x%x\n", __func__, __LINE__, rc,
-			client->cci_client->sid<<1);/*                      */
+			client->cci_client->sid<<1);/* LGE : add debug logs */
 		return rc;
 	}
 	rc = cci_ctrl.status;

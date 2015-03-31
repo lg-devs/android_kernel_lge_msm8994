@@ -1914,12 +1914,12 @@ begin:
 		IPADBG("STATUS opcode=%d src=%d dst=%d len=%d\n",
 				status->status_opcode, status->endp_src_idx,
 				status->endp_dest_idx, status->pkt_len);
-//                                                                                                            
+// LGE_UPDATE_S : IPA debug patch @CN01774246, Subject:Kernel Panic in r1023.3 version (kernel BUG ipa.c 1542)
 		ipa_ctx->status[ipa_ctx->status_wr_idx++] = *status; 
 
 		if (ipa_ctx->status_wr_idx >= 128)
 			ipa_ctx->status_wr_idx = 0;
-//             
+// LGE_UPDATE_E
 		if (status->status_opcode !=
 			IPA_HW_STATUS_OPCODE_DROPPED_PACKET &&
 			status->status_opcode !=

@@ -444,9 +444,9 @@ static struct msm_cam_clk_info cam_8960_clk_info[] = {
 };
 
 static struct msm_cam_clk_info cam_8974_clk_info[] = {
-	/*                             */
+	/* LGE_CHANGE_S, camera bringup*/
 	[SENSOR_CAM_MCLK] = {"cam_src_clk", 24000000},
-	/*                             */
+	/* LGE_CHANGE_E, camera bringup*/
 	[SENSOR_CAM_CLK] = {"cam_clk", 0},
 };
 
@@ -678,12 +678,12 @@ ERROR3:
 ERROR2:
 	kfree(power_info->cam_vreg);
 ERROR1:
-/*                             */
+/* LGE_CHANGE_S, camera bringup*/
 	if (power_info->power_setting)
 		kfree(power_info->power_setting);
 	if (power_info->power_down_setting)
 		kfree(power_info->power_down_setting);
-/*                             */
+/* LGE_CHANGE_E, camera bringup*/
 	return rc;
 }
 
@@ -913,7 +913,7 @@ static int msm_eeprom_spi_remove(struct spi_device *sdev)
 	kfree(e_ctrl);
 	return 0;
 }
-/*                      */
+/* LGE: eeprom checksum */
 #if defined(CONFIG_MACH_MSM8994_Z2)
 static int verify_eeprom_data(struct msm_eeprom_ctrl_t *e_ctrl)
 {
@@ -985,7 +985,7 @@ static int eeprom_config_read_cal_data32(struct msm_eeprom_ctrl_t *e_ctrl,
 
 	rc = copy_to_user(ptr_dest, e_ctrl->cal_data.mapdata,
 		cdata.cfg.read_data.num_bytes);
-/*                                                                */
+/*LGE_CHANGE_S, fixed eeprom crash, 2014-10-20, ejoon.kim@lge.com */
 #if 0 
 	/* should only be called once.  free kernel resource */
 	if (!rc) {
@@ -994,7 +994,7 @@ static int eeprom_config_read_cal_data32(struct msm_eeprom_ctrl_t *e_ctrl,
 		memset(&e_ctrl->cal_data, 0, sizeof(e_ctrl->cal_data));
 	}
 #endif
-/*                                                                */
+/*LGE_CHANGE_E, fixed eeprom crash, 2014-10-20, ejoon.kim@lge.com */
 	return rc;
 }
 
@@ -1079,7 +1079,7 @@ static int msm_eeprom_platform_probe(struct platform_device *pdev)
 	struct device_node *of_node = pdev->dev.of_node;
 	struct msm_camera_power_ctrl_t *power_info = NULL;
 #if defined (CONFIG_MACH_MSM8994_Z2)	
-	uint16_t read_data;/*                             */
+	uint16_t read_data;/* LGE support for two modules */
 #endif
 	CDBG("%s E\n", __func__);
 
@@ -1167,7 +1167,7 @@ static int msm_eeprom_platform_probe(struct platform_device *pdev)
 	rc = of_property_read_string(of_node, "qcom,eeprom-name",
 		&eb_info->eeprom_name);
 	pr_err("%s qcom,eeprom-name %s, rc %d\n", __func__,
-		eb_info->eeprom_name, rc);/*               */
+		eb_info->eeprom_name, rc);/* LGE debugging */
 	if (rc < 0) {
 		pr_err("%s failed %d\n", __func__, __LINE__);
 		goto board_free;
@@ -1191,7 +1191,7 @@ static int msm_eeprom_platform_probe(struct platform_device *pdev)
 		pr_err("failed rc %d\n", rc);
 		goto memdata_free;
 	}
-/*                             */
+/* LGE support for two modules */
 #if defined (CONFIG_MACH_MSM8994_Z2)
 	if(!strncmp(rev_str[lge_get_board_revno()], "rev_b", 5)) {//rev_b only
 		e_ctrl->i2c_client.addr_type = MSM_CAMERA_I2C_WORD_ADDR;
@@ -1214,7 +1214,7 @@ static int msm_eeprom_platform_probe(struct platform_device *pdev)
 			}
 		}
 	}
-/*                      */
+/* LGE: eeprom checksum */
 	if (!strcmp(eb_info->eeprom_name, "imx135_eeprom")) {
 		j = 3; //Retry cnt
 		do {
@@ -1281,7 +1281,7 @@ static int msm_eeprom_platform_probe(struct platform_device *pdev)
 #endif
 
 	e_ctrl->is_supported = (e_ctrl->is_supported << 1) | 1;
-	pr_err("%s X\n", __func__);//                 
+	pr_err("%s X\n", __func__);//LGE for debugging
 	return rc;
 
 power_down:

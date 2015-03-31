@@ -121,7 +121,7 @@
  */
 #if 0 // QCT org
 #define WCD9XXX_CS_MEAS_INVALD_RANGE_LOW_MV 160
-#else //            
+#else // LGE_CHANGED
 #define WCD9XXX_CS_MEAS_INVALD_RANGE_LOW_MV 230
 #endif
 #define WCD9XXX_CS_MEAS_INVALD_RANGE_HIGH_MV 265
@@ -140,7 +140,7 @@
 
 #define WCD9XXX_USLEEP_RANGE_MARGIN_US 100
 
-/*                                                          */
+/* LGE UPDATE ADVANCED HEADSET TYPE DETECT L impedance Range*/
 #define LGE_ADVANCED_MIN_THD	100000
 #define LGE_ADVANCED_MAX_THD	400000
 #define LGE_SWITCH_NAME_ADVANCED	"h2w_advanced"
@@ -260,24 +260,24 @@ static void wcd9xxx_turn_onoff_override(struct wcd9xxx_mbhc *mbhc, bool on)
 			    0x04, on ? 0x04 : 0x00);
 }
 
-//                                                        
+// LGE_CHANGE_S, separate set switch device name function.
 static void lge_set_switch_device(struct wcd9xxx_mbhc *mbhc, int state)
 {
 	if(mbhc->zl > LGE_ADVANCED_MAX_THD)
-	{ //                                             
+	{ //LGE UPDATE L impedance is higher than 400 ohm
 		mbhc->sdev.name = LGE_SWITCH_NAME_AUX;
 	}
 	else if((mbhc->zl < LGE_ADVANCED_MAX_THD) && (mbhc->zl > LGE_ADVANCED_MIN_THD))
-	{ //                                       
+	{ //LGE UPDATE L impedance is 100 ~ 400 ohm
 		mbhc->sdev.name = LGE_SWITCH_NAME_ADVANCED;
 	}
 	else
-	{ //                                       
+	{ //LGE UPDATE L impedance is under 100 ohm
 		mbhc->sdev.name = LGE_SWITCH_NAME_NORMAL;
 	}
 	switch_set_state(&mbhc->sdev, (state == SND_JACK_HEADPHONE) ? LGE_HEADSET_NO_MIC  : LGE_HEADSET );
 }
-//                                                        
+// LGE_CHANGE_E, separate set switch device name function.
 
 /* called under codec_resource_lock acquisition */
 static void wcd9xxx_pause_hs_polling(struct wcd9xxx_mbhc *mbhc)
@@ -666,7 +666,7 @@ static void wcd9xxx_jack_report(struct wcd9xxx_mbhc *mbhc,
 	lge_uart_console_on_earjack_in();
 #endif
 
-/*                                         */
+/* LGE UPDATE ADVANCED HEADSET TYPE DETECT */
 	if (mask == WCD9XXX_JACK_MASK) {
 		if (status == SND_JACK_HEADPHONE
 				|| status == SND_JACK_HEADSET)
@@ -927,7 +927,7 @@ static void wcd9xxx_insert_detect_setup(struct wcd9xxx_mbhc *mbhc, bool ins)
 	else
 		snd_soc_write(mbhc->codec, WCD9XXX_A_MBHC_INSERT_DETECT,
 			      (0x6C | (ins ? (1 << 1) : 0)));
-	/*                                                                      */
+	/* LGE workaround code to remove insertion noise when insert just half. */
 	snd_soc_write(mbhc->codec, WCD9XXX_A_MBHC_INSERT_DETECT2,
 		      (0x10 | (ins ? 0 : (3 << 6))));
 	/* Re-enable detection */
@@ -1588,7 +1588,7 @@ wcd9xxx_cs_find_plug_type(struct wcd9xxx_mbhc *mbhc,
 		} else
 			d->_type = PLUG_TYPE_HEADSET;
 
-		/*                                */
+		/* LGE UPDATE : add debugging log */
 		printk("[LGE MBHC]: wcd9xxx_cs_find_plug_type DCE #%d, %04x, V %04d(%04d), mic_bias %d, swap_gnd %d, HPHL %d, TYPE %d\n",
 				i, d->dce, vdce, d->_vdces,d->mic_bias, d->swap_gnd, d->hphl_status & 0x01,d->_type);
 
@@ -1722,7 +1722,7 @@ wcd9xxx_cs_find_plug_type(struct wcd9xxx_mbhc *mbhc,
 exit:
 	pr_debug("%s: Plug type %d detected\n", __func__, type);
 
-	/*                                */
+	/* LGE UPDATE : add debugging log */
 	printk("[LGE MBHC]: wcd9xxx_cs_find_plug_type - Plug type %d detected \n", type);
 
 	return type;
@@ -3916,7 +3916,7 @@ irqreturn_t wcd9xxx_dce_handler(int irq, void *data)
 	pr_debug("%s: Meas HW - DCE 0x%x,%d,%d button %d\n", __func__,
 		 dce[0] & 0xFFFF, mv[0], mv_s[0], btnmeas[0]);
 
-	/*                                */
+	/* LGE UPDATE : add debugging log */
 	printk("[LGE MBHC]: Meas HW - DCE 0x%x,%d,%d button %d\n",dce[0] & 0xFFFF, mv[0], mv_s[0], btnmeas[0]);
 
 	if (n_btn_meas == 0)
@@ -3932,7 +3932,7 @@ irqreturn_t wcd9xxx_dce_handler(int irq, void *data)
 			 __func__, meas, dce[meas] & 0xFFFF, mv[meas],
 			 mv_s[meas], btnmeas[meas]);
 
-		/*                                */
+		/* LGE UPDATE : add debugging log */
 		printk("[LGE MBHC]:  Meas %d - DCE 0x%x,%d,%d button %d\n",meas, dce[meas] & 0xFFFF, mv[meas], mv_s[meas], btnmeas[meas]);
 
 		/*
@@ -5518,7 +5518,7 @@ static int wcd9xxx_detect_impedance(struct wcd9xxx_mbhc *mbhc, uint32_t *zl,
 		 r[0] & 0xffff, r[0], r[1] & 0xffff, r[1], r[2] & 0xffff, r[2]);
 	pr_debug("%s: RL %u milliohm, RR %u milliohm\n", __func__, *zl, *zr);
 	pr_debug("%s: Impedance detection completed\n", __func__);
-	/*                                */
+	/* LGE UPDATE : add debugging log */
 	printk("[LGE MBHC]: %s: RL %u ohm, RR %u ohm\n", __func__, *zl/1000, *zr/1000);
 	return ret;
 }

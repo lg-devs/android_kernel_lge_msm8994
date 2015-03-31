@@ -7667,7 +7667,7 @@ static const struct wcd9xxx_reg_mask_val tomtom_codec_reg_init_val[] = {
 	{TOMTOM_A_INTR_MODE, 0x04, 0x04},
 
 #ifdef CONFIG_INPUT_MAX14688
-        /*                         */
+        /* LGE use NO type earjack */
         {TOMTOM_A_MBHC_INSERT_DETECT, 0x04, 0x04},
 #endif
 };
@@ -8729,7 +8729,7 @@ static int tomtom_codec_probe(struct snd_soc_codec *codec)
 	tomtom_update_reg_defaults(codec);
 
 #ifdef CONFIG_INPUT_MAX14688
-	/*                              */
+	/* LGE make pull-down bits to 0 */
 #if defined (CONFIG_MACH_MSM8994_Z2_KR) || defined (CONFIG_MACH_MSM8994_Z2_SPR_US) || defined (CONFIG_MACH_MSM8994_Z2_USC_US) || defined (CONFIG_MACH_MSM8994_Z2_GLOBAL_COM)
 	if(strncmp(rev_str[lge_get_board_revno()],"rev_a",5)==0) // z2 use max14688 on rev_a
 #endif

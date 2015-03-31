@@ -98,7 +98,7 @@ static int remap_cal_data(struct cal_block_data *cal_block,
 static int voice_unmap_cal_memory(int32_t cal_type,
 				  struct cal_block_data *cal_block);
 
-//                                      
+//[AUDIO_BSP_START]minyoung1.kim@lge.com
 static uint32_t audio_start = 0;
 //static String audio_start = "/sys/module/q6voice/parameters/audio_start";
 static int set_start_call(const char *buf, struct kernel_param *kp)
@@ -119,7 +119,7 @@ static int get_start_call(char *buf, struct kernel_param *kp)
 	return ret;
 }
 module_param_call(audio_start,set_start_call, get_start_call, NULL, 0664);
-//                                    
+//[AUDIO_BSP_END]minyoung1.kim@lge.com
 
 static void voice_itr_init(struct voice_session_itr *itr,
 			   u32 session_id)
@@ -5196,10 +5196,10 @@ int voc_end_voice_call(uint32_t session_id)
 {
 	struct voice_data *v = voice_get_session(session_id);
 	int ret = 0;
-  //                                      
+  //[AUDIO_BSP_START]minyoung1.kim@lge.com
 	char temp_buf[2] = "0";
 	set_start_call(temp_buf,NULL);
-  //                                    
+  //[AUDIO_BSP_END]minyoung1.kim@lge.com
 
 	if (v == NULL) {
 		pr_err("%s: invalid session_id 0x%x\n", __func__, session_id);
@@ -5466,7 +5466,7 @@ int voc_start_voice_call(uint32_t session_id)
 {
 	struct voice_data *v = voice_get_session(session_id);
 	int ret = 0;
-	char temp_buf[2] = "1";  //                                      
+	char temp_buf[2] = "1";  //[AUDIO_BSP_START]minyoung1.kim@lge.com
 
 	if (v == NULL) {
 		pr_err("%s: invalid session_id 0x%x\n", __func__, session_id);
@@ -5524,12 +5524,12 @@ int voc_start_voice_call(uint32_t session_id)
 			goto fail;
 		}
 		ret = voice_setup_vocproc(v);
-		//                                      
+		//[AUDIO_BSP_START]minyoung1.kim@lge.com
 		if(ret == 0){
 			set_start_call(temp_buf,NULL);
 			pr_info("LG audio bsp - stated voice call \n");
 		}
-		//                                    
+		//[AUDIO_BSP_END]minyoung1.kim@lge.com
 		if (ret < 0) {
 			pr_err("setup voice failed\n");
 			goto fail;

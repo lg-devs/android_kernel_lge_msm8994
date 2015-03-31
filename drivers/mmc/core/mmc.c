@@ -625,9 +625,9 @@ static int mmc_compare_ext_csds(struct mmc_card *card, unsigned bus_width)
 
 	if (err || bw_ext_csd == NULL) {
 		#ifdef CONFIG_MACH_LGE
-		/*                                                 
-                                                
-  */
+		/* LGE_CHANGE, 2014-09-01, Z2G4-BSP-FileSys@lge.com
+		* Adding Print, Requested by QMC-CASE-01158823
+		*/
 		pr_err("%s: %s: 0x%x, 0x%x\n", mmc_hostname(card->host), __func__, err, bw_ext_csd ? *bw_ext_csd : 0x0);
 		#endif
 		err = -EINVAL;
@@ -671,9 +671,9 @@ static int mmc_compare_ext_csds(struct mmc_card *card, unsigned bus_width)
 			bw_ext_csd[EXT_CSD_SEC_CNT + 3]));
 
 	#ifdef CONFIG_MACH_LGE
-	/*                                                 
-                                               
- */
+	/* LGE_CHANGE, 2014-09-01, Z2G4-BSP-FileSys@lge.com
+	* Adding Print, Requested by QMC-CASE-01158823
+	*/
 	if (err) {
 		pr_err("%s: %s: fail during compare, err = 0x%x\n", mmc_hostname(card->host), __func__, err);
 		err = -EINVAL;
@@ -804,9 +804,9 @@ static int mmc_select_powerclass(struct mmc_card *card,
 		break;
 	default:
 		#ifdef CONFIG_MACH_LGE
-		/*                                                 
-                                                
-  */
+		/* LGE_CHANGE, 2014-09-01, Z2G4-BSP-FileSys@lge.com
+		* Adding Print, Requested by QMC-CASE-01158823
+		*/
 		pr_err("%s: %s: Voltage range not supported for power class, host->ios.vdd = 0x%x\n", mmc_hostname(host), __func__, host->ios.vdd);
 		#else
 		pr_warning("%s: Voltage range not supported "
@@ -1474,10 +1474,10 @@ static int mmc_init_card(struct mmc_host *host, u32 ocr,
 			goto free_card;
 		}
 #ifndef CONFIG_MACH_LGE
-		/*           
-                                                                           
-                                          
-   */
+		/* LGE_CHANGE
+		 *  ext_csd.rev value are required while decoding cid.year, so move down.
+		 *  2014-09-01, Z2G4-BSP-FileSys@lge.com
+		 */
 		err = mmc_decode_cid(card);
 		if (err) {
 			pr_err("%s: %s: mmc_decode_cid() fails %d\n",
@@ -1518,10 +1518,10 @@ static int mmc_init_card(struct mmc_host *host, u32 ocr,
 			goto free_card;
 		}
 #ifdef CONFIG_MACH_LGE
-		/*           
-                     
-                                         
-   */
+		/* LGE_CHANGE
+		 * decode cid here.
+		 * 2014-09-01, Z2G4-BSP-FileSys@lge.com
+		 */
 		err = mmc_decode_cid(card);
 		if (err) {
 			pr_err("%s: %s: mmc_decode_cid() fails %d\n",

@@ -87,4 +87,4 @@
 #endif  //BTA_NOT_USE_ROOT_PERM
 
 
-#endif/*                      */
+#endif/*__MACH_LGE_BLUETOOTH_H*/

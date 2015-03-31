@@ -195,10 +195,10 @@ enum power_supply_property {
 	POWER_SUPPLY_PROP_CHARGE_COUNTER_EXT,
 #ifdef CONFIG_LGE_PM_UNIFIED_WLC
 	POWER_SUPPLY_PROP_WIRELESS_CHARGER_SWITCH,
-#endif /*                         */
+#endif /*CONFIG_LGE_PM_UNIFIED_WLC*/
 #ifdef CONFIG_LGE_PM_UNIFIED_WLC_ALIGNMENT
 	POWER_SUPPLY_PROP_ALIGNMENT,
-#endif /*                                   */
+#endif /*CONFIG_LGE_PM_UNIFIED_WLC_ALIGNMENT*/
 	/* Properties of type `const char *' */
 	POWER_SUPPLY_PROP_MODEL_NAME,
 	POWER_SUPPLY_PROP_MANUFACTURER,

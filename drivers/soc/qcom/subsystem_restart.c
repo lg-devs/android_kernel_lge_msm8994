@@ -496,6 +496,7 @@ static int wait_for_err_ready(struct subsys_device *subsys)
 					  msecs_to_jiffies(10000));
 	if (!ret) {
 		pr_err("[%s]: Error ready timed out\n", subsys->desc->name);
+		panic("image load fail"); //2012-10-09, seungkyu.joo@lge.com, reset code add for pil load fail during boot-up
 		return -ETIMEDOUT;
 	}
 

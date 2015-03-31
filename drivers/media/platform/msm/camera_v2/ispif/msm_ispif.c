@@ -1223,7 +1223,7 @@ static void msm_ispif_release(struct ispif_device *ispif)
 	}
 
 	/* make sure no streaming going on */
-	if (ispif->fs_vfe && regulator_is_enabled(ispif->fs_vfe))	//                                         
+	if (ispif->fs_vfe && regulator_is_enabled(ispif->fs_vfe))	//LGE_CHANGE, vdd_vfe to check if vfe is up
 		msm_ispif_reset(ispif);
 	else
 		pr_err("%s: failed to reset. fs_vfe is NULL \n", __func__);
@@ -1434,7 +1434,7 @@ static int ispif_probe(struct platform_device *pdev)
 			pr_err("%s: no valid csi_mux region\n", __func__);
 	}
 
-	//                                         
+	//LGE_CHANGE, vdd_vfe to check if vfe is up
         ispif->fs_vfe = regulator_get(&pdev->dev, "vdd_vfe");
 
 	if (ispif->fs_vfe == NULL)

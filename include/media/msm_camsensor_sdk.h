@@ -90,10 +90,10 @@ enum msm_sensor_power_seq_gpio_t {
 	SENSOR_GPIO_VANA,
 	SENSOR_GPIO_VDIG,
 	SENSOR_GPIO_VAF,
-/*                                      */
+/* LGE_CHANGE_S, Add gpio to control LDO*/
     SENSOR_GPIO_LDAF_EN,
     SENSOR_GPIO_OIS_RESET,
- /*                                      */
+ /* LGE_CHANGE_E, Add gpio to control LDO*/
 	SENSOR_GPIO_FL_EN,
 	SENSOR_GPIO_FL_NOW,
 	SENSOR_GPIO_FL_RESET,
@@ -107,10 +107,10 @@ enum msm_camera_vreg_name_t {
 	CAM_VIO,
 	CAM_VANA,
 	CAM_VAF,
-/*                         */
+/* LGE_CHANGE_S, Add OISVDD*/
     CAM_OISVDD,
     CAM_OISDVDD,
-/*                         */
+/* LGE_CHANGE_E, Add OISVDD*/
 	CAM_V_CUSTOM1,
 	CAM_V_CUSTOM2,
 	CAM_VREG_MAX,
@@ -157,9 +157,9 @@ enum actuator_type {
 	ACTUATOR_VCM,
 	ACTUATOR_PIEZO,
 	ACTUATOR_HVCM,
-	/*             */
+	/* LGE_CHANGE_S*/
 	ACTUATOR_CLOSE_LOOP_HVCM,
-	/*             */
+	/* LGE_CHANGE_E*/
 };
 
 enum msm_flash_driver_type {
@@ -175,7 +175,7 @@ enum msm_flash_cfg_type_t {
 	CFG_FLASH_OFF,
 	CFG_FLASH_LOW,
 	CFG_FLASH_HIGH,
-/*                                 */
+/* LGE: For torch, Video recording */
 	CFG_FLASH_TORCH
 };
 
@@ -303,12 +303,12 @@ struct region_params_t {
 	*/
 	uint16_t step_bound[2];
 	uint16_t code_per_step;
-	/*             */
+	/* LGE_CHANGE_S*/
 	int16_t infinity_dac;
 	int16_t macro_dac;
 	int16_t dac_20;
 	int16_t dac_40;
-	/*             */
+	/* LGE_CHANGE_E*/
 };
 
 struct reg_settings_t {

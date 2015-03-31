@@ -18,7 +18,7 @@
 #include <soc/qcom/lge/lge_charging_scenario.h>
 #include <linux/string.h>
 
-/*                                 */
+/* For LGE charging scenario debug */
 #ifdef DEBUG_LCS
 /* For fake battery temp' debug */
 #ifdef DEBUG_LCS_DUMMY_TEMP
@@ -325,7 +325,7 @@ void lge_monitor_batt_temp(struct charging_info req, struct charging_rsp *res)
 		last_thermal_current = res->dc_current;
 		res->force_update = true;
 	}
-#endif  //                                       
+#endif  //CONFIG_LGE_THERMALE_CHG_CONTROL_FOR_WLC
 #else
 	res->dc_current =
 		charging_state ==

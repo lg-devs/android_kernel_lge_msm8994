@@ -74,7 +74,7 @@ struct v4l2_subdev_info {
 };
 
 struct msm_camera_gpio_num_info {
-	uint16_t gpio_num[20];//            
+	uint16_t gpio_num[20];//LGE increase
 	uint8_t valid[20];
 };
 

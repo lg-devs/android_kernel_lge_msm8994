@@ -1203,22 +1203,22 @@ static int msm_compr_set_params(struct snd_compr_stream *cstream,
 	case SNDRV_PCM_RATE_11025:
 		prtd->sample_rate = 11025;
 		break;
-	//                   
+	// LGE_AUDIO_UPDATE_S
 	case SNDRV_PCM_RATE_12000:
 		prtd->sample_rate = 12000;
 		break;
-	//                   
+	// LGE_AUDIO_UPDATE_E
 	case SNDRV_PCM_RATE_16000:
 		prtd->sample_rate = 16000;
 		break;
 	case SNDRV_PCM_RATE_22050:
 		prtd->sample_rate = 22050;
 		break;
-	//                   
+	// LGE_AUDIO_UPDATE_S
 	case SNDRV_PCM_RATE_24000:
 		prtd->sample_rate = 24000;
 		break;
-	//                   
+	// LGE_AUDIO_UPDATE_E
 	case SNDRV_PCM_RATE_32000:
 		prtd->sample_rate = 32000;
 		break;

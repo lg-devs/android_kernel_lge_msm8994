@@ -100,7 +100,7 @@ struct mdp_csc_cfg dmb_csc_convert = {
 	{ 0x0, 0xff, 0x0, 0xff, 0x0, 0xff,},
 #endif
 };
-#endif /*               */
+#endif /* LGE_BROADCAST */
 
 /*
  * To program a linear LUT we need to make the slope to be 1/16 to enable
@@ -412,7 +412,7 @@ int pp_set_dmb_status(int flag) {
 	dmb_status = flag;
 	return 0;
 }
-#endif /*               */
+#endif /* LGE_BROADCAST */
 
 static u32 pp_hist_read(char __iomem *v_addr,
 				struct pp_hist_col_info *hist_info);
@@ -956,7 +956,7 @@ static int pp_vig_pipe_setup(struct mdss_mdp_pipe *pipe, u32 *op)
 			} else {
 				mdss_mdp_csc_setup(MDSS_MDP_BLOCK_SSPP, pipe->num, MDSS_MDP_CSC_YUV2RGB);
 			}
-#endif /*               */
+#endif /* LGE_BROADCAST */
 		}
 	}
 

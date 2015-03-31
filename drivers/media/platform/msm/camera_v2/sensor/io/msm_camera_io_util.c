@@ -25,7 +25,7 @@
 #undef CDBG
 #define CDBG(fmt, args...) pr_debug(fmt, ##args)
 
-/*                                                                                           */
+/* LGE_CHANGE_S, jaehan.jeong, 2014.11.17, Changed to inline/macro  function for RTB logging */
 #ifndef LGE_RTB_ENABLED
 void msm_camera_io_w(u32 data, void __iomem *addr)
 {

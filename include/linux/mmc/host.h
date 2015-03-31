@@ -229,9 +229,9 @@ enum dev_state {
 
 
 #ifdef CONFIG_MACH_LGE
-/*           
-                                                
-                                       
+/* LGE_CHANGE
+ * define enumeration for mmc-host-driver-index.
+ * 2014-09-01, Z2G4-BSP-FileSys@lge.com
  */
 enum mmc_host_driver_index {
        MMC_HOST_DRIVER_INDEX_MMC0 = 0,

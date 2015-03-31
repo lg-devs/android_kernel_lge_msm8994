@@ -158,11 +158,11 @@ struct msm_isp_buf_mgr {
 	int init_done;
 	uint32_t open_count;
 	uint32_t pagefault_debug;
-/*                                                      */
+/* LGE_S QMC patch : can't deep sleep after dual camera */
 #if 0
 	spinlock_t lock;
 #endif
-/*                                                      */
+/* LGE_S QMC patch : can't deep sleep after dual camera */
 	uint16_t num_buf_q;
 	struct msm_isp_bufq *bufq;
 
@@ -190,9 +190,9 @@ struct msm_isp_buf_mgr {
 	struct device *iommu_secure_ctx[2];
 	int attach_ref_cnt[MAX_PROTECTION_MODE][MAX_IOMMU_CTX];
 	enum msm_isp_buf_mgr_state attach_state;
-/*                                                      */
+/* LGE_S QMC patch : can't deep sleep after dual camera */
 	struct mutex lock;
-/*                                                      */
+/* LGE_E QMC patch : can't deep sleep after dual camera */
 };
 
 int msm_isp_create_isp_buf_mgr(struct msm_isp_buf_mgr *buf_mgr,
