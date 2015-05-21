@@ -1,0 +1,2 @@
+# UAPI Header export list
+header-y += pn544.h
