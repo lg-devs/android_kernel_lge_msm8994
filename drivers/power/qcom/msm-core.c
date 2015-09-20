@@ -343,11 +343,7 @@ static void clear_static_power(struct cpu_static_info *sp)
 	kfree(sp);
 }
 
-#ifdef CONFIG_MACH_LGE
-static int update_userspace_power(struct sched_params  *argp)
-#else
 static int update_userspace_power(struct sched_params __user *argp)
-#endif
 {
 	int i;
 	int ret;
@@ -392,15 +388,10 @@ static int update_userspace_power(struct sched_params __user *argp)
 	sp->table = node->sp->table;
 
 	for (i = 0; i < TEMP_DATA_POINTS; i++) {
-#ifdef CONFIG_MACH_LGE
-		memcpy(sp->power[i], &argp->power[i][0],
-			sizeof(sp->power[i][0]) * node->sp->num_of_freqs);
-#else
 		ret = copy_from_user(sp->power[i], &argp->power[i][0],
 			sizeof(sp->power[i][0]) * node->sp->num_of_freqs);
 		if (ret)
 			goto failed;
-#endif
 	}
 
 	/* Copy the same power values for all the cpus in the cpumask
@@ -433,9 +424,8 @@ static int update_userspace_power(struct sched_params __user *argp)
 
 	activate_power_table = true;
 	return 0;
-#ifndef CONFIG_MACH_LGE
+
 failed:
-#endif
 	for (i = 0; i < TEMP_DATA_POINTS; i++)
 		kfree(sp->power[i]);
 	kfree(sp->power);
@@ -448,11 +438,7 @@ static long msm_core_ioctl(struct file *file, unsigned int cmd,
 {
 	long ret = 0;
 	struct cpu_activity_info *node = NULL;
-#ifdef CONFIG_MACH_LGE
-	struct sched_params  *kargp = NULL;
-#endif
 	struct sched_params __user *argp = (struct sched_params __user *)arg;
-
 	int i, cpu = num_possible_cpus();
 	int mpidr;
 	int cpumask;
@@ -460,44 +446,20 @@ static long msm_core_ioctl(struct file *file, unsigned int cmd,
 	if (!argp)
 		return -EINVAL;
 
-#ifdef CONFIG_MACH_LGE
-	kargp = kzalloc(sizeof(struct sched_params), GFP_KERNEL);
-	if (!kargp)
-		return -ENOMEM;
-
-	ret = copy_from_user(kargp,argp,sizeof(struct sched_params));
-	if (ret){
-		kfree(kargp);
-		return ret;
-	}
-	mpidr = (kargp->cluster << (MAX_CORES_PER_CLUSTER *
-			MAX_NUM_OF_CLUSTERS));
-	cpumask = kargp->cpumask;
-
-#else
 	mpidr = (argp->cluster << (MAX_CORES_PER_CLUSTER *
 			MAX_NUM_OF_CLUSTERS));
 	cpumask = argp->cpumask;
 
-#endif
 	switch (cmd) {
 	case EA_LEAKAGE:
-#ifdef CONFIG_MACH_LGE
-		ret = update_userspace_power(kargp);
-#else
 		ret = update_userspace_power(argp);
-#endif
 		if (ret)
 			pr_err("Userspace power update failed with %ld\n", ret);
 		break;
 	case EA_VOLT:
-		for (i = 0; i < MAX_CORES_PER_CLUSTER; i++, cpumask >>= 1) {
-			if (!(cpumask & 0x01))
-				continue;
-
-			mpidr |= i;
+		for (i = 0; cpumask > 0; i++, cpumask >>= 1) {
 			for_each_possible_cpu(cpu) {
-				if (cpu_logical_map(cpu) == mpidr)
+				if (cpu_logical_map(cpu) == (mpidr | i))
 					break;
 			}
 		}
@@ -514,21 +476,13 @@ static long msm_core_ioctl(struct file *file, unsigned int cmd,
 				node->sp->voltage,
 				sizeof(uint32_t) * node->sp->num_of_freqs);
 		if (ret)
-#ifdef CONFIG_MACH_LGE
-			goto unlock;
-#else
 			break;
-#endif
 		for (i = 0; i < node->sp->num_of_freqs; i++) {
 			ret = copy_to_user((void __user *)&argp->freq[i],
 					&node->sp->table[i].frequency,
 					sizeof(uint32_t));
 			if (ret)
-#ifdef CONFIG_MACH_LGE
-				goto unlock;
-#else
 				break;
-#endif
 		}
 unlock:
 		mutex_unlock(&policy_update_mutex);
@@ -537,10 +491,6 @@ unlock:
 		break;
 	}
 
-#ifdef CONFIG_MACH_LGE
-	if (kargp)
-		kfree(kargp);
-#endif
 	return ret;
 }
 
@@ -1026,7 +976,6 @@ static int uio_init(struct platform_device *pdev)
 		return ret;
 	}
 	dev_set_drvdata(&pdev->dev, info);
-	pr_info("Device created for client '%s'\n", clnt_res->name);
 
 	return 0;
 }

@@ -37,7 +37,7 @@ config MACH_MSM8994_Z2_KR
 	select MACH_LGE
 	help
 	  Support for the Qualcomm MSM8994 Z2 KR device.
-	  
+
 config MACH_MSM8994_Z2_GLOBAL_COM
 	bool "MSM8994 Z2_GLOBAL_COM"
 	depends on MACH_MSM8994_Z2
@@ -58,13 +58,21 @@ config MACH_MSM8994_Z2_USC_US
 	select MACH_LGE
 	help
 	  Support for the Qualcomm MSM8994 Z2 USC US device.
-	  
+
 config MACH_MSM8994_Z2_ATT_US
 	bool "MSM8994 Z2_ATT_US"
 	depends on MACH_MSM8994_Z2
 	select MACH_LGE
 	help
 	  Support for the Qualcomm MSM8994 Z2 ATT US device.
+
+
+config MACH_MSM8994_Z2_ACG_US
+    bool "MSM8994 Z2_ACG_US"
+    depends on MACH_MSM8994_Z2
+    select MACH_LGE
+    help
+      Support for the Qualcomm MSM8994 Z2 ACG US device.
 
 config MACH_MSM8994_G4_KR
     bool "MSM8994 G4_KR"
@@ -235,6 +243,11 @@ config LGE_PM_FACTORY_TESTMODE
 	help
 	  LGE PM pseudo battery mode
 
+config LCD_KCAL
+	depends on MACH_LGE
+	bool "Enable sysfs for LCD KCAL"
+	default n
+
 config LGE_HANDLE_PANIC
 	tristate "Support LGE Kernel Panic Handler"
 	default n
@@ -243,10 +256,11 @@ config LGE_HANDLE_PANIC
 	  LGE Crash Handler
 
 config LGE_EARJACK_DEBUGGER
-    bool "Earjack UART debugger support"
-    default n
-    help
-      Support earjack type UART debugger cable
+	bool "Earjack UART debugger support"
+	default n
+	depends on SERIAL_MSM_HSL
+	help
+	    Support earjack type UART debugger cable
 
 config LGE_KSWITCH
 	bool "Support LGE Kill Switch"

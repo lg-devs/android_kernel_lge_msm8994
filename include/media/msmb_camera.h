@@ -55,17 +55,21 @@
 #define MSM_CAMERA_SUBDEV_SENSOR_INIT  14
 #define MSM_CAMERA_SUBDEV_OIS          15
 #define MSM_CAMERA_SUBDEV_FLASH        16
-/* LGE_CHANGE_S, proxy, 2014-09-16, byungsoo.moon@lge.com */
+/*                                                        */
 #define MSM_CAMERA_SUBDEV_PROXY        17
-/* LGE_CHANGE_E, proxy, 2014-09-16, byungsoo.moon@lge.com */
+/*                                                        */
 #define MSM_MAX_CAMERA_SENSORS  5
 
 /* The below macro is defined to put an upper limit on maximum
  * number of buffer requested per stream. In case of extremely
  * large value for number of buffer due to data structure corruption
- * we return error to avoid integer overflow. This value may be
+ * we return error to avoid integer overflow. Group processing
+ * can have max of 9 groups of 8 bufs each. This value may be
  * configured in future*/
-#define MSM_CAMERA_MAX_STREAM_BUF 40
+#define MSM_CAMERA_MAX_STREAM_BUF 72
+
+/* Max batch size of processing */
+#define MSM_CAMERA_MAX_USER_BUFF_CNT 16
 
 /* featur base */
 #define MSM_CAMERA_FEATURE_BASE     0x00010000
@@ -196,6 +200,11 @@ enum smmu_attach_mode {
 
 struct msm_camera_smmu_attach_type {
 	enum smmu_attach_mode attach;
+};
+
+struct msm_camera_user_buf_cont_t {
+	unsigned int buf_cnt;
+	unsigned int buf_idx[MSM_CAMERA_MAX_USER_BUFF_CNT];
 };
 
 #endif /* __LINUX_MSMB_CAMERA_H */

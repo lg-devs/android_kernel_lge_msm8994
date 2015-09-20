@@ -19,6 +19,20 @@ enum hw_rev_type {
 extern char *rev_str[];
 
 enum hw_rev_type lge_get_board_revno(void);
+
+#if defined(CONFIG_LCD_KCAL)
+struct kcal_data {
+		int red;
+		int green;
+		int blue;
+};
+
+struct kcal_platform_data {
+	int (*set_values) (int r, int g, int b);
+	int (*get_values) (int *r, int *g, int *b);
+	int (*refresh_display) (void);
+};
+#endif /* CONFIG_LCD_KCAL */
 int lge_get_fake_battery(void);
 
 #ifdef CONFIG_LGE_PM_USB_ID
@@ -100,6 +114,10 @@ struct pseudo_batt_info_type;
 void pseudo_batt_set(struct pseudo_batt_info_type *);
 #endif
 
+#ifdef CONFIG_LGE_PM_DEBUG
+void xo_therm_logging(void);
+#endif
+
 enum lge_laf_mode_type {
 	LGE_LAF_MODE_NORMAL = 0,
 	LGE_LAF_MODE_LAF,
@@ -117,7 +135,7 @@ enum lge_boot_mode_type {
 	LGE_BOOT_MODE_PIF_56K,
 	LGE_BOOT_MODE_PIF_130K,
 	LGE_BOOT_MODE_PIF_910K,
-	LGE_BOOT_MODE_MINIOS    /* LGE_UPDATE for MINIOS2.0 */
+	LGE_BOOT_MODE_MINIOS    /*                          */
 };
 
 enum lge_boot_mode_type lge_get_boot_mode(void);
@@ -194,5 +212,7 @@ extern int lge_get_bootreason(void);
 #ifdef CONFIG_LGE_LCD_OFF_DIMMING
 extern int lge_get_bootreason_with_lcd_dimming(void);
 #endif
+
+extern int on_hidden_reset;
 
 #endif

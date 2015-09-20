@@ -293,6 +293,7 @@ bool sp_tx_edid_read(unchar *pBuf);
 
 bool slimport_chip_detect(void);
 void slimport_chip_initial(void);
+void sp_tx_variable_init(void);
 void slimport_main_process(void);
 unchar is_cable_detected(void);
 unchar sp_tx_aux_dpcdread_bytes(unchar addrh, unchar addrm,

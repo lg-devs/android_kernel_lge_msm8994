@@ -1665,8 +1665,8 @@ void input_reset_device(struct input_dev *dev)
 		 * to be still pressed when we resume.
 		 */
 #if 0
-                /* LGE CHANGE
-                 * Block this part to recognize long key event properly during sleep
+                /*           
+                                                                                    
                  */
 
 		if (!test_bit(INPUT_PROP_NO_DUMMY_RELEASE, dev->propbit)) {

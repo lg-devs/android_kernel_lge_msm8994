@@ -1484,7 +1484,7 @@ static int max14688_probe (struct i2c_client *client, const struct i2c_device_id
     int i, rc;
     u8 pincontrol2 = 0;
 
-#if defined (CONFIG_MACH_MSM8994_Z2_KR) || defined (CONFIG_MACH_MSM8994_Z2_SPR_US) || defined (CONFIG_MACH_MSM8994_Z2_USC_US) || defined (CONFIG_MACH_MSM8994_Z2_GLOBAL_COM) || defined (CONFIG_MACH_MSM8994_Z2_GLOBAL_ESA)
+#if defined (CONFIG_MACH_MSM8994_Z2_KR) || defined (CONFIG_MACH_MSM8994_Z2_SPR_US) || defined (CONFIG_MACH_MSM8994_Z2_USC_US) || defined (CONFIG_MACH_MSM8994_Z2_GLOBAL_COM) || defined (CONFIG_MACH_MSM8994_Z2_GLOBAL_ESA) || defined (CONFIG_MACH_MSM8994_Z2_ACG_US)
     if(strncmp(rev_str[lge_get_board_revno()],"rev_a",5)!=0) // z2 not use max14688 after rev_b
         return 0;
 #elif defined (CONFIG_ENABLE_MBHC)

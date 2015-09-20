@@ -95,6 +95,12 @@ static void free_buffer_page(struct ion_system_heap *heap,
 {
 	bool cached = ion_buffer_cached(buffer);
 
+#ifdef CONFIG_ION_SYSTEM_HEAP_DIRECT_FREE
+	/* If memory pressure is high, cached pool causes performance penalty
+	* This feature do free directly
+	*/
+	buffer->private_flags |= ION_PRIV_FLAG_SHRINKER_FREE;
+#endif
 	if (!(buffer->private_flags & ION_PRIV_FLAG_SHRINKER_FREE)) {
 		struct ion_page_pool *pool;
 		if (cached)

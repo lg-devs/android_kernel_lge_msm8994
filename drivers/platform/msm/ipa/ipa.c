@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2014, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-2015, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -44,9 +44,6 @@
 			       x == IPA_MODE_MOBILE_AP_WLAN)
 #define IPA_CNOC_CLK_RATE (75 * 1000 * 1000UL)
 #define IPA_A5_MUX_HEADER_LENGTH (8)
-#define IPA_DMA_POOL_SIZE (512)
-#define IPA_DMA_POOL_ALIGNMENT (4)
-#define IPA_DMA_POOL_BOUNDARY (1024)
 #define IPA_ROUTING_RULE_BYTE_SIZE (4)
 #define IPA_BAM_CNFG_BITS_VALv1_1 (0x7FFFE004)
 #define IPA_BAM_CNFG_BITS_VALv2_0 (0xFFFFE004)
@@ -55,7 +52,7 @@
 
 #define IPA_AGGR_MAX_STR_LENGTH (10)
 
-#define CLEANUP_TAG_PROCESS_TIMEOUT 20
+#define CLEANUP_TAG_PROCESS_TIMEOUT 150
 
 #define IPA_AGGR_STR_IN_BYTES(str) \
 	(strnlen((str), IPA_AGGR_MAX_STR_LENGTH - 1) + 1)
@@ -71,7 +68,7 @@
 #define IPA_Q6_CLEANUP_EXP_AGGR_MAX_CMDS \
 	(IPA_NUM_PIPES*2) \
 
-#define IPA_SPS_PROD_TIMEOUT_MSEC 1000
+#define IPA_SPS_PROD_TIMEOUT_MSEC 100
 
 #ifdef CONFIG_COMPAT
 #define IPA_IOC_ADD_HDR32 _IOWR(IPA_IOC_MAGIC, \
@@ -188,9 +185,9 @@ static DECLARE_WORK(ipa_tag_work, ipa_start_tag_process);
 static void ipa_sps_process_irq(struct work_struct *work);
 static DECLARE_WORK(ipa_sps_process_irq_work, ipa_sps_process_irq);
 
-static void ipa_dec_clients_delayed(struct work_struct *work);
-static DECLARE_DELAYED_WORK(ipa_dec_clients_delayed_work,
-	ipa_dec_clients_delayed);
+static void ipa_sps_release_resource(struct work_struct *work);
+static DECLARE_DELAYED_WORK(ipa_sps_release_resource_work,
+	ipa_sps_release_resource);
 
 static struct ipa_plat_drv_res ipa_res = {0, };
 static struct of_device_id ipa_plat_drv_match[] = {
@@ -1493,7 +1490,7 @@ static int ipa_q6_set_ex_path_dis_agg(void)
 		}
 	}
 
-	/* Will wait 20msecs for IPA tag process completion */
+	/* Will wait 150msecs for IPA tag process completion */
 	retval = ipa_tag_process(desc, num_descs,
 				 msecs_to_jiffies(CLEANUP_TAG_PROCESS_TIMEOUT));
 	if (retval) {
@@ -1504,10 +1501,6 @@ static int ipa_q6_set_ex_path_dis_agg(void)
 				kfree(desc[index].user1);
 			retval = -EINVAL;
 		}
-
-                /* Ignoring TAG process timeout */
-                if (retval == -ETIME)
-                        retval = 0;
 	}
 
 	kfree(desc);
@@ -1653,6 +1646,8 @@ int _ipa_init_sram_v2_5(void)
 
 #define IPA_SRAM_SET(ofst, val) (ipa_sram_mmio[(ofst - 4) / 4] = val)
 
+	IPA_SRAM_SET(IPA_MEM_PART(v4_flt_ofst) - 4, IPA_MEM_CANARY_VAL);
+	IPA_SRAM_SET(IPA_MEM_PART(v4_flt_ofst), IPA_MEM_CANARY_VAL);
 	IPA_SRAM_SET(IPA_MEM_PART(v6_flt_ofst) - 4, IPA_MEM_CANARY_VAL);
 	IPA_SRAM_SET(IPA_MEM_PART(v6_flt_ofst), IPA_MEM_CANARY_VAL);
 	IPA_SRAM_SET(IPA_MEM_PART(v4_rt_ofst) - 4, IPA_MEM_CANARY_VAL);
@@ -1663,8 +1658,7 @@ int _ipa_init_sram_v2_5(void)
 							IPA_MEM_CANARY_VAL);
 	IPA_SRAM_SET(IPA_MEM_PART(modem_hdr_proc_ctx_ofst), IPA_MEM_CANARY_VAL);
 	IPA_SRAM_SET(IPA_MEM_PART(modem_ofst), IPA_MEM_CANARY_VAL);
-	IPA_SRAM_SET(IPA_MEM_PART(apps_v4_flt_ofst), IPA_MEM_CANARY_VAL);
-	IPA_SRAM_SET(IPA_MEM_PART(uc_info_ofst), IPA_MEM_CANARY_VAL);
+	IPA_SRAM_SET(IPA_MEM_PART(end_ofst), IPA_MEM_CANARY_VAL);
 
 	iounmap(ipa_sram_mmio);
 
@@ -2325,7 +2319,7 @@ void _ipa_enable_clks_v2_0(void)
 	}
 }
 
-void _ipa_enable_clks_v1(void)
+void _ipa_enable_clks_v1_1(void)
 {
 
 	if (ipa_cnoc_clk) {
@@ -2414,7 +2408,7 @@ void ipa_enable_clks(void)
 		WARN_ON(1);
 }
 
-void _ipa_disable_clks_v1(void)
+void _ipa_disable_clks_v1_1(void)
 {
 
 	if (ipa_inactivity_clk)
@@ -2581,7 +2575,6 @@ static int ipa_setup_bam_cfg(const struct ipa_plat_drv_res *res)
 	if (!ipa_bam_mmio)
 		return -ENOMEM;
 	switch (ipa_ctx->ipa_hw_type) {
-	case IPA_HW_v1_0:
 	case IPA_HW_v1_1:
 		reg_val = IPA_BAM_CNFG_BITS_VALv1_1;
 		break;
@@ -2593,9 +2586,8 @@ static int ipa_setup_bam_cfg(const struct ipa_plat_drv_res *res)
 		retval = -EPERM;
 		goto fail;
 	}
-
-	ipa_write_reg(ipa_bam_mmio, IPA_BAM_CNFG_BITS_OFST, reg_val);
-
+	if (ipa_ctx->ipa_hw_type < IPA_HW_v2_5)
+		ipa_write_reg(ipa_bam_mmio, IPA_BAM_CNFG_BITS_OFST, reg_val);
 fail:
 	iounmap(ipa_bam_mmio);
 
@@ -2775,7 +2767,7 @@ static void ipa_sps_process_irq_schedule_rel(void)
 {
 	ipa_ctx->sps_pm.res_rel_in_prog = true;
 	queue_delayed_work(ipa_ctx->sps_power_mgmt_wq,
-			   &ipa_dec_clients_delayed_work,
+			   &ipa_sps_release_resource_work,
 			   msecs_to_jiffies(IPA_SPS_PROD_TIMEOUT_MSEC));
 }
 
@@ -2812,7 +2804,7 @@ static int apps_cons_request_resource(void)
 	return 0;
 }
 
-static void ipa_dec_clients_delayed(struct work_struct *work)
+static void ipa_sps_release_resource(struct work_struct *work)
 {
 	unsigned long flags;
 	bool dec_clients = false;
@@ -2881,7 +2873,7 @@ static void sps_event_cb(enum sps_callback_case event, void *param)
 		bool *ready = (bool *)param;
 
 		/* make sure no release will happen */
-		cancel_delayed_work(&ipa_dec_clients_delayed_work);
+		cancel_delayed_work(&ipa_sps_release_resource_work);
 		ipa_ctx->sps_pm.res_rel_in_prog = false;
 
 		if (ipa_ctx->sps_pm.res_granted) {
@@ -2992,6 +2984,8 @@ static int ipa_init(const struct ipa_plat_drv_res *resource_p,
 	ipa_ctx->ipa_hw_type = resource_p->ipa_hw_type;
 	ipa_ctx->ipa_hw_mode = resource_p->ipa_hw_mode;
 	ipa_ctx->use_ipa_teth_bridge = resource_p->use_ipa_teth_bridge;
+	ipa_ctx->ipa_bam_remote_mode = resource_p->ipa_bam_remote_mode;
+	ipa_ctx->wan_rx_ring_size = resource_p->wan_rx_ring_size;
 
 	/* default aggregation parameters */
 	ipa_ctx->aggregation_type = IPA_MBIM_16;
@@ -3089,6 +3083,7 @@ static int ipa_init(const struct ipa_plat_drv_res *resource_p,
 		result = -ENOMEM;
 		goto fail_init_hw;
 	}
+
 	ipa_ctx->sps_power_mgmt_wq =
 		create_singlethread_workqueue("sps_ipa_power_mgmt");
 	if (!ipa_ctx->sps_power_mgmt_wq) {
@@ -3112,6 +3107,8 @@ static int ipa_init(const struct ipa_plat_drv_res *resource_p,
 	if (ipa_ctx->ipa_hw_mode != IPA_HW_MODE_VIRTUAL)
 		bam_props.options |= SPS_BAM_OPT_IRQ_WAKEUP;
 	bam_props.options |= SPS_BAM_RES_CONFIRM;
+	if (ipa_ctx->ipa_bam_remote_mode == true)
+		bam_props.manage |= SPS_BAM_MGR_DEVICE_REMOTE;
 	bam_props.ee = resource_p->ee;
 	bam_props.callback = sps_event_cb;
 
@@ -3197,21 +3194,11 @@ static int ipa_init(const struct ipa_plat_drv_res *resource_p,
 		result = -ENOMEM;
 		goto fail_rx_pkt_wrapper_cache;
 	}
-	/*
-	 * setup DMA pool 4 byte aligned, don't cross 1k boundaries, nominal
-	 * size 512 bytes
-	 * This is an issue with IPA HW v1.0 only.
-	 */
-	if (ipa_ctx->ipa_hw_type == IPA_HW_v1_0) {
-		ipa_ctx->dma_pool = dma_pool_create("ipa_1k",
-				ipa_ctx->pdev,
-				IPA_DMA_POOL_SIZE, IPA_DMA_POOL_ALIGNMENT,
-				IPA_DMA_POOL_BOUNDARY);
-	} else {
-		ipa_ctx->dma_pool = dma_pool_create("ipa_tx", ipa_ctx->pdev,
-			IPA_NUM_DESC_PER_SW_TX * sizeof(struct sps_iovec),
-			0, 0);
-	}
+
+	/* Setup DMA pool */
+	ipa_ctx->dma_pool = dma_pool_create("ipa_tx", ipa_ctx->pdev,
+		IPA_NUM_DESC_PER_SW_TX * sizeof(struct sps_iovec),
+		0, 0);
 	if (!ipa_ctx->dma_pool) {
 		IPAERR("cannot alloc DMA pool.\n");
 		result = -ENOMEM;
@@ -3449,11 +3436,6 @@ fail_empty_rt_tbl:
 			  ipa_ctx->empty_rt_tbl_mem.phys_base);
 fail_apps_pipes:
 	idr_destroy(&ipa_ctx->ipa_idr);
-	/*
-	 * DMA pool need to be released only for IPA HW v1.0 only.
-	 */
-	if (ipa_ctx->ipa_hw_type == IPA_HW_v1_0)
-		dma_pool_destroy(ipa_ctx->dma_pool);
 fail_dma_pool:
 	kmem_cache_destroy(ipa_ctx->rx_pkt_wrapper_cache);
 fail_rx_pkt_wrapper_cache:
@@ -3502,6 +3484,8 @@ static int get_ipa_dts_configuration(struct platform_device *pdev,
 	ipa_drv_res->ipa_pipe_mem_size = IPA_PIPE_MEM_SIZE;
 	ipa_drv_res->ipa_hw_type = 0;
 	ipa_drv_res->ipa_hw_mode = 0;
+	ipa_drv_res->ipa_bam_remote_mode = false;
+	ipa_drv_res->wan_rx_ring_size = IPA_GENERIC_RX_POOL_SZ;
 
 	/* Get IPA HW Version */
 	result = of_property_read_u32(pdev->dev.of_node, "qcom,ipa-hw-ver",
@@ -3521,12 +3505,29 @@ static int get_ipa_dts_configuration(struct platform_device *pdev,
 		IPADBG(": found ipa_drv_res->ipa_hw_mode = %d",
 				ipa_drv_res->ipa_hw_mode);
 
+	/* Get IPA WAN RX pool sizee */
+	result = of_property_read_u32(pdev->dev.of_node,
+			"qcom,wan-rx-ring-size",
+			&ipa_drv_res->wan_rx_ring_size);
+	if (result)
+		IPADBG("using default for wan-rx-ring-size\n");
+	else
+		IPADBG(": found ipa_drv_res->wan-rx-ring-size = %u",
+				ipa_drv_res->wan_rx_ring_size);
+
 	ipa_drv_res->use_ipa_teth_bridge =
 			of_property_read_bool(pdev->dev.of_node,
 			"qcom,use-ipa-tethering-bridge");
 	IPADBG(": using TBDr = %s",
 		ipa_drv_res->use_ipa_teth_bridge
 		? "True" : "False");
+
+	ipa_drv_res->ipa_bam_remote_mode =
+			of_property_read_bool(pdev->dev.of_node,
+			"qcom,ipa-bam-remote-mode");
+	IPADBG(": ipa bam remote mode = %s\n",
+			ipa_drv_res->ipa_bam_remote_mode
+			? "True" : "False");
 
 	/* Get IPA wrapper address */
 	resource = platform_get_resource_byname(pdev, IORESOURCE_MEM,
@@ -3627,23 +3628,57 @@ static int ipa_plat_drv_probe(struct platform_device *pdev_p)
 	return result;
 }
 
+/**
+ * ipa_ap_suspend() - suspend callback for runtime_pm
+ * @dev: pointer to device
+ *
+ * This callback will be invoked by the runtime_pm framework when an AP suspend
+ * operation is invoked, usually by pressing a suspend button.
+ *
+ * Returns -EAGAIN to runtime_pm framework in case IPA is in use by AP.
+ * This will postpone the suspend operation until IPA is no longer used by AP.
+*/
 static int ipa_ap_suspend(struct device *dev)
 {
-	int res = 0;
+	int i;
 
 	IPADBG("Enter...\n");
-	/* Do not allow A7 to suspend in case there are active clients of IPA */
-	ipa_active_clients_lock();
-	if (ipa_ctx->ipa_active_clients.cnt != 0) {
-		IPADBG("IPA is in use, postponing AP suspend.\n");
-		res = -EAGAIN;
+	/*
+	 * In case SPS requested IPA resources fail to suspend.
+	 * This can happen if SPS driver is during the processing of
+	 * IPA BAM interrupt
+	 */
+	if (ipa_ctx->sps_pm.res_granted && !ipa_ctx->sps_pm.res_rel_in_prog) {
+		IPAERR("SPS resource is granted, do not suspend\n");
+		return -EAGAIN;
 	}
-	ipa_active_clients_unlock();
+
+	/* In case there is a tx/rx handler in polling mode fail to suspend */
+	for (i = 0; i < IPA_NUM_PIPES; i++) {
+		if (ipa_ctx->ep[i].sys &&
+			atomic_read(&ipa_ctx->ep[i].sys->curr_polling_state)) {
+			IPAERR("EP %d is in polling state, do not suspend\n",
+				i);
+			return -EAGAIN;
+		}
+	}
+
+	/* release SPS IPA resource without waiting for inactivity timer */
+	ipa_sps_release_resource(NULL);
 	IPADBG("Exit\n");
 
-	return res;
+	return 0;
 }
 
+/**
+* ipa_ap_resume() - resume callback for runtime_pm
+* @dev: pointer to device
+*
+* This callback will be invoked by the runtime_pm framework when an AP resume
+* operation is invoked.
+*
+* Always returns 0 since resume should always succeed.
+*/
 static int ipa_ap_resume(struct device *dev)
 {
 	return 0;

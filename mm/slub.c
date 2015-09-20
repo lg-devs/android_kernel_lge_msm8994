@@ -1300,6 +1300,10 @@ static struct page *allocate_slab(struct kmem_cache *s, gfp_t flags, int node)
 	 * so we fall-back to the minimum order allocation.
 	 */
 	alloc_gfp = (flags | __GFP_NOWARN | __GFP_NORETRY) & ~__GFP_NOFAIL;
+#ifdef CONFIG_SLUB_RESTRAIN_HIGH_ORDER_ALLOC
+	if (oo_order(oo) > 0 && (oo_order(oo) != oo_order(s->min)))
+		alloc_gfp = (alloc_gfp | __GFP_NO_KSWAPD) & ~__GFP_WAIT;
+#endif
 
 	page = alloc_slab_page(alloc_gfp, node, oo);
 	if (unlikely(!page)) {

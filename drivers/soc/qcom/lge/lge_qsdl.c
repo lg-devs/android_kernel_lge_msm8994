@@ -307,7 +307,7 @@ void __init lge_add_qsdl_device(void)
 {
 	platform_device_register(&lge_qsdl_device);
 }
-#endif /* CONFIG_LGE_QSDL_SUPPORT */
+#endif /*                         */
 
 static int __init lge_qsdl_handler_init(void)
 {

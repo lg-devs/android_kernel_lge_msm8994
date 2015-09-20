@@ -235,15 +235,15 @@ static const char fsg_string_interface[] = "Mass Storage";
 
 #ifdef CONFIG_USB_G_LGE_ANDROID_AUTORUN
 
-/* Belows are LGE-customized SCSI cmd and
- * sub-cmd for autorun processing.
- * 2011-03-09, hyunhui.park@lge.com
+/*                                       
+                                  
+                                   
  */
 #define SC_LGE_SPE              0xF1
 #define SUB_CODE_MODE_CHANGE    0x01
 #define SUB_CODE_GET_VALUE      0x02
 #define SUB_CODE_PROBE_DEV      0xff
-/* def CONFIG_USB_G_LGE_ANDROID_AUTORUN_VZW */
+/*                                          */
 #if 0
 #define SUB_CODE_SET_VALUE	0x05
 #endif
@@ -269,7 +269,7 @@ static const char fsg_string_interface[] = "Mass Storage";
 #ifdef CONFIG_USB_G_LGE_MULTIPLE_CONFIGURATION_VZW
 #define TYPE_MOD_CHG2_TO_MUL    0x8A
 #endif
-/* def CONFIG_USB_G_LGE_ANDROID_AUTORUN_VZW */
+/*                                          */
 #if 0
 #define TYPE_SET_VAL_USB_DRV_INSTALLED		0x30
 #define TYPE_SET_VAL_USB_DRV_UNINSTALLED	0x31
@@ -294,7 +294,7 @@ static const char fsg_string_interface[] = "Mass Storage";
 #define SUB_ACK_STATUS_MUL      0x07
 #endif
 
-#endif /* CONFIG_USB_G_LGE_ANDROID_AUTORUN */
+#endif /*                                  */
 
 #include "storage_common.c"
 
@@ -305,12 +305,22 @@ static int csw_hack_sent;
 #endif
 /*-------------------------------------------------------------------------*/
 
+#ifndef CONFIG_USB_G_LGE_ANDROID_AUTORUN
+/*If USB mass storage vfs operation is stuck for more than 10 sec
+host will initiate the reset. Configure the timer with 9 sec to print
+the error message before host is intiating the resume on it.*/
+#define MSC_VFS_TIMER_PERIOD_MS	9000
+static int msc_vfs_timer_period_ms = MSC_VFS_TIMER_PERIOD_MS;
+module_param(msc_vfs_timer_period_ms, int, S_IRUGO | S_IWUSR);
+MODULE_PARM_DESC(msc_vfs_timer_period_ms, "Set period for MSC VFS timer");
+#endif
+
 struct fsg_dev;
 struct fsg_common;
 #ifdef CONFIG_USB_G_LGE_ANDROID_AUTORUN
-/* Belows are uevent string to communicate with
- * android framework and application.
- * 2011-03-09, hyunhui.park@lge.com
+/*                                             
+                                     
+                                   
  */
 static char *envp_ack[2] = {"AUTORUN=ACK", NULL};
 
@@ -468,7 +478,7 @@ struct fsg_common {
 	 */
 	char inquiry_string[8 + 16 + 4 + 1];
 #ifdef CONFIG_USB_G_LGE_ANDROID_AUTORUN
-	/* LGE-customized USB mode */
+	/*                         */
 	enum chg_mode_state mode_state;
 #endif
 #ifdef CONFIG_USB_G_LGE_ANDROID_AUTORUN_VZW
@@ -476,6 +486,9 @@ struct fsg_common {
 	enum usb_drv_state drv_state;
 #endif
 	struct kref		ref;
+#ifndef CONFIG_USB_G_LGE_ANDROID_AUTORUN
+	struct timer_list	vfs_timer;
+#endif
 };
 
 struct fsg_config {
@@ -520,6 +533,28 @@ struct fsg_dev {
 	struct usb_ep		*bulk_in;
 	struct usb_ep		*bulk_out;
 };
+
+#ifndef CONFIG_USB_G_LGE_ANDROID_AUTORUN
+static void msc_usb_vfs_timer_func(unsigned long data)
+{
+	struct fsg_common *common = (struct fsg_common *) data;
+
+	switch (common->data_dir) {
+	case DATA_DIR_FROM_HOST:
+		dev_err(&common->curlun->dev,
+				"usb mass storage stuck in vfs_write\n");
+		break;
+	case DATA_DIR_TO_HOST:
+		dev_err(&common->curlun->dev,
+				"usb mass storage stuck in vfs_read\n");
+		break;
+	default:
+		dev_err(&common->curlun->dev,
+				"usb mass storage stuck in vfs_sync\n");
+		break;
+	}
+}
+#endif
 
 static inline int __fsg_is_set(struct fsg_common *common,
 			       const char *func, unsigned line)
@@ -911,9 +946,16 @@ static int do_read(struct fsg_common *common)
 #ifdef CONFIG_USB_MSC_PROFILING
 		start = ktime_get();
 #endif
+#ifndef CONFIG_USB_G_LGE_ANDROID_AUTORUN
+		mod_timer(&common->vfs_timer, jiffies +
+			msecs_to_jiffies(msc_vfs_timer_period_ms));
+#endif
 		nread = vfs_read(curlun->filp,
 				 (char __user *)bh->buf,
 				 amount, &file_offset_tmp);
+#ifndef CONFIG_USB_G_LGE_ANDROID_AUTORUN
+		del_timer_sync(&common->vfs_timer);
+#endif
 		VLDBG(curlun, "file read %u @ %llu -> %d\n", amount,
 		     (unsigned long long) file_offset, (int) nread);
 #ifdef CONFIG_USB_MSC_PROFILING
@@ -1131,9 +1173,16 @@ static int do_write(struct fsg_common *common)
 #ifdef CONFIG_USB_MSC_PROFILING
 			start = ktime_get();
 #endif
+#ifndef CONFIG_USB_G_LGE_ANDROID_AUTORUN
+			mod_timer(&common->vfs_timer, jiffies +
+				msecs_to_jiffies(msc_vfs_timer_period_ms));
+#endif
 			nwritten = vfs_write(curlun->filp,
 					     (char __user *)bh->buf,
 					     amount, &file_offset_tmp);
+#ifndef CONFIG_USB_G_LGE_ANDROID_AUTORUN
+			del_timer_sync(&common->vfs_timer);
+#endif
 			VLDBG(curlun, "file write %u @ %llu -> %d\n", amount,
 			      (unsigned long long)file_offset, (int)nwritten);
 #ifdef CONFIG_USB_MSC_PROFILING
@@ -1233,9 +1282,16 @@ static int do_synchronize_cache(struct fsg_common *common)
 
 	/* We ignore the requested LBA and write out all file's
 	 * dirty data buffers. */
+#ifndef CONFIG_USB_G_LGE_ANDROID_AUTORUN
+	mod_timer(&common->vfs_timer, jiffies +
+		msecs_to_jiffies(msc_vfs_timer_period_ms));
+#endif
 	rc = fsg_lun_fsync_sub(curlun);
 	if (rc)
 		curlun->sense_data = SS_WRITE_ERROR;
+#ifndef CONFIG_USB_G_LGE_ANDROID_AUTORUN
+	del_timer_sync(&common->vfs_timer);
+#endif
 	return 0;
 }
 
@@ -1291,7 +1347,14 @@ static int do_verify(struct fsg_common *common)
 	file_offset = ((loff_t) lba) << curlun->blkbits;
 
 	/* Write out all the dirty buffers before invalidating them */
+#ifndef CONFIG_USB_G_LGE_ANDROID_AUTORUN
+	mod_timer(&common->vfs_timer, jiffies +
+		msecs_to_jiffies(msc_vfs_timer_period_ms));
+#endif
 	fsg_lun_fsync_sub(curlun);
+#ifndef CONFIG_USB_G_LGE_ANDROID_AUTORUN
+	del_timer_sync(&common->vfs_timer);
+#endif
 	if (signal_pending(current))
 		return -EINTR;
 
@@ -1321,9 +1384,16 @@ static int do_verify(struct fsg_common *common)
 
 		/* Perform the read */
 		file_offset_tmp = file_offset;
+#ifndef CONFIG_USB_G_LGE_ANDROID_AUTORUN
+		mod_timer(&common->vfs_timer, jiffies +
+			msecs_to_jiffies(msc_vfs_timer_period_ms));
+#endif
 		nread = vfs_read(curlun->filp,
 				(char __user *) bh->buf,
 				amount, &file_offset_tmp);
+#ifndef CONFIG_USB_G_LGE_ANDROID_AUTORUN
+		del_timer_sync(&common->vfs_timer);
+#endif
 		VLDBG(curlun, "file read %u @ %llu -> %d\n", amount,
 				(unsigned long long) file_offset,
 				(int) nread);
@@ -1379,8 +1449,8 @@ static int do_inquiry(struct fsg_common *common, struct fsg_buffhd *bh)
 	return 36;
 }
 #ifdef CONFIG_USB_G_LGE_ANDROID_AUTORUN
-/* Add function which handles LGE-customized command from PC.
- * 2011-03-09, hyunhui.park@lge.com
+/*                                                           
+                                   
  */
 static int do_ack_status(struct fsg_common *common, struct fsg_buffhd *bh, u8 ack)
 {
@@ -1793,8 +1863,17 @@ static int do_prevent_allow(struct fsg_common *common)
 		curlun->sense_data = SS_INVALID_FIELD_IN_CDB;
 		return -EINVAL;
 	}
+#ifndef CONFIG_USB_G_LGE_ANDROID_AUTORUN
+	if (!curlun->nofua && curlun->prevent_medium_removal && !prevent) {
+		mod_timer(&common->vfs_timer, jiffies +
+			msecs_to_jiffies(msc_vfs_timer_period_ms));
+#endif
 	if (!curlun->nofua && curlun->prevent_medium_removal && !prevent)
 		fsg_lun_fsync_sub(curlun);
+#ifndef CONFIG_USB_G_LGE_ANDROID_AUTORUN
+		del_timer_sync(&common->vfs_timer);
+	}
+#endif
 	curlun->prevent_medium_removal = prevent;
 	return 0;
 }
@@ -2429,7 +2508,7 @@ static int do_scsi_command(struct fsg_common *common)
 			common->mode_state = MODE_STATE_PROBE_DEV;
 			reply = 0;
 			break;
-/* def CONFIG_USB_G_LGE_ANDROID_AUTORUN_VZW */
+/*                                          */
 #if 0
 		case SUB_CODE_SET_VALUE:
 			switch (common->cmnd[2]) {
@@ -2457,7 +2536,7 @@ static int do_scsi_command(struct fsg_common *common)
 			break;
 		} /* switch (common->cmnd[1]) */
 		break;
-#endif /* CONFIG_USB_G_LGE_ANDROID_AUTORUN */
+#endif /*                                  */
 
 	case MODE_SELECT:
 		common->data_size_from_cmnd = common->cmnd[4];
@@ -3737,6 +3816,10 @@ static int fsg_bind_config(struct usb_composite_dev *cdev,
 	fsg->function.disable     = fsg_disable;
 
 	fsg->common               = common;
+#ifndef CONFIG_USB_G_LGE_ANDROID_AUTORUN
+	setup_timer(&common->vfs_timer, msc_usb_vfs_timer_func,
+			(unsigned long) common);
+#endif
 	/*
 	 * Our caller holds a reference to common structure so we
 	 * don't have to be worry about it being freed until we return

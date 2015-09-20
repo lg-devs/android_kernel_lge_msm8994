@@ -41,7 +41,6 @@
 	pinctrl-1 = <&mdss_dsi_suspend &mdss_te_suspend>;
 
 	qcom,platform-reset-gpio = <&msm_gpio 78 0>;
-	qcom,dsi-panel-bias-vreg;
 	qcom,platform-vddio_en-gpio = <&msm_gpio 110 0>;
 	qcom,platform-avdd-gpio = <&msm_gpio 89 0>;
 
@@ -346,18 +345,17 @@
 			regulator-always-on;
 		};
 	};
-	rpm-regulator-ldoa25 {
+/*	rpm-regulator-ldoa25 {
 		status = "okay";
-		revision = "rev_a";
 		pm8994_l25: regulator-l25 {
 			regulator-min-microvolt = <1800000>;
 			regulator-max-microvolt = <1800000>;
 			qcom,init-voltage = <1800000>;
 			status = "okay";
-			revision = "rev_a";
 			regulator-always-on;
 		};
 	};
+*/
 	rpm-regulator-ldoa22 {
 		status = "okay";
 		pm8994_l22: regulator-l22 {

@@ -68,7 +68,7 @@ static struct msm_sensor_power_setting imx208_power_setting[] = {
 		.delay = 10,
 	},
 };
-/*LGE add for sequence of power down */
+/*                                   */
 static struct msm_sensor_power_setting imx208_power_down_setting[] = {
 	{
 		.seq_type = SENSOR_I2C_MUX,
@@ -162,13 +162,13 @@ static int32_t imx208_platform_probe(struct platform_device *pdev)
 	pr_err("%s: E\n", __func__);
 	match = of_match_device(imx208_dt_match, &pdev->dev);
 
-/* LGE_CHANGE_S : WBT, 2013-5-31, jonghwan.ko@lge.com */
+/*                                                    */
 	if(!match)
 	{
 		pr_err(" %s failed ",__func__);
 	      return -ENODEV;
 	}
-/* LGE_CHANGE_E : WBT, 2013-5-31, jonghwan.ko@lge.com */
+/*                                                    */
 
 	rc = msm_sensor_platform_probe(pdev, match->data);
 	pr_err("%s: X\n", __func__);
@@ -201,7 +201,7 @@ static struct msm_sensor_ctrl_t imx208_s_ctrl = {
 	.sensor_i2c_client = &imx208_sensor_i2c_client,
 	.power_setting_array.power_setting = imx208_power_setting,
 	.power_setting_array.size = ARRAY_SIZE(imx208_power_setting),
-/*LGE add for sequence of power down */
+/*                                   */
 	.power_setting_array.power_down_setting = imx208_power_down_setting,
 	.power_setting_array.size_down = ARRAY_SIZE(imx208_power_down_setting),
 	.msm_sensor_mutex = &imx208_mut,

@@ -1024,10 +1024,10 @@ static int mmc_sd_init_card(struct mmc_host *host, u32 ocr,
 	WARN_ON(!host->claimed);
 
 	#ifdef CONFIG_MACH_LGE
-	/* LGE_UPDATE
-	 * When uSD is not inserted, return proper error-value.
-	 * 2014-09-01, Z2G4-BSP-FileSys@lge.com
-	 */
+	/*           
+                                                        
+                                        
+  */
 	if (!mmc_gpio_get_cd(host)) {
 		printk(KERN_INFO "[LGE][MMC][%-18s( )] sd-no-exist. skip next\n", __func__);
 		err = -ENOMEDIUM;
@@ -1260,10 +1260,10 @@ static int mmc_sd_resume(struct mmc_host *host)
 		err = mmc_sd_init_card(host, host->ocr, host->card);
 
 		#ifdef CONFIG_MACH_LGE
-			/* LGE_CHANGE
-			* Skip below When ENOMEDIUM
-			* 2014-09-01, Z2G4-BSP-FileSys@lge.com
-			*/
+			/*           
+                              
+                                         
+   */
 			if (err == -ENOMEDIUM) {
 				printk(KERN_INFO "[LGE][MMC][%-18s( )] error:ENOMEDIUM\n", __func__);
 				break;
@@ -1424,10 +1424,10 @@ int mmc_attach_sd(struct mmc_host *host)
 		err = mmc_sd_init_card(host, host->ocr, NULL);
 
 		#ifdef CONFIG_MACH_LGE
-		/* LGE_CHANGE
-		* Skip below When ENOMEDIUM
-		* 2014-09-01, Z2G4-BSP-FileSys@lge.com
-		*/
+		/*           
+                             
+                                        
+  */
 		if (err == -ENOMEDIUM) {
 			printk(KERN_INFO "[LGE][MMC][%-18s( )] error:ENOMEDIUM\n", __func__);
 			retries=0;

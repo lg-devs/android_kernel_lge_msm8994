@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2014, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-2015, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -413,7 +413,7 @@ static int hdmi_20nm_pll_lock_status(struct mdss_pll_resources *io)
 	/* poll for PLL ready status */
 	if (!readl_poll_timeout_noirq(
 		(io->pll_base + QSERDES_COM_RESET_SM),
-		status, ((status & BIT(6)) == 1),
+		status, status & BIT(6),
 		HDMI_PLL_POLL_MAX_READS,
 		HDMI_PLL_POLL_TIMEOUT_US)) {
 		pr_debug("%s: C READY\n", __func__);
@@ -426,7 +426,7 @@ static int hdmi_20nm_pll_lock_status(struct mdss_pll_resources *io)
 	/* poll for PHY ready status */
 	if (pll_locked && !readl_poll_timeout_noirq(
 		(io->phy_base + HDMI_PHY_STATUS),
-		status, ((status & BIT(0)) == 1),
+		status, status & BIT(0),
 		HDMI_PLL_POLL_MAX_READS,
 		HDMI_PLL_POLL_TIMEOUT_US)) {
 		pr_debug("%s: PHY READY\n", __func__);
@@ -617,21 +617,21 @@ static u32 hdmi_20nm_phy_pll_set_clk_rate(struct clk *c, u32 tmds_clk)
 		tmds_clk >= 74000000 ? 0x0C : 0x04);
 	MDSS_PLL_REG_W(io->pll_base + 0x800, QSERDES_TX_L2_VMODE_CTRL1,
 		tmds_clk >= 74000000 ? 0x0D : 0x05);
-	MDSS_PLL_REG_W(io->pll_base + 0x800, QSERDES_TX_L0_TX_DRV_LVL,
+	MDSS_PLL_REG_W(io->pll_base + 0x400, QSERDES_TX_L0_TX_DRV_LVL,
 		tmds_clk >= 74000000 ? 0x1F : 0x11);
 	MDSS_PLL_REG_W(io->pll_base + 0x800, QSERDES_TX_L2_TX_DRV_LVL,
 		tmds_clk >= 74000000 ? 0x1F : 0x11);
 	MDSS_PLL_REG_W(io->pll_base + 0x400, QSERDES_TX_L0_VMODE_CTRL2, 0x80);
-	MDSS_PLL_REG_W(io->pll_base + 0x400, QSERDES_TX_L2_VMODE_CTRL2, 0x00);
+	MDSS_PLL_REG_W(io->pll_base + 0x800, QSERDES_TX_L2_VMODE_CTRL2, 0x00);
 	MDSS_PLL_REG_W(io->pll_base + 0x400, QSERDES_TX_L0_VMODE_CTRL3,
 		tmds_clk >= 74000000 ? 0x01 : 0x02);
-	MDSS_PLL_REG_W(io->pll_base + 0x400, QSERDES_TX_L2_VMODE_CTRL3,
+	MDSS_PLL_REG_W(io->pll_base + 0x800, QSERDES_TX_L2_VMODE_CTRL3,
 		tmds_clk >= 74000000 ? 0x00 : 0x02);
 	MDSS_PLL_REG_W(io->pll_base + 0x400, QSERDES_TX_L0_VMODE_CTRL5,
 		tmds_clk >= 74000000 ? 0x00 : 0xA0);
 	MDSS_PLL_REG_W(io->pll_base + 0x800, QSERDES_TX_L2_VMODE_CTRL5,
 		tmds_clk >= 74000000 ? 0x00 : 0xA0);
-	MDSS_PLL_REG_W(io->pll_base + 0x800, QSERDES_TX_L0_VMODE_CTRL6, 0x00);
+	MDSS_PLL_REG_W(io->pll_base + 0x400, QSERDES_TX_L0_VMODE_CTRL6, 0x00);
 	MDSS_PLL_REG_W(io->pll_base + 0x800, QSERDES_TX_L2_VMODE_CTRL6, 0x00);
 
 	MDSS_PLL_REG_W(io->pll_base + 0x400,

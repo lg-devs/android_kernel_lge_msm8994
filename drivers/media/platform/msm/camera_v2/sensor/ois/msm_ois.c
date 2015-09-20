@@ -1,4 +1,4 @@
-/* Copyright (c) 2014, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2014 - 2015, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -37,7 +37,8 @@ extern void lgit_imx135_ois_init(struct msm_ois_ctrl_t *msm_ois_t);
 extern void lgit_imx214_ois_init(struct msm_ois_ctrl_t *msm_ois_t);
 #endif
 #if defined(CONFIG_IMX234)
-extern void lgit_imx234_ois_init(struct msm_ois_ctrl_t *msm_ois_t);
+extern void lgit_imx234_onsemi_ois_init(struct msm_ois_ctrl_t *msm_ois_t);
+extern void lgit_imx234_rohm_ois_init(struct msm_ois_ctrl_t *msm_ois_t);
 #endif
 static struct msm_ois_ctrl_t *local_msm_ois_t;
 static struct v4l2_file_operations msm_ois_v4l2_subdev_fops;
@@ -208,7 +209,7 @@ static int msm_ois_init(struct msm_ois_ctrl_t *o_ctrl)
 		lgit_imx214_ois_init(o_ctrl);
 #endif
 #if defined(CONFIG_IMX234)
-		lgit_imx234_ois_init(o_ctrl);
+		lgit_imx234_onsemi_ois_init(o_ctrl);
 #endif
 		local_msm_ois_t->sid_ois = o_ctrl->sid_ois;
 		rc = ois_i2c_read(0x027F, &chipid, 2);
@@ -220,10 +221,15 @@ static int msm_ois_init(struct msm_ois_ctrl_t *o_ctrl)
 		printk("%s : LGIT onsemi i2c shift addr 0x%x!\n", __func__, o_ctrl->sid_ois);
 		break;
 #endif
-#if defined(CONFIG_IMX135)
+#if defined(CONFIG_IMX135) || defined(CONFIG_IMX234)
 	case 0x02:
 	case 0x05:
+#if defined(CONFIG_IMX135)
 		lgit_imx135_ois_init(o_ctrl);
+#endif
+#if defined(CONFIG_IMX234)
+		lgit_imx234_rohm_ois_init(o_ctrl);
+#endif
 		local_msm_ois_t->sid_ois = o_ctrl->sid_ois;
 		printk("%s : LGIT rohm i2c shift addr 0x%x!\n", __func__, o_ctrl->sid_ois);
 		break;
@@ -467,7 +473,8 @@ static int msm_ois_close(struct v4l2_subdev *sd,
 	int rc = 0;
 	struct msm_ois_ctrl_t *o_ctrl =  v4l2_get_subdevdata(sd);
 	CDBG("Enter\n");
-	if (!o_ctrl) {
+	if (!o_ctrl || !o_ctrl->i2c_client.i2c_func_tbl) {
+		/* check to make sure that init happens before release */
 		pr_err("failed\n");
 		return -EINVAL;
 	}
@@ -499,8 +506,12 @@ static long msm_ois_subdev_ioctl(struct v4l2_subdev *sd,
 	case VIDIOC_MSM_OIS_CFG:
 		return msm_ois_config(o_ctrl, argp);
 	case MSM_SD_SHUTDOWN:
-		msm_ois_close(sd, NULL);
-		return 0;
+		if (!o_ctrl->i2c_client.i2c_func_tbl) {
+			pr_err("o_ctrl->i2c_client.i2c_func_tbl NULL\n");
+			return -EINVAL;
+		} else {
+			return msm_ois_close(sd, NULL);
+		}
 	default:
 		return -ENOIOCTLCMD;
 	}
@@ -560,8 +571,7 @@ static int32_t msm_ois_i2c_probe(struct i2c_client *client,
 
 	if (client == NULL) {
 		pr_err("msm_ois_i2c_probe: client is null\n");
-		rc = -EINVAL;
-		goto probe_failure;
+		return -EINVAL;
 	}
 
 	ois_ctrl_t = kzalloc(sizeof(struct msm_ois_ctrl_t),
@@ -573,6 +583,7 @@ static int32_t msm_ois_i2c_probe(struct i2c_client *client,
 
 	if (!i2c_check_functionality(client->adapter, I2C_FUNC_I2C)) {
 		pr_err("i2c_check_functionality failed\n");
+		rc = -EINVAL;
 		goto probe_failure;
 	}
 
@@ -583,7 +594,7 @@ static int32_t msm_ois_i2c_probe(struct i2c_client *client,
 	CDBG("cell-index %d, rc %d\n", ois_ctrl_t->subdev_id, rc);
 	if (rc < 0) {
 		pr_err("failed rc %d\n", rc);
-		return rc;
+		goto probe_failure;
 	}
 
 	ois_ctrl_t->i2c_driver = &msm_ois_i2c_driver;
@@ -615,6 +626,7 @@ static int32_t msm_ois_i2c_probe(struct i2c_client *client,
 	CDBG("Exit\n");
 
 probe_failure:
+	kfree(ois_ctrl_t);
 	return rc;
 }
 
@@ -869,7 +881,7 @@ static int32_t msm_ois_platform_probe(struct platform_device *pdev)
 	rc = of_property_read_u32((&pdev->dev)->of_node, "qcom,cci-master",
 		&msm_ois_t->cci_master);
 	CDBG("qcom,cci-master %d, rc %d\n", msm_ois_t->cci_master, rc);
-	if (rc < 0) {
+	if (rc < 0 || msm_ois_t->cci_master >= MASTER_MAX) {
 		kfree(msm_ois_t);
 		pr_err("failed rc %d\n", rc);
 		return rc;
@@ -906,7 +918,7 @@ static int32_t msm_ois_platform_probe(struct platform_device *pdev)
 
 	cci_client = msm_ois_t->i2c_client.cci_client;
 	cci_client->cci_subdev = msm_cci_get_subdev();
-	cci_client->cci_i2c_master = MASTER_MAX;
+	cci_client->cci_i2c_master = msm_ois_t->cci_master;
 	v4l2_subdev_init(&msm_ois_t->msm_sd.sd,
 		msm_ois_t->ois_v4l2_subdev_ops);
 	v4l2_set_subdevdata(&msm_ois_t->msm_sd.sd, msm_ois_t);

@@ -1,4 +1,4 @@
-/* Copyright (c) 2014, Linux Foundation. All rights reserved.
+/* Copyright (c) 2014-2015, Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -18,10 +18,45 @@
 #include <linux/module.h>
 #include <linux/slab.h>
 #include <soc/qcom/rpm-smd.h>
+#include <trace/events/trace_msm_bus.h>
 #include "msm_bus_core.h"
 #include "msm_bus_adhoc.h"
 #include "msm_bus_noc.h"
 #include "msm_bus_bimc.h"
+
+ssize_t vrail_show(struct device *dev, struct device_attribute *attr,
+			  char *buf)
+{
+	struct msm_bus_node_info_type *node_info = NULL;
+	struct msm_bus_node_device_type *bus_node = NULL;
+
+	bus_node = dev->platform_data;
+	if (!bus_node)
+		return -EINVAL;
+	node_info = bus_node->node_info;
+
+	return snprintf(buf, PAGE_SIZE, "%u", node_info->vrail_comp);
+}
+
+ssize_t vrail_store(struct device *dev, struct device_attribute *attr,
+			   const char *buf, size_t count)
+{
+	struct msm_bus_node_info_type *node_info = NULL;
+	struct msm_bus_node_device_type *bus_node = NULL;
+	int ret = 0;
+
+	bus_node = dev->platform_data;
+	if (!bus_node)
+		return -EINVAL;
+	node_info = bus_node->node_info;
+
+	ret = sscanf(buf, "%u", &node_info->vrail_comp);
+	if (ret != 1)
+		return -EINVAL;
+	return count;
+}
+
+DEVICE_ATTR(vrail, 0600, vrail_show, vrail_store);
 
 struct static_rules_type {
 	int num_rules;
@@ -164,6 +199,9 @@ static int send_rpm_msg(struct device *device)
 					 ndev->node_info->mas_rpm_id);
 				goto exit_send_rpm_msg;
 			}
+			trace_bus_agg_bw(ndev->node_info->id,
+				ndev->node_info->mas_rpm_id, ctx,
+				ndev->node_ab.ab[ctx]);
 		}
 
 		if (ndev->node_info->slv_rpm_id != -1) {
@@ -178,6 +216,9 @@ static int send_rpm_msg(struct device *device)
 					ndev->node_info->slv_rpm_id);
 				goto exit_send_rpm_msg;
 			}
+			trace_bus_agg_bw(ndev->node_info->id,
+				ndev->node_info->slv_rpm_id, ctx,
+				ndev->node_ab.ab[ctx]);
 		}
 	}
 exit_send_rpm_msg:
@@ -265,8 +306,17 @@ static int flush_clk_data(struct device *node_device, int ctx)
 			}
 
 			ret = enable_nodeclk(nodeclk);
-		} else
+
+			if ((node->node_info->is_fab_dev) &&
+				!IS_ERR_OR_NULL(node->qos_clk.clk))
+					ret = enable_nodeclk(&node->qos_clk);
+		} else {
+			if ((node->node_info->is_fab_dev) &&
+				!IS_ERR_OR_NULL(node->qos_clk.clk))
+					ret = disable_nodeclk(&node->qos_clk);
+
 			ret = disable_nodeclk(nodeclk);
+		}
 
 		if (ret) {
 			MSM_BUS_ERR("%s: Failed to enable for %d", __func__,
@@ -274,6 +324,7 @@ static int flush_clk_data(struct device *node_device, int ctx)
 			ret = -ENODEV;
 			goto exit_flush_clk_data;
 		}
+		trace_bus_agg_clk(node->node_info->id, ctx, nodeclk->rate);
 		MSM_BUS_DBG("%s: Updated %d clk to %llu", __func__,
 				node->node_info->id, nodeclk->rate);
 
@@ -584,6 +635,15 @@ static int msm_bus_qos_enable_clk(struct msm_bus_node_device_type *node)
 	}
 	bus_qos_enabled = 1;
 
+	if (!IS_ERR_OR_NULL(bus_node->qos_clk.clk)) {
+		ret = enable_nodeclk(&bus_node->qos_clk);
+		if (ret) {
+			MSM_BUS_ERR("%s: Failed to enable bus QOS clk, node %d",
+				__func__, node->node_info->id);
+			goto exit_enable_qos_clk;
+		}
+	}
+
 	if (!IS_ERR_OR_NULL(node->qos_clk.clk)) {
 		rounded_rate = clk_round_rate(node->qos_clk.clk, 1);
 		ret = setrate_nodeclk(&node->qos_clk, rounded_rate);
@@ -607,7 +667,7 @@ exit_enable_qos_clk:
 }
 
 int msm_bus_enable_limiter(struct msm_bus_node_device_type *node_dev,
-				bool enable, uint64_t lim_bw)
+				int enable, uint64_t lim_bw)
 {
 	int ret = 0;
 	struct msm_bus_node_device_type *bus_node_dev;
@@ -634,7 +694,6 @@ int msm_bus_enable_limiter(struct msm_bus_node_device_type *node_dev,
 	}
 	if (bus_node_dev->fabdev &&
 		bus_node_dev->fabdev->noc_ops.limit_mport) {
-		ret = msm_bus_qos_enable_clk(node_dev);
 		if (ret < 0) {
 			MSM_BUS_ERR("Can't Enable QoS clk %d",
 				node_dev->node_info->id);
@@ -647,7 +706,6 @@ int msm_bus_enable_limiter(struct msm_bus_node_device_type *node_dev,
 				bus_node_dev->fabdev->qos_off,
 				bus_node_dev->fabdev->qos_freq,
 				enable, lim_bw);
-		ret = msm_bus_qos_disable_clk(node_dev, ret);
 	}
 
 exit_enable_limiter:
@@ -765,8 +823,6 @@ static int msm_bus_fabric_init(struct device *dev,
 		goto exit_fabric_init;
 	}
 
-	/*if (msmbus_coresight_init(pdev))
-		pr_warn("Coresight support absent for bus: %d\n", pdata->id);*/
 exit_fabric_init:
 	return ret;
 }
@@ -826,12 +882,15 @@ static int msm_bus_copy_node_info(struct msm_bus_node_device_type *pdata,
 	node_info->num_connections = pdata_node_info->num_connections;
 	node_info->num_blist = pdata_node_info->num_blist;
 	node_info->num_qports = pdata_node_info->num_qports;
+	node_info->num_aggports = pdata_node_info->num_aggports;
 	node_info->buswidth = pdata_node_info->buswidth;
 	node_info->virt_dev = pdata_node_info->virt_dev;
 	node_info->is_fab_dev = pdata_node_info->is_fab_dev;
 	node_info->qos_params.mode = pdata_node_info->qos_params.mode;
 	node_info->qos_params.prio1 = pdata_node_info->qos_params.prio1;
 	node_info->qos_params.prio0 = pdata_node_info->qos_params.prio0;
+	node_info->qos_params.reg_prio1 = pdata_node_info->qos_params.reg_prio1;
+	node_info->qos_params.reg_prio0 = pdata_node_info->qos_params.reg_prio0;
 	node_info->qos_params.prio_lvl = pdata_node_info->qos_params.prio_lvl;
 	node_info->qos_params.prio_rd = pdata_node_info->qos_params.prio_rd;
 	node_info->qos_params.prio_wr = pdata_node_info->qos_params.prio_wr;
@@ -839,6 +898,8 @@ static int msm_bus_copy_node_info(struct msm_bus_node_device_type *pdata,
 	node_info->qos_params.thmp = pdata_node_info->qos_params.thmp;
 	node_info->qos_params.ws = pdata_node_info->qos_params.ws;
 	node_info->qos_params.bw_buffer = pdata_node_info->qos_params.bw_buffer;
+	node_info->util_fact = pdata_node_info->util_fact;
+	node_info->vrail_comp = pdata_node_info->vrail_comp;
 
 	node_info->dev_connections = devm_kzalloc(bus_dev,
 			sizeof(struct device *) *
@@ -981,6 +1042,7 @@ static struct device *msm_bus_device_init(
 		bus_dev = NULL;
 		goto exit_device_init;
 	}
+	device_create_file(bus_dev, &dev_attr_vrail);
 
 exit_device_init:
 	return bus_dev;

@@ -1,10 +1,10 @@
 
-/* LGE_CHANGE_S
- *
- * do read/mmap profiling during booting
- * in order to use the data as readahead args
- *
- * matia.kim@lge.com 20130403
+/*             
+  
+                                        
+                                             
+  
+                             
  */
 #include <linux/semaphore.h>
 #include <linux/pagemap.h>
@@ -18,6 +18,12 @@
 #include <linux/timer.h>
 #include <linux/workqueue.h>
 
+#ifdef CONFIG_VM_EVENT_COUNTERS
+#include <linux/vmstat.h>
+#include <linux/jiffies.h>
+#include <linux/cpu.h>
+#endif
+
 #define FILE_PATH_LEN	256
 #define PROC_NAME_LEN	16
 #define PROF_BUF_SIZE	2000
@@ -27,6 +33,10 @@
 #define PROF_RUN	2
 #define PROF_OPT	3
 #define PROF_DONE	4
+
+#ifdef CONFIG_VM_EVENT_COUNTERS
+#define VM_CHK_INTERVAL (HZ / 10)
+#endif
 
 /* #define DEBUG */
 #ifdef DEBUG
@@ -57,4 +67,4 @@ struct sreadahead_prof {
 };
 
 int sreadahead_prof(struct file *filp, size_t len, loff_t pos);
-/* LGE_CHANGE_E */
+/*              */

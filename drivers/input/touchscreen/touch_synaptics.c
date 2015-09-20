@@ -188,6 +188,7 @@ extern int touch_ta_status;
 #define LPWG_TOUCH_SLOP_REG2		(LPWG_TOUCH_SLOP_REG + LPWG_BLOCK_SIZE)
 #define LPWG_TAP_DISTANCE_REG2		(LPWG_TAP_DISTANCE_REG + LPWG_BLOCK_SIZE)
 #define LPWG_INTERRUPT_DELAY_REG2	(LPWG_INTERRUPT_DELAY_REG + LPWG_BLOCK_SIZE)
+#define LPWG_PARTIAL_REG		(LPWG_INTERRUPT_DELAY_REG2 + 2)
 #define MISC_HOST_CONTROL_REG		(ts->f51.dsc.control_base + 7 + LPWG_BLOCK_SIZE)
 /* finger_amplitude(0x80) = 0.5 */
 #define THERMAL_HIGH_FINGER_AMPLITUDE	0x60
@@ -209,6 +210,7 @@ extern int touch_ta_status;
 #define TOUCH_SLOP_CTRL		6
 #define TAP_DISTANCE_CTRL	7
 #define INTERRUPT_DELAY_CTRL	8
+#define PARTIAL_LPWG_ON		9
 
 #define TCI_ENABLE_CTRL2	22
 #define TAP_COUNT_CTRL2		23
@@ -238,6 +240,12 @@ extern int touch_ta_status;
 #define F54_REPORT_DATA		(ts->f54.dsc.data_base + 3)
 #define MAX_CAL_DATA_SIZE	(32*18*2)
 #define MAX_ND_CAL_DATA_SIZE	(32*2*2)
+#define MAX_DETAIL_SIZE         (32*18)
+#define MAX_COARSE_SIZE         (32*18)
+#define MAX_FINE_SIZE           (32*18)
+#define MAX_ND_DETAIL_SIZE	(32*2)
+#define MAX_ND_COARSE_SIZE	(32*2)
+#define MAX_ND_FINE_SIZE	(32*2)
 #define MAX_CAL_LOG_SIZE (MAX_CAL_DATA_SIZE*20)
 
 /* Get user-finger-data from register.
@@ -674,6 +682,11 @@ static int tci_control(struct synaptics_ts_data *ts, int type, u8 value)
 					(buffer[0] = (KNOCKON_DELAY << 1) | 0x1)
 					: (buffer[0] = 0)), error);
 		break;
+	case PARTIAL_LPWG_ON:
+		DO_SAFE(synaptics_ts_page_data_write_byte(client,
+					LPWG_PAGE, ts->f51_reg.lpwg_partial_reg,
+					value), error);
+		break;
 	default:
 		break;
 	}
@@ -924,6 +937,10 @@ static int lpwg_control(struct synaptics_ts_data *ts, int mode)
 		if (!(strncmp(ts->fw_info.fw_product_id, "PLG349", 6)))  {
 			tci_control(ts, REPORT_MODE_CTRL, 1); /* wakeup_gesture_only */
 		}
+		if (!(strncmp(ts->fw_info.fw_product_id, "PLG446", 6))
+			|| !(strncmp(ts->fw_info.fw_product_id, "PLG468", 6))) {
+			tci_control(ts, PARTIAL_LPWG_ON, 1);
+		}
 		break;
 	case LPWG_PASSWORD:                           /* TCI-1 and TCI-2 */
 		if (ts->ts_swipe_data.support_swipe > NO_SUPPORT_SWIPE) {
@@ -958,6 +975,10 @@ static int lpwg_control(struct synaptics_ts_data *ts, int mode)
 		if (!(strncmp(ts->fw_info.fw_product_id, "PLG349", 6))) {
 			tci_control(ts, REPORT_MODE_CTRL, 1); /* wakeup_gesture_only */
 		}
+		if (!(strncmp(ts->fw_info.fw_product_id, "PLG446", 6))
+			|| !(strncmp(ts->fw_info.fw_product_id, "PLG468", 6))) {
+			tci_control(ts, PARTIAL_LPWG_ON, 1);
+		}
 		break;
 	default:
 		if (ts->ts_swipe_data.support_swipe > NO_SUPPORT_SWIPE)
@@ -966,6 +987,10 @@ static int lpwg_control(struct synaptics_ts_data *ts, int mode)
 		tci_control(ts, TCI_ENABLE_CTRL2, 0); /* tci-2 disable */
 		if (!(strncmp(ts->fw_info.fw_product_id, "PLG349", 6))) {
 			tci_control(ts, REPORT_MODE_CTRL, 0); /* normal */
+		}
+		if (!(strncmp(ts->fw_info.fw_product_id, "PLG446", 6))
+			|| !(strncmp(ts->fw_info.fw_product_id, "PLG468", 6))) {
+			tci_control(ts, PARTIAL_LPWG_ON, 0);
 		}
 		break;
 	}
@@ -1030,6 +1055,7 @@ void matchUp_f51_regMap(struct synaptics_ts_data *ts)
 		ts->f51_reg.lpwg_touch_slop_reg = LPWG_TOUCH_SLOP_REG;
 		ts->f51_reg.lpwg_tap_distance_reg = LPWG_TAP_DISTANCE_REG;
 		ts->f51_reg.lpwg_interrupt_delay_reg = LPWG_INTERRUPT_DELAY_REG;
+		ts->f51_reg.lpwg_partial_reg = LPWG_PARTIAL_REG;
 
 		ts->f51_reg.lpwg_tapcount_reg2 = (LPWG_TAPCOUNT_REG + LPWG_BLOCK_SIZE);
 		ts->f51_reg.lpwg_min_intertap_reg2 = (LPWG_MIN_INTERTAP_REG + LPWG_BLOCK_SIZE);
@@ -1049,6 +1075,7 @@ void matchUp_f51_regMap(struct synaptics_ts_data *ts)
 		ts->f51_reg.lpwg_touch_slop_reg = LPWG_TOUCH_SLOP_REG;
 		ts->f51_reg.lpwg_tap_distance_reg = LPWG_TAP_DISTANCE_REG;
 		ts->f51_reg.lpwg_interrupt_delay_reg = LPWG_INTERRUPT_DELAY_REG;
+		ts->f51_reg.lpwg_partial_reg = LPWG_PARTIAL_REG + 132;
 
 		ts->f51_reg.lpwg_tapcount_reg2 = (LPWG_TAPCOUNT_REG + LPWG_BLOCK_SIZE);
 		ts->f51_reg.lpwg_min_intertap_reg2 = (LPWG_MIN_INTERTAP_REG + LPWG_BLOCK_SIZE);
@@ -1770,7 +1797,9 @@ static void lpwg_timer_func(struct work_struct *work_timer)
 	struct synaptics_ts_data *ts = container_of(to_delayed_work(work_timer),
 			struct synaptics_ts_data, work_timer);
 
-	sleep_control(ts, 0, 1); /* sleep until receive the reply. */
+	if (!(strncmp(ts->fw_info.fw_product_id, "PLG349", 6))) {
+		sleep_control(ts, 0, 1); /* sleep until receive the reply. */
+	}
 	send_uevent_lpwg(ts->client, LPWG_PASSWORD);
 	wake_unlock(&ts->timer_wake_lock);
 
@@ -1811,6 +1840,39 @@ static int get_binFW_version(struct synaptics_ts_data *ts)
 	release_firmware(fw_entry);
 
 	return rc;
+}
+
+static int get_currFW_version(struct synaptics_ts_data *ts)
+{
+	u8 temp_pid[11] = {0,};
+
+	DO_SAFE(touch_i2c_read(ts->client, PRODUCT_ID_REG,
+				sizeof(ts->fw_info.fw_product_id) - 1,
+				ts->fw_info.fw_product_id), error);
+	DO_SAFE(touch_i2c_read(ts->client, FLASH_CONFIG_ID_REG,
+				sizeof(ts->fw_info.fw_version) - 1,
+				ts->fw_info.fw_version), error);
+
+	if (!strncmp(ts->fw_info.fw_product_id, "S332U", 5)) {
+		DO_SAFE(touch_i2c_read(ts->client, FLASH_CONFIG_ID_REG,
+		sizeof(temp_pid) - 1,
+		temp_pid), error);
+		memset(ts->fw_info.fw_product_id, 0, sizeof(ts->fw_info.fw_product_id));
+		memcpy(ts->fw_info.fw_product_id, &temp_pid[4], 6);
+	}
+	TOUCH_INFO_MSG("=============================================\n");
+	TOUCH_INFO_MSG(" Curr FW product id : %s\n", ts->fw_info.fw_product_id);
+	TOUCH_INFO_MSG(" Curr FW Version : v%d.%02d\n",
+			(ts->fw_info.fw_version[3] & 0x80) >> 7,
+			ts->fw_info.fw_version[3] & 0x7F);
+	TOUCH_INFO_MSG("=============================================\n");
+
+	return 0;
+
+error:
+	TOUCH_ERR_MSG("%s, %d : get_currFW_version failed\n", __func__, __LINE__);
+
+	return -EIO;
 }
 
 static ssize_t show_firmware(struct i2c_client *client, char *buf)
@@ -1981,8 +2043,6 @@ static ssize_t show_sd(struct i2c_client *client, char *buf)
 	int upper_sensor = 0;
 	int lower_adc = 0;
 	int upper_adc = 0;
-	int lower_slope = 0;
-	int upper_slope = 0;
 	int noise_limit = 0;
 	char *temp_buf = NULL;
 	int len = 0;
@@ -2017,18 +2077,6 @@ static ssize_t show_sd(struct i2c_client *client, char *buf)
 					ts->pdata,
 					"RspUpperImageLimit",
 					UpperImage);
-			lower_slope = get_limit(TxChannelCount,
-					RxChannelCount,
-					*ts->client,
-					ts->pdata,
-					"RspLowerSlopeLimit",
-					RspLowerSlope);
-			upper_slope = get_limit(TxChannelCount,
-					RxChannelCount,
-					*ts->client,
-					ts->pdata,
-					"RspUpperSlopeLimit",
-					RspUpperSlope);
 			noise_limit = get_limit(TxChannelCount,
 					RxChannelCount,
 					*ts->client,
@@ -2049,16 +2097,6 @@ static ssize_t show_sd(struct i2c_client *client, char *buf)
 				ret = snprintf(buf+ret, PAGE_SIZE-ret, "Can not check the limit of raw cap\n");
 			} else {
 				TOUCH_INFO_MSG("Getting limit of raw cap is success\n");
-			}
-
-			if (lower_slope < 0 || upper_slope< 0) {
-				TOUCH_INFO_MSG("[%s] lower return = %d upper return = %d\n",
-						__func__, lower_slope, upper_slope);
-				TOUCH_INFO_MSG("[%s][FAIL] Can not check the limit of slope\n",
-						__func__);
-				ret = snprintf(buf+ret, PAGE_SIZE-ret, "Can not check the limit of slope\n");
-			} else {
-				TOUCH_INFO_MSG("Getting limit of slope is success\n");
 			}
 
 			if (noise_limit < 0) {
@@ -2090,7 +2128,7 @@ static ssize_t show_sd(struct i2c_client *client, char *buf)
 			ret += snprintf(buf+ret,
 					PAGE_SIZE-ret,
 					"Channel Status : %s",
-					(Rsp_short == 1) ? "Pass\n" : "Fail");
+					(Rsp_short == 1) ? "Pass\n" : "Fail\n");
 		} else {
 			lower_img = get_limit(TxChannelCount,
 					RxChannelCount,
@@ -2305,7 +2343,18 @@ static ssize_t show_rawdata(struct i2c_client *client, char *buf)
 					__func__, lower_ret, upper_ret);
 			TOUCH_INFO_MSG("[%s][SUCCESS] Can check the limit of raw cap\n",
 					__func__);
-			ret = F54Test('a', 1, buf);
+
+                        if(!(strncmp(ts->fw_info.fw_product_id, "PLG446", 6))
+                            || !(strncmp(ts->fw_info.fw_product_id, "PLG349", 6))) {
+                                TOUCH_INFO_MSG("Display Rawdata Start PLG446\n");
+			        ret = F54Test('a', 1, buf);
+                        }
+                        else if(!(strncmp(ts->fw_info.fw_product_id, "PLG468", 6))){
+                                TOUCH_INFO_MSG("Display Rawdata Start PLG468\n");
+                                ret = F54Test('q', 1, buf);
+                        } else {
+                                TOUCH_INFO_MSG("Who are you ?, I'm : %s \n", ts->fw_info.fw_product_id);
+                        }
 		}
 
 		touch_enable_irq(ts->client->irq);
@@ -3359,7 +3408,7 @@ static ssize_t store_mfts_enable(struct i2c_client *client, const char *buf, siz
 	return count;
 }
 
-static ssize_t show_normal_calibration(struct i2c_client *client, char *buf)
+static ssize_t show_status_normal_calibration(struct i2c_client *client, char *buf)
 {
 	struct synaptics_ts_data *ts = (struct synaptics_ts_data *)get_touch_handle(client);
 	int ret = 0;
@@ -3431,24 +3480,19 @@ error:
 	return ret;
 }
 
-static ssize_t store_normal_calibration(struct i2c_client *client, const char *buf, size_t count)
+static ssize_t show_normal_calibration(struct i2c_client *client, char *buf)
 {
 	struct synaptics_ts_data *ts = (struct synaptics_ts_data *)get_touch_handle(client);
-	int value;
-	int ret;
+	int value = 1;
+	int ret = 0;
 	u8 buffer;
 	u8 calibration_on = 0x01;
 
-	sscanf(buf, "%d", &value);
-
-	if (value != 1) {
-		TOUCH_INFO_MSG("Invalid fw_calibration value : %d\n", value);
-		return count;
-	}
-
 	if (ts->pdata->panel_id != 1) {
 		TOUCH_INFO_MSG("Panel id : %d, Not supproted f/w calibration\n", ts->pdata->panel_id);
-		return count;
+		ret += snprintf(buf + ret, PAGE_SIZE - ret,
+				"Not supproted f/w calibration\n");
+		return ret;
 	}
 
 	mutex_lock(&ts->pdata->thread_lock);
@@ -3461,7 +3505,7 @@ static ssize_t store_normal_calibration(struct i2c_client *client, const char *b
 			TOUCH_ERR_MSG("Failed to read calibration_flag_reg\n");
 			goto error;
 		}
-		TOUCH_INFO_MSG("[%s] buffer = 0x%02x Val = %x\n", __func__, buffer, value);
+		TOUCH_INFO_MSG("[%s] buffer = 0x%02x\n", __func__, buffer);
 
 		if((buffer & calibration_on)){
 			TOUCH_ERR_MSG("Now Running Calibration....\n");
@@ -3482,15 +3526,15 @@ static ssize_t store_normal_calibration(struct i2c_client *client, const char *b
 	}
 
 	mutex_unlock(&ts->pdata->thread_lock);
-	return count;
+	return ret;
 error:
 	mutex_unlock(&ts->pdata->thread_lock);
-	return count;
+	return ret;
 }
 
 
 
-static ssize_t show_lpwg_calibration(struct i2c_client *client, char *buf)
+static ssize_t show_status_lpwg_calibration(struct i2c_client *client, char *buf)
 {
 	struct synaptics_ts_data *ts = (struct synaptics_ts_data *)get_touch_handle(client);
 	int ret = 0;
@@ -3557,62 +3601,56 @@ error:
 	return ret;	return ret;
 }
 
-static ssize_t store_lpwg_calibration(struct i2c_client *client, const char *buf, size_t count)
+static ssize_t show_lpwg_calibration(struct i2c_client *client, char *buf)
 {
-		struct synaptics_ts_data *ts = (struct synaptics_ts_data *)get_touch_handle(client);
-		int value;
-		int ret;
-		u8 buffer;
-		u8 calibration_on = 0x01;
+	struct synaptics_ts_data *ts = (struct synaptics_ts_data *)get_touch_handle(client);
+	int value = 1;
+	int ret;
+	u8 buffer;
+	u8 calibration_on = 0x01;
 
-		sscanf(buf, "%d", &value);
+	if (ts->pdata->panel_id != 1) {
+		TOUCH_INFO_MSG("Panel id : %d, Not supproted f/w calibration\n", ts->pdata->panel_id);
+		ret += snprintf(buf + ret, PAGE_SIZE - ret,
+			"Not supproted f/w calibration\n");
+		return ret;
+	}
 
-		if (value != 1) {
-			TOUCH_INFO_MSG("Invalid fw_calibration value : %d\n", value);
-			return count;
+	mutex_lock(&ts->pdata->thread_lock);
+	if (power_state == POWER_SLEEP) {
+		ret = synaptics_ts_page_data_read(client,
+					ANALOG_PAGE, CALIBRATION_STATUS_REG,
+					1, &buffer);
+
+		if (ret < 0) {
+			TOUCH_ERR_MSG("Failed to read calibration_flag_reg\n");
+			goto error;
+		}
+		TOUCH_INFO_MSG("[%s] buffer = 0x%02x Val = %x\n", __func__, buffer, value);
+
+		if((buffer & calibration_on)){
+			TOUCH_ERR_MSG("Now Running Calibration....\n");
+			goto error;
 		}
 
-		if (ts->pdata->panel_id != 1) {
-			TOUCH_INFO_MSG("Panel id : %d, Not supproted f/w calibration\n", ts->pdata->panel_id);
-			return count;
+		ret = synaptics_ts_page_data_write_byte(client,
+					ANALOG_PAGE, CALIBRATION_FLAGS_REG,
+					(value << 1));
+		if (ret < 0) {
+			TOUCH_ERR_MSG("Failed to write calibration_flag_reg value\n");
+			goto error;
 		}
+		TOUCH_INFO_MSG("Start LPWG Calibration\n");
 
-		mutex_lock(&ts->pdata->thread_lock);
-		if (power_state == POWER_SLEEP) {
-			ret = synaptics_ts_page_data_read(client,
-						ANALOG_PAGE, CALIBRATION_STATUS_REG,
-						1, &buffer);
+	} else {
+		TOUCH_ERR_MSG("state is suspend, Failed to Calibration because cannot use I2C\n");
+	}
 
-			if (ret < 0) {
-				TOUCH_ERR_MSG("Failed to read calibration_flag_reg\n");
-				goto error;
-			}
-			TOUCH_INFO_MSG("[%s] buffer = 0x%02x Val = %x\n", __func__, buffer, value);
-
-			if((buffer & calibration_on)){
-				TOUCH_ERR_MSG("Now Running Calibration....\n");
-				goto error;
-			}
-
-			ret = synaptics_ts_page_data_write_byte(client,
-						ANALOG_PAGE, CALIBRATION_FLAGS_REG,
-						(value << 1));
-			if (ret < 0) {
-				TOUCH_ERR_MSG("Failed to write calibration_flag_reg value\n");
-				goto error;
-			}
-			TOUCH_INFO_MSG("Start LPWG Calibration\n");
-
-		} else {
-			TOUCH_ERR_MSG("state is suspend, Failed to Calibration because cannot use I2C\n");
-		}
-
-		mutex_unlock(&ts->pdata->thread_lock);
-		return count;
-	error:
-		mutex_unlock(&ts->pdata->thread_lock);
-		return count;
-
+	mutex_unlock(&ts->pdata->thread_lock);
+	return ret;
+error:
+	mutex_unlock(&ts->pdata->thread_lock);
+	return ret;
 }
 
 static ssize_t show_get_calibration(struct i2c_client *client, char *buf)
@@ -3631,10 +3669,23 @@ static ssize_t show_get_calibration(struct i2c_client *client, char *buf)
 	u8 *save_buf;
 	u8 freq = 0;
 	int i = 0;
-	int t = 0;
+        int k = 0;
+	int line = 0;
+        u8 *detail;
+        u8 *coarse;
+        u8 *fine;
+        u8 *nd_detail;
+        u8 *nd_coarse;
+        u8 *nd_fine;
 	char *f_path = "/sdcard/touch_cal_data.txt";
 
 	save_buf = kzalloc(sizeof(u8)*MAX_CAL_LOG_SIZE, GFP_KERNEL);
+	detail = kzalloc(sizeof(u8)*MAX_DETAIL_SIZE, GFP_KERNEL);
+	coarse = kzalloc(sizeof(u8)*MAX_COARSE_SIZE, GFP_KERNEL);
+	fine = kzalloc(sizeof(u8)*MAX_FINE_SIZE, GFP_KERNEL);
+	nd_detail = kzalloc(sizeof(u8)*MAX_ND_DETAIL_SIZE, GFP_KERNEL);
+	nd_coarse = kzalloc(sizeof(u8)*MAX_ND_COARSE_SIZE, GFP_KERNEL);
+	nd_fine = kzalloc(sizeof(u8)*MAX_ND_FINE_SIZE, GFP_KERNEL);
 
 	if (save_buf == NULL){
 		TOUCH_ERR_MSG("fail to allocate memory \n");
@@ -3697,7 +3748,7 @@ static ssize_t show_get_calibration(struct i2c_client *client, char *buf)
 			TOUCH_ERR_MSG("Failed to read F54 CMD Base\n");
 			goto error;
 		}
-		if (power_state == POWER_SLEEP)
+		if (power_state == POWER_SLEEP) /*For collecting lpwg calibration Data*/
 			freq = 3;
 
 		buffer = buffer | (freq << 2);
@@ -3712,6 +3763,7 @@ static ssize_t show_get_calibration(struct i2c_client *client, char *buf)
 		}
 
 		/*waiting clear get report bit*/
+		retry_cnt = 300;
 		do{
 			err = synaptics_ts_page_data_read(client,
 							ANALOG_PAGE, ts->f54.dsc.command_base,
@@ -3720,7 +3772,6 @@ static ssize_t show_get_calibration(struct i2c_client *client, char *buf)
 			mdelay(10);
 			retry_cnt--;
 			if(retry_cnt <= 0) {
-				retry_cnt = 300;
 				TOUCH_ERR_MSG("Fail to Read Get Report type. \n");
 				goto error;
 			}
@@ -3738,21 +3789,67 @@ static ssize_t show_get_calibration(struct i2c_client *client, char *buf)
 			goto error;
 		}
 
-		t = 0;
+		memset(detail,0x0,sizeof(u8)*MAX_DETAIL_SIZE);
+		memset(coarse,0x0,sizeof(u8)*MAX_COARSE_SIZE);
+		memset(fine,0x0,sizeof(u8)*MAX_FINE_SIZE);
+		memset(nd_detail,0x0,sizeof(u8)*MAX_ND_DETAIL_SIZE);
+		memset(nd_coarse,0x0,sizeof(u8)*MAX_ND_COARSE_SIZE);
+		memset(nd_fine,0x0,sizeof(u8)*MAX_ND_FINE_SIZE);
+
 
 		ret_size += snprintf(save_buf + ret_size, (sizeof(u8)*MAX_CAL_LOG_SIZE) - ret_size,
 				"\n ============ Calibration Data [Freq = %d] ============ \n", freq);
 		TOUCH_INFO_MSG("Start Get Cal Data, Freq = %d", freq);
+		k = 0;
 		for(i = 0; i < MAX_CAL_DATA_SIZE; i += 2){
-			TOUCH_INFO_MSG("%d ",(cal_data[i] << 8) | cal_data[i+1]);
+                        detail[k] = cal_data[i];
+                        coarse[k] = (cal_data[i+1] & 0xf0) >> 4;
+                        fine[k] = cal_data[i+1] & 0x0f;
+                        k++;
+		}
+
+		ret_size += snprintf(save_buf + ret_size, (sizeof(u8)*MAX_CAL_LOG_SIZE) - ret_size,
+						"==== detail ==\n");
+                line = 0;
+		for(i = 0; i < (MAX_CAL_DATA_SIZE/2); i++){
 			ret_size += snprintf(save_buf + ret_size, (sizeof(u8)*MAX_CAL_LOG_SIZE) - ret_size,
-					"%d ", (cal_data[i] << 8) | cal_data[i+1]);
-			if(((i+2)%36 == 0) && (i != 0)){
+					"%d ", detail[i]);
+			if(((i+1)%18 == 0) && (i != 0)){
 				TOUCH_INFO_MSG(" \n");
 				ret_size += snprintf(save_buf + ret_size, (sizeof(u8)*MAX_CAL_LOG_SIZE) - ret_size,
-						" %d\n" , ++t);
+						" %d\n" , ++line);
 				}
 		}
+
+		ret_size += snprintf(save_buf + ret_size, (sizeof(u8)*MAX_CAL_LOG_SIZE) - ret_size,
+						"\n==== coarse ==\n");
+
+                line = 0;
+		for(i = 0; i < (MAX_CAL_DATA_SIZE/2); i++){
+			ret_size += snprintf(save_buf + ret_size, (sizeof(u8)*MAX_CAL_LOG_SIZE) - ret_size,
+					"%d ", coarse[i]);
+			if(((i+1)%18 == 0) && (i != 0)){
+				TOUCH_INFO_MSG(" \n");
+				ret_size += snprintf(save_buf + ret_size, (sizeof(u8)*MAX_CAL_LOG_SIZE) - ret_size,
+						" %d\n" , ++line);
+				}
+		}
+
+		ret_size += snprintf(save_buf + ret_size, (sizeof(u8)*MAX_CAL_LOG_SIZE) - ret_size,
+						"\n==== fine ==\n");
+
+		line = 0;
+		for(i = 0; i < (MAX_CAL_DATA_SIZE/2); i++){
+			ret_size += snprintf(save_buf + ret_size, (sizeof(u8)*MAX_CAL_LOG_SIZE) - ret_size,
+					"%d ", fine[i]);
+
+			if(((i+1)%18 == 0) && (i != 0)){
+				TOUCH_INFO_MSG(" \n");
+				ret_size += snprintf(save_buf + ret_size, (sizeof(u8)*MAX_CAL_LOG_SIZE) - ret_size,
+						" %d\n" , ++line);
+				}
+		}
+
 		ret_size += snprintf(save_buf + ret_size, (sizeof(u8)*MAX_CAL_LOG_SIZE) - ret_size,
 						"\n");
 
@@ -3764,23 +3861,62 @@ static ssize_t show_get_calibration(struct i2c_client *client, char *buf)
 			TOUCH_ERR_MSG("Failed to read calibration_status_reg\n");
 			goto error;
 		}
-
-		t = 0;
-
 		ret_size += snprintf(save_buf + ret_size, (sizeof(u8)*MAX_CAL_LOG_SIZE) - ret_size,
 				"\n ============ ND Calibration Data [Freq = %d] ============ \n", freq);
 		TOUCH_INFO_MSG("Start Get ND Cal Data, Freq = %d", freq);
 
+		k = 0;
 		for(i = 0; i < MAX_ND_CAL_DATA_SIZE; i += 2){
-			TOUCH_INFO_MSG("%d ",(nd_cal_data[i] << 8) | nd_cal_data[i+1]);
+                        nd_detail[k] = cal_data[i];
+                        nd_coarse[k] = (cal_data[i+1] & 0xf0) >> 4;
+                        nd_fine[k] = cal_data[i+1] & 0x0f;
+                        k++;
+		}
+
+                ret_size += snprintf(save_buf + ret_size, (sizeof(u8)*MAX_CAL_LOG_SIZE) - ret_size,
+                                    "==== detail ==\n");
+		line = 0;
+		for(i = 0; i < (MAX_ND_CAL_DATA_SIZE/2); i++){
 			ret_size += snprintf(save_buf + ret_size, (sizeof(u8)*MAX_CAL_LOG_SIZE) - ret_size,
-					"%d ", (nd_cal_data[i] << 8) | nd_cal_data[i+1]);
-			if(((i+2)%4 == 0) && (i != 0)){
+					"%d ", nd_detail[i]);
+			if(((i+1)%2 == 0) && (i != 0)){
 				TOUCH_INFO_MSG(" \n");
 				ret_size += snprintf(save_buf + ret_size, (sizeof(u8)*MAX_CAL_LOG_SIZE) - ret_size,
-						" %d\n" , ++t);
+						" %d\n" , ++line);
 				}
-		}
+                }
+
+		ret_size += snprintf(save_buf + ret_size, (sizeof(u8)*MAX_CAL_LOG_SIZE) - ret_size,
+						"\n==== coarse ==\n");
+
+                line = 0;
+		for(i = 0; i < (MAX_ND_CAL_DATA_SIZE/2); i++){
+			ret_size += snprintf(save_buf + ret_size, (sizeof(u8)*MAX_CAL_LOG_SIZE) - ret_size,
+					"%d ", nd_coarse[i]);
+			if(((i+1)%2 == 0) && (i != 0)){
+				TOUCH_INFO_MSG(" \n");
+				ret_size += snprintf(save_buf + ret_size, (sizeof(u8)*MAX_CAL_LOG_SIZE) - ret_size,
+						" %d\n" , ++line);
+				}
+                }
+
+		ret_size += snprintf(save_buf + ret_size, (sizeof(u8)*MAX_CAL_LOG_SIZE) - ret_size,
+						"\n==== fine ==\n");
+
+                line = 0;
+		for(i = 0; i < (MAX_ND_CAL_DATA_SIZE/2); i++){
+			ret_size += snprintf(save_buf + ret_size, (sizeof(u8)*MAX_CAL_LOG_SIZE) - ret_size,
+					"%d ", nd_fine[i]);
+
+			if(((i+1)%2 == 0) && (i != 0)){
+				TOUCH_INFO_MSG(" \n");
+				ret_size += snprintf(save_buf + ret_size, (sizeof(u8)*MAX_CAL_LOG_SIZE) - ret_size,
+						" %d\n" , ++line);
+				}
+                }
+
+		ret_size += snprintf(save_buf + ret_size, (sizeof(u8)*MAX_CAL_LOG_SIZE) - ret_size,
+						"\n");
 	}
 
 	ret_size += snprintf(save_buf + ret_size, (sizeof(u8)*MAX_CAL_LOG_SIZE) - ret_size,
@@ -3802,6 +3938,12 @@ static ssize_t show_get_calibration(struct i2c_client *client, char *buf)
 	ret += snprintf(buf + ret, PAGE_SIZE - ret,
 			"Cal Data Extract Complete. \n");
 	kfree(save_buf);
+	kfree(detail);
+	kfree(coarse);
+	kfree(fine);
+	kfree(nd_detail);
+	kfree(nd_coarse);
+	kfree(nd_fine);
 	return ret;
 
 error:
@@ -3810,6 +3952,12 @@ error:
 			"Fail to get Calibration Data. \n");
 	mutex_unlock(&ts->pdata->thread_lock);
 	kfree(save_buf);
+	kfree(detail);
+	kfree(coarse);
+	kfree(fine);
+	kfree(nd_detail);
+	kfree(nd_coarse);
+	kfree(nd_fine);
 	return ret;
 }
 
@@ -3944,8 +4092,10 @@ static LGE_TOUCH_ATTR(adc_range_test, S_IRUGO | S_IWUSR, show_adc_range_test, NU
 static LGE_TOUCH_ATTR(noise_delta_test, S_IRUGO | S_IWUSR, show_noise_delta_test, NULL);
 static LGE_TOUCH_ATTR(gnd_test, S_IRUGO | S_IWUSR, show_gnd_test, NULL);
 static LGE_TOUCH_ATTR(mfts, S_IRUGO | S_IWUSR, show_mfts_enable, store_mfts_enable);
-static LGE_TOUCH_ATTR(normal_calibration, S_IRUGO | S_IWUSR, show_normal_calibration, store_normal_calibration);
-static LGE_TOUCH_ATTR(lpwg_calibration, S_IRUGO | S_IWUSR, show_lpwg_calibration, store_lpwg_calibration);
+static LGE_TOUCH_ATTR(status_normal_calibration, S_IRUGO | S_IWUSR, show_status_normal_calibration, NULL);
+static LGE_TOUCH_ATTR(normal_calibration, S_IRUGO | S_IWUSR, show_normal_calibration, NULL);
+static LGE_TOUCH_ATTR(status_lpwg_calibration, S_IRUGO | S_IWUSR, show_status_lpwg_calibration, NULL);
+static LGE_TOUCH_ATTR(lpwg_calibration, S_IRUGO | S_IWUSR, show_lpwg_calibration, NULL);
 static LGE_TOUCH_ATTR(get_calibration, S_IRUGO | S_IWUSR, show_get_calibration, NULL);
 static LGE_TOUCH_ATTR(swipe_param, S_IRUGO | S_IWUSR, show_swipe_param, store_swipe_param);
 
@@ -3977,7 +4127,9 @@ static struct attribute *synaptics_ts_attribute_list[] = {
 	&lge_touch_attr_noise_delta_test.attr,
 	&lge_touch_attr_gnd_test.attr,
 	&lge_touch_attr_mfts.attr,
+	&lge_touch_attr_status_normal_calibration.attr,
 	&lge_touch_attr_normal_calibration.attr,
+	&lge_touch_attr_status_lpwg_calibration.attr,
 	&lge_touch_attr_lpwg_calibration.attr,
 	&lge_touch_attr_get_calibration.attr,
 	&lge_touch_attr_swipe_param.attr,
@@ -4162,7 +4314,7 @@ static int get_swipe_info(struct synaptics_ts_data *ts)
 	}
 
 	if (swp->support_swipe > NO_SUPPORT_SWIPE) {
-		swp->swipe_min_distance = 10;
+		swp->swipe_min_distance = 16;
 		swp->swipe_ratio_threshold = 200;
 		swp->swipe_ratio_check_period = 5;
 		swp->min_swipe_time_threshold = 0;
@@ -4412,6 +4564,13 @@ static int lpwg_update_all(struct synaptics_ts_data *ts, bool irqctrl)
 		atomic_set(&ts->lpwg_ctrl.is_suspend, 0);
 	} else {
 		if (atomic_read(&ts->lpwg_ctrl.is_suspend) == 0) {
+			if ((power_state == POWER_SLEEP) && (ts->is_init == 0)) {
+				TOUCH_INFO_MSG("%s: restore is_init value (powe_state[%d], is_init[%d])\n",
+						__func__, power_state, ts->is_init);
+				ts->is_init = 1;
+				TOUCH_INFO_MSG("%s: is_init = %d\n", __func__, ts->is_init);
+			}
+
 			atomic_set(&ts->lpwg_ctrl.is_suspend, 1);
 			if (!(strncmp(ts->fw_info.fw_product_id, "PLG349", 6)))
 				set_doze_param(ts, 3);
@@ -4458,17 +4617,29 @@ static int lpwg_update_all(struct synaptics_ts_data *ts, bool irqctrl)
 		DO_SAFE(sleep_control(ts, sleep_status, 0), error);
 	else if (ts->lpwg_ctrl.protocol9_sleep_flag) {
 		if (!ts->lpwg_ctrl.prev_screen && ts->lpwg_ctrl.screen) { /* Deep_sleep -> Active */
-			if (!ts->lpwg_ctrl.sensor) {
+			if (!ts->lpwg_ctrl.sensor && !strncmp(ts->fw_info.fw_product_id, "PLG446", 6)) {
 				DO_SAFE(sleep_control(ts, 3, 0), error);
 				TOUCH_DEBUG(DEBUG_BASE_INFO, "deep sleep to Active! prev_screen = %d, curr_screen = %d, sensor = %d\n",
 						ts->lpwg_ctrl.prev_screen, ts->lpwg_ctrl.screen, ts->lpwg_ctrl.sensor);
 				mdelay(20);
 			}
 			else ;
-		}
-		else if (!ts->lpwg_ctrl.prev_screen && !ts->lpwg_ctrl.screen) {
-			DO_SAFE(sleep_control(ts, sleep_status, 0), error);
-			TOUCH_DEBUG(DEBUG_BASE_INFO, "Normal case of sleep!!\n");
+		} else if (!ts->lpwg_ctrl.prev_screen && !ts->lpwg_ctrl.screen) {
+			if (!strncmp(ts->fw_info.fw_product_id, "PLG446", 6)) {
+				DO_SAFE(sleep_control(ts, sleep_status, 0), error);
+				TOUCH_DEBUG(DEBUG_BASE_INFO, "Normal case of sleep !\n");
+			} else if (!strncmp(ts->fw_info.fw_product_id, "PLG468", 6)) {
+				if (!ts->lpwg_ctrl.prev_sensor && ts->lpwg_ctrl.sensor) {
+					TOUCH_DEBUG(DEBUG_BASE_INFO,
+						"set lpwg value .\n");
+
+				} else {
+					TOUCH_DEBUG(DEBUG_BASE_INFO,
+						"PLG468 dosen't work operations"
+						"associated with the Sensor Deep Sleep.\n");
+					return 0;
+				}
+			}
 		}
 	}
 
@@ -4476,6 +4647,7 @@ static int lpwg_update_all(struct synaptics_ts_data *ts, bool irqctrl)
 		DO_SAFE(lpwg_control(ts, lpwg_status), error);
 
 	ts->lpwg_ctrl.prev_screen = ts->lpwg_ctrl.screen;
+	ts->lpwg_ctrl.prev_sensor = ts->lpwg_ctrl.sensor;
 
 	return NO_ERROR;
 error:
@@ -4536,7 +4708,7 @@ enum error_type synaptics_ts_init(struct i2c_client *client)
 			}
 		}
 	}
-        if( !strncmp(ts->fw_info.fw_product_id,"PLG468",6)){
+        if( !strncmp(ts->fw_info.fw_product_id,"PLG468",6) || (!strncmp(ts->fw_info.fw_product_id,"PLG446",6) && touch_ta_status == 2)){
             TOUCH_INFO_MSG("[%s] CONTROL_REG : DEVICE_CONTROL_NOSLEEP \n", __func__);
 	    DO_SAFE(touch_i2c_write_byte(client, DEVICE_CONTROL_REG,
 				    DEVICE_CONTROL_NOSLEEP
@@ -4856,7 +5028,10 @@ enum error_type synaptics_ts_get_data(struct i2c_client *client,
 			if (ts->lpwg_ctrl.password_enable) {
 				get_tci_data(ts, ts->pw_data.tap_count);
 				wake_lock(&ts->timer_wake_lock);
-				tci_control(ts, REPORT_MODE_CTRL, 0);
+			        if ((!strncmp(ts->fw_info.fw_product_id, "PLG446", 6))
+                                    || (!strncmp(ts->fw_info.fw_product_id, "PLG349", 6))) {
+				    tci_control(ts, REPORT_MODE_CTRL, 0);
+                                }
 				queue_delayed_work(touch_wq, &ts->work_timer,
 						msecs_to_jiffies(UEVENT_DELAY
 							- I2C_DELAY));
@@ -5419,7 +5594,7 @@ enum error_type synaptics_ts_fw_upgrade(struct i2c_client *client,
 
 		if (rc != 0) {
 			TOUCH_ERR_MSG("request_firmware() failed %d\n", rc);
-			goto error;
+			goto request_fw_error;
 		}
 	} else if (info->fw_force_upgrade || info->fw_force_upgrade_cat) {
 		TOUCH_DEBUG(DEBUG_BASE_INFO, "IC_product_id: %s \n",
@@ -5432,11 +5607,11 @@ enum error_type synaptics_ts_fw_upgrade(struct i2c_client *client,
 			"FW: file[%s]\n", path);
 		if (rc != 0) {
 			TOUCH_ERR_MSG("request_firmware() failed %d\n", rc);
-			goto error;
+			goto request_fw_error;
 		}
 	} else {
 		TOUCH_ERR_MSG("error get inbuilt_fw_name \n");
-		goto error;
+		goto request_fw_error;
 	}
 
 	firmware = fw_entry->data;
@@ -5444,17 +5619,22 @@ enum error_type synaptics_ts_fw_upgrade(struct i2c_client *client,
 	memcpy(ts->fw_info.fw_image_product_id, &firmware[ts->pdata->fw_pid_addr], 6);
 	memcpy(ts->fw_info.fw_image_version, &firmware[ts->pdata->fw_ver_addr], 4);
 
-	if (info->fw_force_upgrade) {
+	if (info->fw_force_upgrade || info->fw_force_upgrade_cat) {
 		TOUCH_DEBUG(DEBUG_BASE_INFO | DEBUG_FW_UPGRADE,
 				"FW: need_upgrade[%d] force[%d] file[%s]\n",
-				fw->need_upgrade, info->fw_force_upgrade, path);
-		goto firmware_up;
-	}
-
-	if (info->fw_force_upgrade_cat) {
-		TOUCH_DEBUG(DEBUG_BASE_INFO | DEBUG_FW_UPGRADE,
-				"FW: need_upgrade[%d] force[%d] file[%s]\n",
-				fw->need_upgrade, info->fw_force_upgrade, info->fw_path);
+				fw->need_upgrade, info->fw_force_upgrade,
+				info->fw_force_upgrade ? path : info->fw_path);
+		TOUCH_INFO_MSG("=============================================\n");
+		TOUCH_INFO_MSG(" Curr FW product id : %s\n", ts->fw_info.fw_product_id);
+		TOUCH_INFO_MSG(" Curr FW Version : v%d.%02d\n",
+				(ts->fw_info.fw_version[3] & 0x80) >> 7,
+				ts->fw_info.fw_version[3] & 0x7F);
+		TOUCH_INFO_MSG("\n");
+		TOUCH_INFO_MSG(" FW image product id : %s\n", ts->fw_info.fw_image_product_id);
+		TOUCH_INFO_MSG(" FW image Version : v%d.%02d\n",
+				(ts->fw_info.fw_image_version[3] & 0x80) >> 7,
+				ts->fw_info.fw_image_version[3] & 0x7F);
+		TOUCH_INFO_MSG("=============================================\n");
 		goto firmware_up;
 	}
 
@@ -5501,13 +5681,17 @@ enum error_type synaptics_ts_fw_upgrade(struct i2c_client *client,
 firmware_up:
 	ts->is_probed = 0;
 	ts->is_init = 0; /* During upgrading, interrupt will be ignored. */
-	info->fw_force_upgrade = 0;
-	info->fw_force_upgrade_cat = 0;
+	ts->fw_info.need_rewrite_firmware = 0;
 	need_scan_pdt = true;
 	DO_SAFE(FirmwareUpgrade(ts, fw_entry), error);
 	release_firmware(fw_entry);
+	if (info->fw_force_upgrade || info->fw_force_upgrade_cat)
+		DO_SAFE(get_currFW_version(ts), request_fw_error);
 	return NO_ERROR;
 error:
+	release_firmware(fw_entry);
+	return ERROR;
+request_fw_error:
 	return ERROR;
 }
 
@@ -5715,7 +5899,8 @@ enum error_type synaptics_ts_lpwg(struct i2c_client *client,
 				break;
 			}
 			DO_SAFE(lpwg_update_all(ts, 1), error);
-			if ((!strncmp(ts->fw_info.fw_product_id, "PLG446", 6) || !strncmp(ts->fw_info.fw_product_id, "PLG468", 6)) && !value) {
+			if (!strncmp(ts->fw_info.fw_product_id, "PLG446", 6)
+				&& !value) {
 				tci_control(ts, REPORT_MODE_CTRL, 1);
 			}
 		} else {
@@ -5748,27 +5933,36 @@ enum error_type synaptics_ts_lpwg(struct i2c_client *client,
 	/* LPWG On Sequence has to be after Display off callback timing. */
 	case LPWG_INCELL_LPWG_ON:
 		tci_control(ts, REPORT_MODE_CTRL, 1);           // wakeup_gesture_only
-		if(!ts->lpwg_ctrl.sensor) { /* Active -> Deep sleep */
-			sleep_control(ts, 0, 0);
-			TOUCH_DEBUG(DEBUG_BASE_INFO, "%s : It's Active->deep sleep\n", __func__);
+
+		if (!ts->lpwg_ctrl.sensor) { /* Active -> Deep sleep */
+			if (!strncmp(ts->fw_info.fw_product_id, "PLG446", 6)) {
+				sleep_control(ts, 0, 0);
+				TOUCH_DEBUG(DEBUG_BASE_INFO,
+					"%s : It's Active->deep sleep\n",
+					__func__);
+			} else if (!strncmp(ts->fw_info.fw_product_id, "PLG468", 6)) {
+				TOUCH_DEBUG(DEBUG_BASE_INFO,
+					"PLG468 dosen't work operations, "
+					"associated with the Sensor Deep Sleep.\n");
+			}
 		}
 		ts->lpwg_ctrl.protocol9_sleep_flag = true; /* Protocol 9 enable for sleep control */
 		TOUCH_DEBUG(DEBUG_BASE_INFO, "Protocol 9 enable!\n");
 	break;
 	case LPWG_INCELL_LPWG_OFF:
-                if( !strncmp(ts->fw_info.fw_product_id,"PLG468",6)){
-                TOUCH_INFO_MSG("[%s] CONTROL_REG : DEVICE_CONTROL_NOSLEEP \n", __func__);
-		DO_SAFE(touch_i2c_write_byte(client,
-					DEVICE_CONTROL_REG,
-					DEVICE_CONTROL_NOSLEEP
-					| DEVICE_CONTROL_CONFIGURED), error);
-                } else {
-                TOUCH_INFO_MSG("[%s] DCONTROL_REG : EVICE_CONTROL_NORMAL_OP \n", __func__);
-		DO_SAFE(touch_i2c_write_byte(client,
-					DEVICE_CONTROL_REG,
-					DEVICE_CONTROL_NORMAL_OP
-					| DEVICE_CONTROL_CONFIGURED), error);
-                }
+		if (!strncmp(ts->fw_info.fw_product_id,"PLG468",6)) {
+			TOUCH_INFO_MSG("[%s] CONTROL_REG : DEVICE_CONTROL_NOSLEEP \n", __func__);
+			DO_SAFE(touch_i2c_write_byte(client,
+						DEVICE_CONTROL_REG,
+						DEVICE_CONTROL_NOSLEEP
+						| DEVICE_CONTROL_CONFIGURED), error);
+		} else {
+			TOUCH_INFO_MSG("[%s] CONTROL_REG : DEVICE_CONTROL_NORMAL_OP \n", __func__);
+			DO_SAFE(touch_i2c_write_byte(client,
+						DEVICE_CONTROL_REG,
+						DEVICE_CONTROL_NORMAL_OP
+						| DEVICE_CONTROL_CONFIGURED), error);
+		}
 		tci_control(ts, REPORT_MODE_CTRL, 0); /* normal */
 		ts->lpwg_ctrl.protocol9_sleep_flag = false; /* Protocol 9 disable for sleep control */
 		TOUCH_DEBUG(DEBUG_BASE_INFO, "Protocol 9 disable!\n");
@@ -5914,6 +6108,34 @@ enum window_status synapitcs_check_crack(struct i2c_client *client)
 		return NO_CRACK;
 }
 
+static void synaptics_change_sleepmode(struct i2c_client *client)
+{
+	struct synaptics_ts_data *ts =
+		(struct synaptics_ts_data *)get_touch_handle(client);
+
+	if (!strncmp(ts->fw_info.fw_product_id, "PLG349", 6) ||
+		!strncmp(ts->fw_info.fw_product_id, "PLG468", 6))
+		return ;
+
+	if (touch_ta_status == 2 || touch_ta_status == 3) {
+		DO_SAFE(touch_i2c_write_byte(client, DEVICE_CONTROL_REG,
+					DEVICE_CONTROL_NOSLEEP
+					| DEVICE_CONTROL_CONFIGURED), error);
+		TOUCH_DEBUG(DEBUG_BASE_INFO, "NOSLEEP mode for TA \n");
+	}
+	else {
+		DO_SAFE(touch_i2c_write_byte(client, DEVICE_CONTROL_REG,
+					DEVICE_CONTROL_NORMAL_OP
+					| DEVICE_CONTROL_CONFIGURED), error);
+		TOUCH_DEBUG(DEBUG_BASE_INFO, "NORMAL_OP mode for TA \n");
+	}
+
+	return ;
+error:
+	TOUCH_ERR_MSG("%s : failed to set sleep_mode \n", __func__);
+	return ;
+}
+
 static int synapitcs_ts_register_sysfs(struct kobject * k)
 {
 	return sysfs_create_group(k, &synaptics_ts_attribute_group);
@@ -5934,6 +6156,7 @@ struct touch_device_driver synaptics_ts_driver = {
 	.lpwg		= synaptics_ts_lpwg,
 	.ime_drumming = synapitcs_change_ime_status,
 	.inspection_crack = synapitcs_check_crack,
+	.sleepmode_change = synaptics_change_sleepmode,
 	.register_sysfs = synapitcs_ts_register_sysfs,
 	.get_type_bl = get_type_bootloader,
 };

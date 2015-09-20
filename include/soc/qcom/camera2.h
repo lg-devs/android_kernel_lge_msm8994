@@ -45,6 +45,7 @@ struct msm_camera_slave_info {
 	uint16_t sensor_slave_addr;
 	uint16_t sensor_id_reg_addr;
 	uint16_t sensor_id;
+	uint16_t sensor_id_mask;
 };
 
 struct msm_cam_clk_info {
@@ -74,7 +75,7 @@ struct v4l2_subdev_info {
 };
 
 struct msm_camera_gpio_num_info {
-	uint16_t gpio_num[20];//LGE increase
+	uint16_t gpio_num[20];//            
 	uint8_t valid[20];
 };
 

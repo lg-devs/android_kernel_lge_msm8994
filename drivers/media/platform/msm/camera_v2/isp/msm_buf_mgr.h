@@ -1,4 +1,4 @@
-/* Copyright (c) 2013-2014, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2013-2015, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -115,6 +115,9 @@ struct msm_isp_buf_ops {
 	int (*enqueue_buf) (struct msm_isp_buf_mgr *buf_mgr,
 		struct msm_isp_qbuf_info *info);
 
+	int (*dequeue_buf)(struct msm_isp_buf_mgr *buf_mgr,
+		struct msm_isp_qbuf_info *info);
+
 	int (*release_buf) (struct msm_isp_buf_mgr *buf_mgr,
 		uint32_t bufq_handle);
 
@@ -152,17 +155,14 @@ struct msm_isp_buf_ops {
 	int (*buf_mgr_debug) (struct msm_isp_buf_mgr *buf_mgr);
 	struct msm_isp_bufq * (*get_bufq)(struct msm_isp_buf_mgr *buf_mgr,
 		uint32_t bufq_handle);
+	int (*update_put_buf_cnt)(struct msm_isp_buf_mgr *buf_mgr,
+		uint32_t bufq_handle, uint32_t buf_index);
 };
 
 struct msm_isp_buf_mgr {
 	int init_done;
 	uint32_t open_count;
 	uint32_t pagefault_debug;
-/* LGE_S QMC patch : can't deep sleep after dual camera */
-#if 0
-	spinlock_t lock;
-#endif
-/* LGE_S QMC patch : can't deep sleep after dual camera */
 	uint16_t num_buf_q;
 	struct msm_isp_bufq *bufq;
 
@@ -186,13 +186,12 @@ struct msm_isp_buf_mgr {
 	int num_iommu_ctx;
 	struct device *iommu_ctx[2];
 	struct list_head buffer_q;
+	spinlock_t bufq_list_lock;
 	int num_iommu_secure_ctx;
 	struct device *iommu_secure_ctx[2];
 	int attach_ref_cnt[MAX_PROTECTION_MODE][MAX_IOMMU_CTX];
 	enum msm_isp_buf_mgr_state attach_state;
-/* LGE_S QMC patch : can't deep sleep after dual camera */
 	struct mutex lock;
-/* LGE_E QMC patch : can't deep sleep after dual camera */
 };
 
 int msm_isp_create_isp_buf_mgr(struct msm_isp_buf_mgr *buf_mgr,

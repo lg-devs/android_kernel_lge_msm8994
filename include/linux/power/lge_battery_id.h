@@ -47,5 +47,5 @@ extern struct battery_id_type battery_id_list[];
 #define BATT_ID_DEFAULT BATT_ID_SW3800_VC0
 #define BATT_ID_DEFAULT_TYPE_NAME "LGE_BL51YF_LGC_3000mAh"
 
-#endif  /* __LGE_BATTERY_ID_H__ */
+#endif  /*                      */
 

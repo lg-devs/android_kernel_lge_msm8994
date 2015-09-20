@@ -19,6 +19,18 @@
 			reg = <0x0 0x0ff00000 0x0 0x100000>;
 			label = "ramoops_mem";
 		};
+
+		dfps_data_mem: dfps_data_mem@0 {
+			status = "disabled";
+		};
+
+		cont_splash_mem: cont_splash_mem@0 {
+			linux,reserve-contiguous-region;
+			linux,reserve-region;
+			reg = <0 0x03400000 0 0x2400000>;
+			label = "cont_splash_mem";
+		};
+
 		peripheral_mem: peripheral_region@0 {
 			reg = <0 0x0d000000 0 0x1d00000>;
 		};
@@ -49,7 +61,10 @@
 	};
 
 	qcom,bcl {
+		qcom,bcl-hotplug-list = <>;
 		qcom,ibat-monitor {
+			qcom,low-threshold-uamp = <2000000>;
+			qcom,high-threshold-uamp = <3800000>;
 			qcom,soc-low-threshold = <0>;
 		};
 	};

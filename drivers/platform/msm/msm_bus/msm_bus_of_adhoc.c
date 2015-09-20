@@ -198,6 +198,12 @@ static void get_qos_params(
 	of_property_read_u32(dev_node, "qcom,prio0",
 						&node_info->qos_params.prio0);
 
+	of_property_read_u32(dev_node, "qcom,reg-prio1",
+					&node_info->qos_params.reg_prio1);
+
+	of_property_read_u32(dev_node, "qcom,reg-prio0",
+					&node_info->qos_params.reg_prio0);
+
 	of_property_read_u32(dev_node, "qcom,prio-rd",
 					&node_info->qos_params.prio_rd);
 
@@ -255,6 +261,11 @@ static struct msm_bus_node_info_type *get_node_info_data(
 	}
 	node_info->qport = get_arr(pdev, dev_node, "qcom,qport",
 			&node_info->num_qports);
+
+	ret = of_property_read_u32(dev_node, "qcom,agg-ports",
+				   &node_info->num_aggports);
+	if (ret)
+		node_info->num_aggports = node_info->num_qports;
 
 	if (of_get_property(dev_node, "qcom,connections", &size)) {
 		node_info->num_connections = size / sizeof(int);
@@ -333,6 +344,14 @@ static struct msm_bus_node_info_type *get_node_info_data(
 		dev_dbg(&pdev->dev, "slv rpm id is missing\n");
 		node_info->slv_rpm_id = -1;
 	}
+	ret = of_property_read_u32(dev_node, "qcom,util-fact",
+						&node_info->util_fact);
+	if (ret)
+		node_info->util_fact = 0;
+	ret = of_property_read_u32(dev_node, "qcom,vrail-comp",
+						&node_info->vrail_comp);
+	if (ret)
+		node_info->vrail_comp = 0;
 	get_qos_params(dev_node, pdev, node_info);
 
 	return node_info;
@@ -384,6 +403,15 @@ static unsigned int get_bus_node_device_data(
 			dev_err(&pdev->dev,
 				"Failed to get bus clk for bus%d ctx%d",
 				 node_device->node_info->id, ACTIVE_CTX);
+
+		node_device->qos_clk.clk = of_clk_get_by_name(dev_node,
+							"bus_qos_clk");
+
+		if (IS_ERR_OR_NULL(node_device->qos_clk.clk))
+			dev_dbg(&pdev->dev,
+				"%s:Failed to get bus qos clk for %d",
+				__func__, node_device->node_info->id);
+
 		if (msmbus_coresight_init_adhoc(pdev, dev_node))
 			dev_warn(&pdev->dev,
 				 "Coresight support absent for bus: %d\n",

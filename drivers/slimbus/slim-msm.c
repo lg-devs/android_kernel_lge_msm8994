@@ -1,4 +1,4 @@
-/* Copyright (c) 2011-2014, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2011-2015, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -12,9 +12,9 @@
 #include <linux/pm_runtime.h>
 #include <linux/dma-mapping.h>
 #include <linux/delay.h>
+#include <linux/slab.h>
 #include <linux/slimbus/slimbus.h>
 #include <linux/msm-sps.h>
-#include <linux/slab.h>
 #include "slim-msm.h"
 
 int msm_slim_rx_enqueue(struct msm_slim_ctrl *dev, u32 *buf, u8 len)
@@ -87,15 +87,15 @@ irqreturn_t msm_slim_port_irq_handler(struct msm_slim_ctrl *dev, u32 pstat)
 	 * client.
 	 */
 	if ((pstat & int_en) == 0)
-                return IRQ_HANDLED;
+		return IRQ_HANDLED;
 	for (i = 0; i < dev->port_nums; i++) {
 		struct msm_slim_endp *endpoint = &dev->pipes[i];
 		if (pstat & (1 << endpoint->port_b)) {
 			u32 val = readl_relaxed(PGD_PORT(PGD_PORT_STATn,
-				endpoint->port_b, dev->ver));
+					endpoint->port_b, dev->ver));
 			if (val & MSM_PORT_OVERFLOW) {
 				dev->ctrl.ports[i].err =
-					SLIM_P_OVERFLOW;
+						SLIM_P_OVERFLOW;
 			} else if (val & MSM_PORT_UNDERFLOW) {
 				dev->ctrl.ports[i].err =
 					SLIM_P_UNDERFLOW;
@@ -609,7 +609,6 @@ static void msm_slim_rx_msgq_cb(struct sps_event_notify *notify)
 static int msm_slim_post_rx_msgq(struct msm_slim_ctrl *dev, int ix)
 {
 	int ret;
-	u32 flags = SPS_IOVEC_FLAG_INT;
 	struct msm_slim_endp *endpoint = &dev->rx_msgq;
 	struct sps_mem_buffer *mem = &endpoint->buf;
 	struct sps_pipe *pipe = endpoint->sps;
@@ -620,7 +619,7 @@ static int msm_slim_post_rx_msgq(struct msm_slim_ctrl *dev, int ix)
 
 	pr_debug("index:%d, virt:0x%p\n", ix, virt_addr);
 
-	ret = sps_transfer_one(pipe, phys_addr, 4, virt_addr, flags);
+	ret = sps_transfer_one(pipe, phys_addr, 4, virt_addr, 0);
 	if (ret)
 		dev_err(dev->dev, "transfer_one() failed 0x%x, %d\n", ret, ix);
 
@@ -679,7 +678,7 @@ int msm_slim_connect_endp(struct msm_slim_ctrl *dev,
 
 	if (notify) {
 		sps_descr_event.mode = SPS_TRIGGER_CALLBACK;
-		sps_descr_event.options = SPS_O_DESC_DONE;
+		sps_descr_event.options = SPS_O_EOT;
 		sps_descr_event.user = (void *)dev;
 		sps_descr_event.xfer_done = notify;
 
@@ -767,7 +766,7 @@ static int msm_slim_init_rx_msgq(struct msm_slim_ctrl *dev, u32 pipe_reg)
 	config->source = dev->bam.hdl;
 	config->destination = SPS_DEV_HANDLE_MEM;
 	config->src_pipe_index = pipe_offset;
-	config->options = SPS_O_DESC_DONE | SPS_O_ERROR |
+	config->options = SPS_O_EOT | SPS_O_ERROR |
 				SPS_O_ACK_TRANSFERS | SPS_O_AUTO_ENABLE;
 
 	/* Allocate memory for the FIFO descriptors */
@@ -948,16 +947,16 @@ init_pipes:
 	/* get the # of ports first */
 	dev->port_nums = msm_slim_data_port_assign(dev);
 	if (dev->port_nums && !dev->pipes) {
-		dev->pipes = (struct msm_slim_endp*)kzalloc(sizeof(struct msm_slim_endp) *
-			dev->port_nums, 
-			GFP_KERNEL);
+		dev->pipes = kzalloc(sizeof(struct msm_slim_endp) *
+					dev->port_nums,
+					GFP_KERNEL);
 		if (IS_ERR_OR_NULL(dev->pipes)) {
 			dev_err(dev->dev, "no memory for data ports");
 			sps_deregister_bam_device(bam_handle);
 			return PTR_ERR(dev->pipes);
 		}
 		/* assign the ports now */
-		msm_slim_data_port_assign(dev);	
+		msm_slim_data_port_assign(dev);
 	}
 
 init_msgq:
@@ -973,20 +972,22 @@ init_msgq:
 	if (ret && bam_handle)
 		dev->use_tx_msgqs = MSM_MSGQ_DISABLED;
 
-	if (dev->use_tx_msgqs == MSM_MSGQ_DISABLED &&
-		dev->use_rx_msgqs == MSM_MSGQ_DISABLED && bam_handle) {
-		sps_deregister_bam_device(bam_handle);
-		dev->bam.hdl = 0L;
-	}
+	/*
+	 * If command interface for BAM fails, register interface is used for
+	 * commands.
+	 * It is possible that other BAM usecases (e.g. apps channels) will
+	 * still need BAM. Since BAM is successfully initialized, we can
+	 * continue using it for non-command use cases.
+	 */
 
-	return ret;
+	return 0;
 }
 
 void msm_slim_disconnect_endp(struct msm_slim_ctrl *dev,
 					struct msm_slim_endp *endpoint,
 					enum msm_slim_msgq *msgq_flag)
 {
-	if (*msgq_flag == MSM_MSGQ_ENABLED) {
+	if (*msgq_flag >= MSM_MSGQ_ENABLED) {
 		sps_disconnect(endpoint->sps);
 		*msgq_flag = MSM_MSGQ_RESET;
 	}
@@ -1021,10 +1022,10 @@ void msm_slim_sps_exit(struct msm_slim_ctrl *dev, bool dereg)
 	for (i = 0; i < dev->port_nums; i++) {
 		if (dev->pipes[i].connected)
 			msm_slim_disconn_pipe_port(dev, i);
- 	}
+	}
 	if (dereg) {
 		for (i = 0; i < dev->port_nums; i++) {
-			if (dev->pipes[i].connected)      
+			if (dev->pipes[i].connected)
 				msm_dealloc_port(&dev->ctrl, i);
 		}
 		sps_deregister_bam_device(dev->bam.hdl);

@@ -1495,6 +1495,8 @@ bool EnableFlash(struct synaptics_ts_data *ts)
 	partition.ID = Bootloader;
 	partition.BlockOffset = 0;
 	partition.TransferLen = 0;
+	partition.data = NULL;
+	partition.size = 0;
 	partition.command = m_EnterBootloader;
 	TOUCH_INFO_MSG("[%s] Start. \n",__func__);
 	memcpy(partition.Payload, g_F34Query.FlashKey, 2);

@@ -27,7 +27,7 @@ int sysctl_nr_open __read_mostly = 1024*1024;
 int sysctl_nr_open_min = BITS_PER_LONG;
 int sysctl_nr_open_max = 1024 * 1024; /* raised later */
 
-#define DEBUG_FOR_EMFILE //LGE_CHANGE, enable the debug feature for too many files issue, 2014-12-13, freeso.kim@lge.com
+#define DEBUG_FOR_EMFILE //                                                                                             
 
 static void *alloc_fdmem(size_t size)
 {

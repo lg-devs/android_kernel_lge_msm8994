@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2014, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-2015, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -30,6 +30,7 @@
 #include <linux/of.h>
 #include <linux/of_device.h>
 #include <linux/regulator/consumer.h>
+#include <linux/notifier.h>
 #include <linux/qcom_iommu.h>
 #include <asm/sizes.h>
 
@@ -176,6 +177,14 @@ struct iommu_access_ops iommu_access_ops_v1 = {
 	.iommu_lock_release = _iommu_lock_release,
 };
 
+static BLOCKING_NOTIFIER_HEAD(msm_iommu_notifier_list);
+
+void msm_iommu_register_notify(struct notifier_block *nb)
+{
+	blocking_notifier_chain_register(&msm_iommu_notifier_list, nb);
+}
+EXPORT_SYMBOL(msm_iommu_register_notify);
+
 #ifdef CONFIG_MSM_IOMMU_VBIF_CHECK
 
 #define VBIF_XIN_HALT_CTRL0 0x200
@@ -215,7 +224,7 @@ static int __check_vbif_state(struct msm_iommu_drvdata const *drvdata)
 
 	if (base) {
 		__dump_vbif_state(drvdata->base, base);
-		__halt_vbif_xin(drvdata->base);
+		__halt_vbif_xin(base);
 		__dump_vbif_state(drvdata->base, base);
 		iounmap(base);
 	} else {
@@ -253,14 +262,17 @@ static void check_halt_state(struct msm_iommu_drvdata const *drvdata)
 }
 
 static void check_tlb_sync_state(struct msm_iommu_drvdata const *drvdata,
-				int ctx)
+				int ctx, struct msm_iommu_priv *priv)
 {
 	int res;
 	unsigned int val;
-	void __iomem *base = drvdata->base;
+	void __iomem *base = drvdata->cb_base;
 	char const *name = drvdata->name;
 
-	pr_err("Timed out waiting for TLB SYNC to complete for %s\n", name);
+	pr_err("Timed out waiting for TLB SYNC to complete for %s (client: %s)\n",
+		name, priv->client_name);
+	blocking_notifier_call_chain(&msm_iommu_notifier_list, TLB_SYNC_TIMEOUT,
+				(void *) priv->client_name);
 	res = __check_vbif_state(drvdata);
 	if (res)
 		BUG();
@@ -290,7 +302,7 @@ static void check_halt_state(struct msm_iommu_drvdata const *drvdata)
 }
 
 static void check_tlb_sync_state(struct msm_iommu_drvdata const *drvdata,
-				int ctx)
+				int ctx, struct msm_iommu_priv *priv)
 {
 	BUG();
 }
@@ -334,7 +346,8 @@ void iommu_resume(const struct msm_iommu_drvdata *iommu_drvdata)
 	}
 }
 
-static void __sync_tlb(struct msm_iommu_drvdata *iommu_drvdata, int ctx)
+static void __sync_tlb(struct msm_iommu_drvdata *iommu_drvdata, int ctx,
+		struct msm_iommu_priv *priv)
 {
 	unsigned int val;
 	unsigned int res;
@@ -346,7 +359,7 @@ static void __sync_tlb(struct msm_iommu_drvdata *iommu_drvdata, int ctx)
 	res = readl_tight_poll_timeout(CTX_REG(CB_TLBSTATUS, base, ctx), val,
 				(val & CB_TLBSTATUS_SACTIVE) == 0, 5000000);
 	if (res)
-		check_tlb_sync_state(iommu_drvdata, ctx);
+		check_tlb_sync_state(iommu_drvdata, ctx, priv);
 }
 
 static int __flush_iotlb_va(struct iommu_domain *domain, unsigned int va)
@@ -370,7 +383,7 @@ static int __flush_iotlb_va(struct iommu_domain *domain, unsigned int va)
 		SET_TLBIVA(iommu_drvdata->cb_base, ctx_drvdata->num,
 			   ctx_drvdata->asid | (va & CB_TLBIVA_VA));
 		mb();
-		__sync_tlb(iommu_drvdata, ctx_drvdata->num);
+		__sync_tlb(iommu_drvdata, ctx_drvdata->num, priv);
 		__disable_clocks(iommu_drvdata);
 	}
 fail:
@@ -396,7 +409,7 @@ static int __flush_iotlb(struct iommu_domain *domain)
 
 		SET_TLBIASID(iommu_drvdata->cb_base, ctx_drvdata->num,
 			     ctx_drvdata->asid);
-		__sync_tlb(iommu_drvdata, ctx_drvdata->num);
+		__sync_tlb(iommu_drvdata, ctx_drvdata->num, priv);
 		__disable_clocks(iommu_drvdata);
 	}
 
@@ -733,14 +746,20 @@ static void __program_context(struct msm_iommu_drvdata *iommu_drvdata,
 	mb();
 	SET_TLBIASID(iommu_drvdata->cb_base, ctx_drvdata->num,
 					ctx_drvdata->asid);
-	__sync_tlb(iommu_drvdata, ctx_drvdata->num);
+	__sync_tlb(iommu_drvdata, ctx_drvdata->num, priv);
 
 	/* Enable the MMU */
 	SET_CB_SCTLR_M(cb_base, ctx, 1);
 	mb();
 }
 
-static int msm_iommu_domain_init(struct iommu_domain *domain, int flags)
+#ifdef CONFIG_IOMMU_PGTABLES_L2
+#define INITIAL_REDIRECT_VAL 1
+#else
+#define INITIAL_REDIRECT_VAL 0
+#endif
+
+static int msm_iommu_domain_init(struct iommu_domain *domain)
 {
 	struct msm_iommu_priv *priv;
 
@@ -748,9 +767,7 @@ static int msm_iommu_domain_init(struct iommu_domain *domain, int flags)
 	if (!priv)
 		goto fail_nomem;
 
-#ifdef CONFIG_IOMMU_PGTABLES_L2
-	priv->pt.redirect = flags & MSM_IOMMU_DOMAIN_PT_CACHEABLE;
-#endif
+	priv->pt.redirect = INITIAL_REDIRECT_VAL;
 
 	INIT_LIST_HEAD(&priv->list_attached);
 	if (msm_iommu_pagetable_alloc(&priv->pt))
@@ -861,6 +878,12 @@ static int msm_iommu_attach_dev(struct iommu_domain *domain, struct device *dev)
 	__program_context(iommu_drvdata, ctx_drvdata, priv, is_secure, set_m2v);
 
 	iommu_resume(iommu_drvdata);
+	/* Ensure TLB is clear */
+	if (iommu_drvdata->model != MMU_500) {
+		SET_TLBIASID(iommu_drvdata->cb_base, ctx_drvdata->num,
+					ctx_drvdata->asid);
+		__sync_tlb(iommu_drvdata, ctx_drvdata->num, priv);
+	}
 
 	__disable_clocks(iommu_drvdata);
 
@@ -914,9 +937,11 @@ static void msm_iommu_detach_dev(struct iommu_domain *domain,
 
 	is_secure = iommu_drvdata->sec_id != -1;
 
-	SET_TLBIASID(iommu_drvdata->cb_base, ctx_drvdata->num,
+	if (iommu_drvdata->model == MMU_500) {
+		SET_TLBIASID(iommu_drvdata->cb_base, ctx_drvdata->num,
 					ctx_drvdata->asid);
-	__sync_tlb(iommu_drvdata, ctx_drvdata->num);
+		__sync_tlb(iommu_drvdata, ctx_drvdata->num, priv);
+	}
 
 	ctx_drvdata->asid = -1;
 
@@ -1451,6 +1476,66 @@ static void msm_iommu_build_dump_regs_table(void)
 	DUMP_REG_INIT(DUMP_REG_CBFRSYNRA_N, CBFRSYNRA, 1, DRT_GLOBAL_REG_N);
 }
 
+#ifdef CONFIG_IOMMU_PGTABLES_L2
+static void __do_set_redirect(struct iommu_domain *domain, void *data)
+{
+	struct msm_iommu_priv *priv;
+	int *no_redirect = data;
+
+	mutex_lock(&msm_iommu_lock);
+	priv = domain->priv;
+	priv->pt.redirect = !(*no_redirect);
+	mutex_unlock(&msm_iommu_lock);
+}
+
+static void __do_get_redirect(struct iommu_domain *domain, void *data)
+{
+	struct msm_iommu_priv *priv;
+	int *no_redirect = data;
+
+	mutex_lock(&msm_iommu_lock);
+	priv = domain->priv;
+	*no_redirect = !priv->pt.redirect;
+	mutex_unlock(&msm_iommu_lock);
+}
+
+#else
+
+static void __do_set_redirect(struct iommu_domain *domain, void *data)
+{
+}
+
+static void __do_get_redirect(struct iommu_domain *domain, void *data)
+{
+}
+#endif
+
+static int msm_iommu_domain_set_attr(struct iommu_domain *domain,
+				enum iommu_attr attr, void *data)
+{
+	switch (attr) {
+	case DOMAIN_ATTR_COHERENT_HTW_DISABLE:
+		__do_set_redirect(domain, data);
+		break;
+	default:
+		return -EINVAL;
+	}
+	return 0;
+}
+
+static int msm_iommu_domain_get_attr(struct iommu_domain *domain,
+				enum iommu_attr attr, void *data)
+{
+	switch (attr) {
+	case DOMAIN_ATTR_COHERENT_HTW_DISABLE:
+		__do_get_redirect(domain, data);
+		break;
+	default:
+		return -EINVAL;
+	}
+	return 0;
+}
+
 static struct iommu_ops msm_iommu_ops = {
 	.domain_init = msm_iommu_domain_init,
 	.domain_destroy = msm_iommu_domain_destroy,
@@ -1464,6 +1549,8 @@ static struct iommu_ops msm_iommu_ops = {
 	.domain_has_cap = msm_iommu_domain_has_cap,
 	.get_pt_base_addr = msm_iommu_get_pt_base_addr,
 	.pgsize_bitmap = MSM_IOMMU_PGSIZES,
+	.domain_set_attr = msm_iommu_domain_set_attr,
+	.domain_get_attr = msm_iommu_domain_get_attr,
 };
 
 static int __init msm_iommu_init(void)

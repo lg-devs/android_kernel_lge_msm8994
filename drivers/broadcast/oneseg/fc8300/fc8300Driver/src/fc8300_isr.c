@@ -25,8 +25,9 @@
 #include "fci_types.h"
 #include "fc8300_regs.h"
 #include "fci_hal.h"
-#include "fci_oal.h"
+#ifndef BBM_I2C_TSIF
 #include "fc8300_drv_api.h"
+#endif
 
 s32 (*fc8300_ac_callback)(u32 userdata, u8 bufid, u8 *data, s32 length) = NULL;
 s32 (*fc8300_ts_callback)(u32 userdata, u8 bufid, u8 *data, s32 length) = NULL;
@@ -142,18 +143,13 @@ extern unsigned int irq_cnt;
 
 void fc8300_isr(HANDLE handle)
 {
-#ifndef BBM_I2C_TSIF
-    static unsigned int overrun_check_count = 0;
-#endif
 #ifdef BBM_AUX_INT
     u8 aux_int_status = 0;
 #endif
 
 #ifndef BBM_I2C_TSIF
+    static unsigned int overrun_check_count = 0;
 	u8 buf_int_status = 0;
-#ifdef BBM_STATUS_AUTO_CLEAR
-    fc8300_data(handle, DIV_MASTER, 0x01);
-#else
     bbm_byte_read(handle, DIV_MASTER, BBM_BUF_STATUS_CLEAR,
                     &buf_int_status);
     if (buf_int_status) {
@@ -173,22 +169,13 @@ void fc8300_isr(HANDLE handle)
         }
 
 
-#if 1
-        {
         irq_cnt++;
             if((overrun_check_count%20) == 0)
             {
             tunerbb_drv_fc8300_Get_SignalInfo(&st, ISDBT_13SEG);
             }
             overrun_check_count++;
-        }
-    #endif
     }
-    else
-    {
-        print_log(NULL, "fc8300 status error %x\n", buf_int_status );
-    }
-#endif
 #endif
 
 #ifdef BBM_AUX_INT

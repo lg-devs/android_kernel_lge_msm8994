@@ -529,6 +529,41 @@ config ZSWAP
 	  they have not be fully explored on the large set of potential
 	  configurations and workloads that exist.
 
+config ZSMALLOC
+       tristate "Memory allocator for compressed pages"
+       depends on MMU
+       default n
+       help
+         zsmalloc is a slab-based memory allocator designed to store
+         compressed RAM pages.  zsmalloc uses virtual memory mapping
+         in order to reduce fragmentation.  However, this results in a
+         non-standard allocator interface where a handle, not a pointer, is
+         returned by an alloc().  This handle must be mapped in order to
+         access the allocated space.
+
+config PGTABLE_MAPPING
+       bool "Use page table mapping to access object in zsmalloc"
+       depends on ZSMALLOC
+       help
+         By default, zsmalloc uses a copy-based object mapping method to
+         access allocations that span two pages. However, if a particular
+         architecture (ex, ARM) performs VM mapping faster than copying,
+         then you should select this. This causes zsmalloc to use page table
+         mapping rather than copying for object mapping.
+
+         You can check speed with zsmalloc benchmark:
+         https://github.com/spartacus06/zsmapbench
+
+config ZSMALLOC_STAT
+       bool "Export zsmalloc statistics"
+       depends on ZSMALLOC
+       select DEBUG_FS
+       help
+         This option enables code in the zsmalloc to collect various
+         statistics about whats happening in zsmalloc and exports that
+         information to userspace via debugfs.
+         If unsure, say N.
+
 config BALANCE_ANON_FILE_RECLAIM
 	bool "During reclaim treat anon and file backed pages equally"
 	depends on SWAP
@@ -553,3 +588,30 @@ config KSWAPD_CPU_AFFINITY_MASK
 	  the resultant bitmask.
 	  For example to limit kswapd to the first 4 cores use the following:
 	  CONFIG_KSWAPD_CPU_AFFINITY_MASK="f"
+
+config SLUB_RESTRAIN_HIGH_ORDER_ALLOC
+	bool "restrain high order allocation of slub"
+	depends on SLUB
+	help
+	  Don't do aggressive high order allocation of slub
+
+config READAHEAD_MMAP_SIZE_ENABLE
+	bool "readahead mmap size set enable"
+	default n
+	help
+	 readahead mmap size set enable
+
+config READAHEAD_MMAP_PAGE_CNT
+	int "readahead mmap page count set"
+	depends on READAHEAD_MMAP_SIZE_ENABLE
+	help
+	 Select readahead mmap page count
+	 Examples:
+		128 ==>512KB
+		64 ==>256KB
+		32 ==>128KB
+		16 ==>64 KB
+		8 ==>32 KB
+		4 ==>16 KB
+		2 ==>8 KB
+		1 ==>4 KB

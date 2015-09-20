@@ -247,6 +247,7 @@ struct synaptics_ts_f51_reg {
 	u8 lpwg_touch_slop_reg2;
 	u8 lpwg_tap_distance_reg2;
 	u8 lpwg_interrupt_delay_reg2;
+	u8 lpwg_partial_reg;
 };
 
 struct synaptics_ts_f54_reg {
@@ -311,6 +312,7 @@ struct lpwg_control {
 	u8              screen;
 	u8		prev_screen;
 	u8              sensor;
+	u8		prev_sensor;
 	u8              qcover;
 	u8		double_tap_enable;
 	u8 		password_enable;

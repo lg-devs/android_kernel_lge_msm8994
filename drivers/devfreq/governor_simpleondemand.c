@@ -14,13 +14,15 @@
 #include <linux/devfreq.h>
 #include <linux/math64.h>
 #include "governor.h"
+#include <linux/mdss_io_util.h>
 
 /* Default constants for DevFreq-Simple-Ondemand (DFSO) */
 #define DFSO_UPTHRESHOLD	(90)
 #define DFSO_DOWNDIFFERENCTIAL	(5)
 #ifdef CONFIG_Z2_LGD_POLED_PANEL
-#define DFSO_KEEP_THRESHOLD	(20)
+#define DFSO_KEEP_THRESHOLD    (22)
 #endif
+
 static int devfreq_simple_ondemand_func(struct devfreq *df,
 					unsigned long *freq,
 					u32 *flag)
@@ -42,6 +44,12 @@ static int devfreq_simple_ondemand_func(struct devfreq *df,
 	if (err)
 		return err;
 
+//dfps mode 0 - LG governor
+//dfps mode 1 - dynamic fps use case
+// 1. camera
+// 2. video clip
+// 3. not static image
+
 	if (data) {
 		if (data->upthreshold)
 			dfso_upthreshold = data->upthreshold;
@@ -52,20 +60,34 @@ static int devfreq_simple_ondemand_func(struct devfreq *df,
 	    dfso_upthreshold < dfso_downdifferential)
 		return -EINVAL;
 #ifdef CONFIG_LGE_DEVFREQ_DFPS
-	if(stat.busy_time > dfso_upthreshold){
-		*freq = max;
-	}else if(stat.busy_time < dfso_downdifferential){
 #ifdef CONFIG_Z2_LGD_POLED_PANEL
-		if(dfso_keep_threshold < stat.busy_time)
-			*freq = min;
-		else
-			*freq = stat.current_frequency;
-#else
-		*freq = min;
-#endif
-	}else{
+	if (stat.busy_time > dfso_upthreshold) {
+		*freq = max;
+	} else if (stat.busy_time < dfso_downdifferential) {
+		if(get_plc_status()) { // auto-adjust screen tone on
+			if(stat.busy_time > dfso_keep_threshold)
+				*freq = min;
+			else
+				*freq = stat.current_frequency;
+		} else { // auto-adjust screen tone off
+			if(!camera_is_power_on()){
+				*freq = stat.current_frequency;
+			} else {
+				*freq = min;
+			}
+		}
+	} else {
 		*freq = stat.current_frequency;
 	}
+#else
+	if(stat.busy_time > dfso_upthreshold){
+                *freq = max;
+	} else if(stat.busy_time < dfso_downdifferential){
+		*freq = min;
+	} else {
+		*freq = stat.current_frequency;
+	}
+#endif
 #else
 	/* Prevent overflow */
 	if (stat.busy_time >= (1 << 24) || stat.total_time >= (1 << 24)) {

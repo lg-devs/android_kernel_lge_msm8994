@@ -28,7 +28,7 @@
 #include "fci_tun.h"
 #include "fc8300_regs.h"
 
-#define SCAN_CHK_PERIOD 1 /* 1 ms */
+#define SCAN_CHK_PERIOD 20 /* 20 ms */
 
 static enum BROADCAST_TYPE broadcast_type;
 extern int get_fc8300_ustop_state(void);
@@ -4012,10 +4012,11 @@ s32 fc8300_init(HANDLE handle, DEVICEID devid)
 	bbm_byte_write(handle, DIV_MASTER, BBM_OSS_CFG_EN, 0x01);
 #endif
 
+#if 0
 	bbm_byte_write(handle, DIV_BROADCAST
 	, BBM_FAIP_MTD_SR_SHIFT_VALUE, 0x10);
 	bbm_byte_write(handle, DIV_BROADCAST, BBM_CIR_THR_23, 0x02);
-
+#endif
 #ifdef BBM_NULL_PID_FILTER
 	bbm_byte_write(handle, DIV_MASTER, BBM_NULL_PID_FILTERING, 0x01);
 #endif
@@ -4047,13 +4048,12 @@ s32 fc8300_init(HANDLE handle, DEVICEID devid)
 	bbm_byte_write(handle, DIV_BROADCAST
 	, BBM_MSNR_FREQ_AVG_PERIOD_13, 0x09);
 
-
 #if defined(BBM_EXT_LNA_ALWAYSON) || defined(BBM_EXT_LNA)
     //bbm_byte_write(handle, DIV_BROADCAST, BBM_GPIO_DIR, 0x00); /*GPIO0 Direction*/
-    bbm_byte_write(handle, DIV_BROADCAST, BBM_GPIO_DIR, 0x04); /*GPIO2 Direction*/
+	bbm_byte_write(handle, DIV_BROADCAST, BBM_GPIO_DIR, 0x04); /*GPIO2 Direction*/
 #if defined(BBM_EXT_LNA_ALWAYSON)
-    //bbm_byte_write(handle, DIV_BROADCAST, BBM_GPIO_DATA, 0x00); /*GPIO0 Output value*/
-    bbm_byte_write(handle, DIV_BROADCAST, BBM_GPIO_DATA, 0x04); /*GPIO2 Output value*/
+	//bbm_byte_write(handle, DIV_BROADCAST, BBM_GPIO_DATA, 0x00); /*GPIO2 Output value*/
+	bbm_byte_write(handle, DIV_BROADCAST, BBM_GPIO_DATA, 0x04); /*GPIO2 Output value*/
 #endif
 #endif
 
@@ -4464,7 +4464,7 @@ s32 fc8300_scan_status(HANDLE handle, DEVICEID devid)
 	if (i == tmcc_timeout)
 		return BBM_NOK;
 
-	ts_err_free_timeout = 950;
+	ts_err_free_timeout = 950 / SCAN_CHK_PERIOD;
 
 	switch (broadcast_type) {
 	case ISDBT_1SEG:

@@ -51,4 +51,4 @@ void pn547_get_clk_source(struct i2c_client *pn547_client, struct pn547_dev *pn5
 
 void pn547_parse_dt(struct device *dev, struct pn547_dev *pn547_dev);
 
-#endif /* _PN547_LGE_HWADAPTER_H_ */
+#endif /*                         */

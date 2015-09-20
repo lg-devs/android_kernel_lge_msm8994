@@ -74,6 +74,7 @@ int touch_thermal_status = 0;
 int current_thermal_mode = 0;
 extern struct pseudo_batt_info_type pseudo_batt_info;
 int touch_ta_status = 0;
+int touch_hdmi_status = 0;
 u8  is_probe = 0;
 extern int is_Sensing;
 static struct lge_touch_data *ts_data = NULL;
@@ -163,7 +164,9 @@ int send_uevent_lpwg(struct i2c_client *client, int type)
 	if (type > 0 && type <= VALID_LPWG_UEVENT_SIZE
 			&& atomic_read(&ts->state.uevent_state)
 			== UEVENT_IDLE) {
-		if (type == LPWG_SWIPE_DOWN && atomic_read(&ts->state.power_state) == POWER_ON) {
+		if (type == LPWG_SWIPE_DOWN
+				&& (atomic_read(&ts->state.power_state) == POWER_ON
+					|| lockscreen_stat == 0)) {
 			ts->pdata->swipe_pwr_ctrl_stage = WAIT_SWIPE_WAKEUP;
 			TOUCH_INFO_MSG("drop LPWG_SWIPE_DOWN event (swipe_pwr_ctrl_stage = %d)\n",
 					ts->pdata->swipe_pwr_ctrl_stage);
@@ -1714,7 +1717,7 @@ void update_status(int code, int value)
 			return;
 		else
 			touch_ta_status = value;
-		TOUCH_DEBUG(DEBUG_BASE_INFO, "TA Type : %d\n", touch_ta_status);
+		TOUCH_DEBUG(DEBUG_BASE_INFO, "TA Type : %d, code : %d\n", touch_ta_status, code);
 		/* INVALID:0, SDP:1, DCP:2, CDP:3 PROPRIETARY:4 FLOATED:5*/
 
 		if (!is_probe || atomic_read(&state->pm_state) > PM_RESUME)
@@ -1733,6 +1736,16 @@ void update_status(int code, int value)
 						msecs_to_jiffies(50));
 			}
 		}
+		mod_delayed_work(touch_wq, &ts_data->work_sleepmode, msecs_to_jiffies(0));
+	} else if (code == NOTIFY_HDMI_CONNECTION) {
+		if ((value == touch_hdmi_status) || (!boot_mode))
+			return;
+		else
+			touch_hdmi_status = value;
+		TOUCH_DEBUG(DEBUG_BASE_INFO, "HDMI Connection : %d\n", touch_hdmi_status);
+
+		if (!is_probe || atomic_read(&state->pm_state) > PM_RESUME)
+			return;
 	} else if (code == NOTIFY_TEMPERATURE_CHANGE)
 		atomic_set(&state->temperature_state, value);
 	else if (code == NOTIFY_PROXIMITY)
@@ -1792,6 +1805,8 @@ static void firmware_upgrade_func(struct work_struct *work_upgrade)
 	interrupt_control(ts, INTERRUPT_ENABLE);
 
 	memset(&ts->fw_info, 0, sizeof(struct touch_firmware_module));
+	ts->fw_info.fw_force_upgrade = 0;
+	ts->fw_info.fw_force_upgrade_cat = 0;
 	TOUCH_INFO_MSG("%s : firmware upgrade end\n", __func__);
 	mutex_unlock(&ts->pdata->thread_lock);
 	return;
@@ -1812,6 +1827,16 @@ static void inspection_crack_func(struct work_struct *work_crack)
 	}
 	TOUCH_INFO_MSG("%s : crack_check end\n", __func__);
 	mutex_unlock(&ts->pdata->thread_lock);
+}
+
+static void sleep_mode_func(struct work_struct *work_sleepmode)
+{
+	struct lge_touch_data *ts = container_of(to_delayed_work(work_sleepmode),
+			struct lge_touch_data, work_sleepmode);
+
+	TOUCH_INFO_MSG("%s : sleep_mode change for TA start \n", __func__);
+	touch_device_func->sleepmode_change(ts->client);
+	TOUCH_INFO_MSG("%s : sleep_mode chagne for TA end\n", __func__);
 }
 
 /* touch_thread_irq_handler
@@ -2451,6 +2476,10 @@ static ssize_t store_lpwg_data(struct i2c_client *client,
 	sscanf(buf, "%d", &reply);
 
 	TOUCH_INFO_MSG("%s : reply = %d\n", __func__, reply);
+
+	if (reply == 0)
+		ts->pdata->swipe_pwr_ctrl_stage = WAIT_SWIPE_WAKEUP;
+
 	if (touch_device_func->lpwg) {
 		mutex_lock(&ts->pdata->thread_lock);
 		touch_device_func->lpwg(client, LPWG_REPLY, reply, NULL);
@@ -3424,9 +3453,6 @@ static int lcd_notifier_callback(struct notifier_block *this,
 	TOUCH_DEBUG(DEBUG_BASE_INFO,"%s: event = %lu\n", __func__, event);
 	switch (event) {
 		case LCD_EVENT_TOUCH_LPWG_ON:
-			if (ts->pdata->panel_id == 0)
-				mdelay(100);
-
 			TOUCH_DEBUG(DEBUG_BASE_INFO, "LCD_EVENT_TOUCH_LPWG_ON\n");
 			touch_device_func->lpwg(ts_data->client, LPWG_INCELL_LPWG_ON, 0, NULL);
 			break;
@@ -3535,6 +3561,7 @@ static int touch_probe(struct i2c_client *client,
 	INIT_DELAYED_WORK(&ts->work_trigger_handle, touch_trigger_handle);
 	INIT_DELAYED_WORK(&ts->work_thermal, change_thermal_param);
 	INIT_DELAYED_WORK(&ts->work_crack, inspection_crack_func);
+	INIT_DELAYED_WORK(&ts->work_sleepmode, sleep_mode_func);
 
 	ASSIGN(ts->input_dev = input_allocate_device(),
 			err_input_allocate_device);

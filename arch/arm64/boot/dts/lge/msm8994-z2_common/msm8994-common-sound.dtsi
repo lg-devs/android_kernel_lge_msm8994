@@ -27,7 +27,7 @@
 			"AIF4 VI", "MCLK",
 			"RX_BIAS", "MCLK",
 			"LDO_H", "MCLK",
-			"AIF4 MAD", "MCLK",
+
 			"AMIC2", "MIC BIAS2 External",
 			"MIC BIAS2 External", "Headset Mic",
 			"AMIC3", "MIC BIAS3 External",
@@ -41,7 +41,7 @@
 		qcom,tomtom-mclk-clk-freq = <9600000>;
 		pinctrl-names = "sleep",
 				"auxpcm-active",
-				"pri_mi2s-active",
+				"mi2s-active",
 				"active";
 		pinctrl-0 = <&pri_mi2s_sleep>, <&pri_mi2s_sd0_sleep>,
 				<&sec_aux_pcm_sleep>, <&sec_aux_pcm_din_sleep>;

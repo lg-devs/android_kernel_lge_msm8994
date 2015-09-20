@@ -1,4 +1,4 @@
-/* Copyright (c) 2013-2014, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2013-2015, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -49,6 +49,11 @@
 #else
 #define CDBG(fmt, args...) do { } while (0)
 #endif
+/*LGCHANGE,QCT Patch camif error 15.04.02*/
+int msm_ispif_get_clk_info(struct ispif_device *ispif_dev,
+	struct platform_device *pdev,
+	struct msm_cam_clk_info *ahb_clk_info,
+	struct msm_cam_clk_info *clk_info);
 
 static void msm_ispif_io_dump_reg(struct ispif_device *ispif)
 {
@@ -61,8 +66,8 @@ static void msm_ispif_io_dump_reg(struct ispif_device *ispif)
 static inline int msm_ispif_is_intf_valid(uint32_t csid_version,
 	uint8_t intf_type)
 {
-	return (csid_version <= CSID_VERSION_V22 && intf_type != VFE0) ?
-		false : true;
+	return ((csid_version <= CSID_VERSION_V22 && intf_type != VFE0) ||
+		(intf_type >= VFE_MAX)) ? false : true;
 }
 
 static struct msm_cam_clk_info ispif_8626_reset_clk_info[] = {
@@ -83,9 +88,8 @@ static struct msm_cam_clk_info ispif_8626_reset_clk_info[] = {
 	{"camss_vfe_vfe_clk", NO_SET_RATE},
 	{"camss_csi_vfe_clk", NO_SET_RATE},
 };
-
-static struct msm_cam_clk_info ispif_8974_ahb_clk_info[ISPIF_CLK_INFO_MAX];
-
+/*LGCHANGE_S,QCT Patch camif error 15.04.02*/
+/*
 static struct msm_cam_clk_info ispif_8974_reset_clk_info[] = {
 	{"csi0_src_clk", INIT_RATE},
 	{"csi0_clk", NO_SET_RATE},
@@ -110,19 +114,37 @@ static struct msm_cam_clk_info ispif_8974_reset_clk_info[] = {
 	{"camss_vfe_vfe1_clk", NO_SET_RATE},
 	{"camss_csi_vfe1_clk", NO_SET_RATE},
 };
-
+*/
+static struct msm_cam_clk_info ispif_ahb_clk_info[ISPIF_CLK_INFO_MAX];
+static struct msm_cam_clk_info ispif_clk_info[ISPIF_CLK_INFO_MAX];
+/*LGCHANGE_E,QCT Patch camif error 15.04.02*/
 static int msm_ispif_reset_hw(struct ispif_device *ispif)
 {
 	int rc = 0;
 	long timeout = 0;
-	struct clk *reset_clk[ARRAY_SIZE(ispif_8974_reset_clk_info)];
+/*LGCHANGE,QCT Patch camif error 15.04.02*/
+/*	struct clk *reset_clk[ARRAY_SIZE(ispif_8974_reset_clk_info)];*/
 	struct clk *reset_clk1[ARRAY_SIZE(ispif_8626_reset_clk_info)];
 	ispif->clk_idx = 0;
+/*LGCHANGE_S,QCT Patch camif error 15.04.02*/
+	rc = msm_ispif_get_clk_info(ispif, ispif->pdev,
+		ispif_ahb_clk_info, ispif_clk_info);
+	if (rc < 0) {
+		pr_err("%s: msm_isp_get_clk_info() failed", __func__);
+			return -EFAULT;
+	}
 
-	rc = msm_cam_clk_enable(&ispif->pdev->dev,
+/*	rc = msm_cam_clk_enable(&ispif->pdev->dev,
 		ispif_8974_reset_clk_info, reset_clk,
 		ARRAY_SIZE(ispif_8974_reset_clk_info), 1);
+*/
+	rc = msm_cam_clk_enable(&ispif->pdev->dev,
+		ispif_clk_info, ispif->clk,
+		ispif->num_clk, 1);
+/*LGCHANGE_E,QCT Patch camif error 15.04.02*/
 	if (rc < 0) {
+		pr_err("%s: cannot enable clock, error = %d\n",
+			__func__, rc);/*LGCHANGE,QCT Patch camif error 15.04.02*/
 		rc = msm_cam_clk_enable(&ispif->pdev->dev,
 			ispif_8626_reset_clk_info, reset_clk1,
 			ARRAY_SIZE(ispif_8626_reset_clk_info), 1);
@@ -145,19 +167,23 @@ static int msm_ispif_reset_hw(struct ispif_device *ispif)
 	/* initiate reset of ISPIF */
 	msm_camera_io_w(ISPIF_RST_CMD_MASK,
 				ispif->base + ISPIF_RST_CMD_ADDR);
-	if (ispif->hw_num_isps > 1)
+/*LGCHANGE_S,QCT Patch camif error 15.04.02*/
+/*	if (ispif->hw_num_isps > 1)
 		msm_camera_io_w(ISPIF_RST_CMD_1_MASK,
 					ispif->base + ISPIF_RST_CMD_1_ADDR);
-
+*/
+/*LGCHANGE_E,QCT Patch camif error 15.04.02*/
 	timeout = wait_for_completion_timeout(
 			&ispif->reset_complete[VFE0], msecs_to_jiffies(500));
 	CDBG("%s: VFE0 done\n", __func__);
 
 	if (timeout <= 0) {
 		pr_err("%s: VFE0 reset wait timeout\n", __func__);
+/*LGCHANGE_S,QCT Patch camif error 15.04.02*/
 		rc = msm_cam_clk_enable(&ispif->pdev->dev,
-			ispif_8974_reset_clk_info, reset_clk,
-			ARRAY_SIZE(ispif_8974_reset_clk_info), 0);
+			ispif_clk_info, ispif->clk,
+			ispif->num_clk, 0);
+/*LGCHANGE_E,QCT Patch camif error 15.04.02*/
 		if (rc < 0) {
 			rc = msm_cam_clk_enable(&ispif->pdev->dev,
 				ispif_8626_reset_clk_info, reset_clk1,
@@ -170,23 +196,31 @@ static int msm_ispif_reset_hw(struct ispif_device *ispif)
 	}
 
 	if (ispif->hw_num_isps > 1) {
+/*LGCHANGE_S,QCT Patch camif error 15.04.02*/
+		msm_camera_io_w(ISPIF_RST_CMD_1_MASK,
+					ispif->base + ISPIF_RST_CMD_1_ADDR);
+/*LGCHANGE_E,QCT Patch camif error 15.04.02*/
 		timeout = wait_for_completion_timeout(
 				&ispif->reset_complete[VFE1],
 				msecs_to_jiffies(500));
 		CDBG("%s: VFE1 done\n", __func__);
 		if (timeout <= 0) {
 			pr_err("%s: VFE1 reset wait timeout\n", __func__);
-			msm_cam_clk_enable(&ispif->pdev->dev,
-				ispif_8974_reset_clk_info, reset_clk,
-				ARRAY_SIZE(ispif_8974_reset_clk_info), 0);
+/*LGCHANGE_S,QCT Patch camif error 15.04.02*/
+		rc = msm_cam_clk_enable(&ispif->pdev->dev,
+			ispif_clk_info, ispif->clk,
+			ispif->num_clk, 0);
+/*LGCHANGE_E,QCT Patch camif error 15.04.02*/
 			return -ETIMEDOUT;
 		}
 	}
 
 	if (ispif->clk_idx == 1) {
+/*LGCHANGE_S,QCT Patch camif error 15.04.02*/
 		rc = msm_cam_clk_enable(&ispif->pdev->dev,
-			ispif_8974_reset_clk_info, reset_clk,
-			ARRAY_SIZE(ispif_8974_reset_clk_info), 0);
+			ispif_clk_info, ispif->clk,
+			ispif->num_clk, 0);
+/*LGCHANGE_E,QCT Patch camif error 15.04.02*/
 		if (rc < 0) {
 			pr_err("%s: cannot disable clock, error = %d",
 				__func__, rc);
@@ -205,7 +239,8 @@ static int msm_ispif_reset_hw(struct ispif_device *ispif)
 
 	return rc;
 }
-
+/*LGCHANGE_S,QCT Patch camif error 15.04.02*/
+/*
 int msm_ispif_get_ahb_clk_info(struct ispif_device *ispif_dev,
 	struct platform_device *pdev,
 	struct msm_cam_clk_info *ahb_clk_info)
@@ -258,7 +293,77 @@ int msm_ispif_get_ahb_clk_info(struct ispif_device *ispif_dev,
 	ispif_dev->num_ahb_clk = num_ahb_clk;
 	return 0;
 }
+*/
+int msm_ispif_get_clk_info(struct ispif_device *ispif_dev,
+	struct platform_device *pdev,
+	struct msm_cam_clk_info *ahb_clk_info,
+	struct msm_cam_clk_info *clk_info)
+{
+	uint32_t count, num_ahb_clk = 0;
+	const char *rate = NULL;
+	int i, rc;
 
+	struct device_node *of_node;
+	of_node = pdev->dev.of_node;
+
+	count = of_property_count_strings(of_node, "clock-names");
+
+	CDBG("count = %d\n", count);
+	if (count == 0) {
+		pr_err("no clocks found in device tree, count=%d", count);
+		return 0;
+	}
+
+	if (count > ISPIF_CLK_INFO_MAX) {
+		pr_err("invalid count=%d, max is %d\n", count,
+			ISPIF_CLK_INFO_MAX);
+		return -EINVAL;
+	}
+
+	for (i = 0; i < count; i++) {
+		rc = of_property_read_string_index(of_node, "clock-names",
+				i, &(clk_info[i].clk_name));
+		if (rc < 0) {
+			pr_err("%s reading clock-name failed index %d\n",
+				__func__, i);
+			return rc;
+		}
+
+		rc = of_property_read_string_index(of_node, "qcom,clock-rates",
+			i, &rate);
+		CDBG("clock-names[%d] = %s, clk_rate = %s\n",
+			i, clk_info[i].clk_name, rate);
+		if (rc < 0) {
+			pr_err("%s reading clock-rate failed index %d\n",
+				__func__, i);
+			return rc;
+		}
+
+		if (!strcmp(rate, "-1") || !strcmp(rate, "0"))
+			clk_info[i].clk_rate = NO_SET_RATE;
+		else if (!strcmp(rate, "-2"))
+			clk_info[i].clk_rate = INIT_RATE;
+		else
+			rc = kstrtol(rate, 10, &clk_info[i].clk_rate);
+
+		if (strnstr(clk_info[i].clk_name, "ahb",
+			strlen(clk_info[i].clk_name))) {
+			ahb_clk_info[num_ahb_clk].clk_name =
+				clk_info[i].clk_name;
+			ahb_clk_info[num_ahb_clk].clk_rate =
+				clk_info[i].clk_rate;
+			CDBG("clk_name[%d]= %s, clk_rate = %ld\n",
+				num_ahb_clk, ahb_clk_info[num_ahb_clk].clk_name,
+				ahb_clk_info[num_ahb_clk].clk_rate);
+			num_ahb_clk++;
+		}
+	}
+	CDBG("%s: num_ahb_clk %d num_clk %d\n", __func__, num_ahb_clk, count);
+	ispif_dev->num_ahb_clk = num_ahb_clk;
+	ispif_dev->num_clk = count;
+	return 0;
+}
+/*LGCHANGE_E,QCT Patch camif error 15.04.02*/
 static int msm_ispif_clk_ahb_enable(struct ispif_device *ispif, int enable)
 {
 	int rc = 0;
@@ -267,17 +372,25 @@ static int msm_ispif_clk_ahb_enable(struct ispif_device *ispif, int enable)
 		/* Older ISPIF versiond don't need ahb clokc */
 		return 0;
 	}
-
-	rc = msm_ispif_get_ahb_clk_info(ispif, ispif->pdev,
-		ispif_8974_ahb_clk_info);
+/*LGCHANGE_S,QCT Patch camif error 15.04.02*/
+/*LGCHANGE_S,QCT Patch for camif error 15.03.24*/
+/*	rc = msm_ispif_get_ahb_clk_info(ispif, ispif->pdev,
+		ispif_ahb_clk_info);
 	if (rc < 0) {
 		pr_err("%s: msm_isp_get_clk_info() failed", __func__);
 			return -EFAULT;
 	}
-
-	rc = msm_cam_clk_enable(&ispif->pdev->dev,
+*/
+/*LGCHANGE_S,QCT Patch for camif error 15.03.24*/
+/*LGCHANGE_E,QCT Patch camif error 15.04.02*/
+/*	rc = msm_cam_clk_enable(&ispif->pdev->dev,
 		ispif_8974_ahb_clk_info, ispif->ahb_clk,
 		ispif->num_ahb_clk, enable);
+*/
+	rc = msm_cam_clk_enable(&ispif->pdev->dev,
+		ispif_ahb_clk_info, ispif->ahb_clk,
+		ispif->num_ahb_clk, enable);
+/*LGCHANGE_E,QCT Patch for camif error 15.03.24*/
 	if (rc < 0) {
 		pr_err("%s: cannot enable clock, error = %d",
 			__func__, rc);
@@ -784,7 +897,6 @@ static int msm_ispif_start_frame_boundary(struct ispif_device *ispif,
 		rc = -EINVAL;
 		return rc;
 	}
-
 	msm_ispif_intf_cmd(ispif, ISPIF_INTF_CMD_ENABLE_FRAME_BOUNDARY, params);
 
 	return rc;
@@ -800,7 +912,8 @@ static int msm_ispif_restart_frame_boundary(struct ispif_device *ispif,
 	enum msm_ispif_vfe_intf vfe_intf;
 	uint32_t vfe_mask = 0;
 	uint32_t intf_addr;
-	struct clk *reset_clk[ARRAY_SIZE(ispif_8974_reset_clk_info)];
+/*LGCHANGE,QCT Patch camif error 15.04.02*/
+/*	struct clk *reset_clk[ARRAY_SIZE(ispif_8974_reset_clk_info)];*/
 
 	if (ispif->ispif_state != ISPIF_POWER_UP) {
 		pr_err("%s: ispif invalid state %d\n", __func__,
@@ -808,15 +921,26 @@ static int msm_ispif_restart_frame_boundary(struct ispif_device *ispif,
 		rc = -EPERM;
 		return rc;
 	}
+	if (params->num > MAX_PARAM_ENTRIES) {
+		pr_err("%s: invalid param entries %d\n", __func__,
+			params->num);
+		rc = -EINVAL;
+		return rc;
+	}
 
 	for (i = 0; i < params->num; i++) {
 		vfe_intf = params->entries[i].vfe_intf;
+		if (vfe_intf >= VFE_MAX) {
+			pr_err("%s: %d invalid i %d vfe_intf %d\n", __func__,
+				__LINE__, i, vfe_intf);
+			return -EINVAL;
+		}
 		vfe_mask |= (1 << vfe_intf);
 	}
-
+/*LGCHANGE,QCT Patch camif error 15.04.02*/
 	rc = msm_cam_clk_enable(&ispif->pdev->dev,
-		ispif_8974_reset_clk_info, reset_clk,
-		ARRAY_SIZE(ispif_8974_reset_clk_info), 1);
+		ispif_clk_info, ispif->clk,
+		ispif->num_clk, 1);
 	if (rc < 0) {
 		pr_err("%s: cannot enable clock, error = %d",
 			__func__, rc);
@@ -859,9 +983,10 @@ static int msm_ispif_restart_frame_boundary(struct ispif_device *ispif,
 	}
 
 	pr_info("%s: ISPIF reset hw done", __func__);
+/*LGCHANGE,QCT Patch camif error 15.04.02*/
 	rc = msm_cam_clk_enable(&ispif->pdev->dev,
-		ispif_8974_reset_clk_info, reset_clk,
-		ARRAY_SIZE(ispif_8974_reset_clk_info), 0);
+		ispif_clk_info, ispif->clk,
+		ispif->num_clk, 0);
 	if (rc < 0) {
 		pr_err("%s: cannot enable clock, error = %d",
 			__func__, rc);
@@ -916,9 +1041,10 @@ static int msm_ispif_restart_frame_boundary(struct ispif_device *ispif,
 end:
 	return rc;
 disable_clk:
+/*LGCHANGE,QCT Patch camif error 15.04.02*/
 	rc = msm_cam_clk_enable(&ispif->pdev->dev,
-		ispif_8974_reset_clk_info, reset_clk,
-		ARRAY_SIZE(ispif_8974_reset_clk_info), 0);
+		ispif_clk_info, ispif->clk,
+		ispif->num_clk, 0);
 	if (rc < 0) {
 		pr_err("%s: cannot enable clock, error = %d",
 		__func__, rc);
@@ -1182,14 +1308,16 @@ static int msm_ispif_init(struct ispif_device *ispif,
 		pr_err("%s: request_irq error = %d\n", __func__, rc);
 		goto error_irq;
 	}
+/*LGCHANGE,QCT Patch camif error 15.04.02*/
+	msm_ispif_reset_hw(ispif);
 
 	rc = msm_ispif_clk_ahb_enable(ispif, 1);
 	if (rc) {
 		pr_err("%s: ahb_clk enable failed", __func__);
 		goto error_ahb;
 	}
-
-	msm_ispif_reset_hw(ispif);
+/*LGCHANGE_S,QCT Patch camif error 15.04.02*/
+/*	msm_ispif_reset_hw(ispif);*/
 
 	rc = msm_ispif_reset(ispif);
 	if (rc == 0) {
@@ -1223,9 +1351,10 @@ static void msm_ispif_release(struct ispif_device *ispif)
 	}
 
 	/* make sure no streaming going on */
-	if (ispif->fs_vfe && regulator_is_enabled(ispif->fs_vfe))	//LGE_CHANGE, vdd_vfe to check if vfe is up
+	if (ispif->fs_vfe && regulator_is_enabled(ispif->fs_vfe)) {	//                                         
 		msm_ispif_reset(ispif);
-	else
+		msm_ispif_reset_hw(ispif);/*LGCHANGE,QCT Patch for camif error 15.03.24*/
+	} else
 		pr_err("%s: failed to reset. fs_vfe is NULL \n", __func__);
 
 	msm_ispif_clk_ahb_enable(ispif, 0);
@@ -1237,6 +1366,7 @@ static void msm_ispif_release(struct ispif_device *ispif)
 	iounmap(ispif->clk_mux_base);
 
 	ispif->ispif_state = ISPIF_POWER_DOWN;
+
 }
 
 static long msm_ispif_cmd(struct v4l2_subdev *sd, void *arg)
@@ -1344,7 +1474,6 @@ static int ispif_close_node(struct v4l2_subdev *sd, struct v4l2_subdev_fh *fh)
 {
 	int rc = 0;
 	struct ispif_device *ispif = v4l2_get_subdevdata(sd);
-
 	if (!ispif) {
 		pr_err("%s: invalid input\n", __func__);
 		return -EINVAL;
@@ -1400,7 +1529,14 @@ static int ispif_probe(struct platform_device *pdev)
 		/* not an error condition */
 		rc = 0;
 	}
-
+/*LGCHANGE_S,QCT Patch camif error 15.04.02*/
+	rc = msm_ispif_get_clk_info(ispif, pdev,
+		ispif_ahb_clk_info, ispif_clk_info);
+	if (rc < 0) {
+		pr_err("%s: msm_isp_get_clk_info() failed", __func__);
+			return -EFAULT;
+	}
+/*LGCHANGE_E,QCT Patch camif error 15.04.02*/
 	mutex_init(&ispif->mutex);
 	ispif->mem = platform_get_resource_byname(pdev,
 		IORESOURCE_MEM, "ispif");
@@ -1434,11 +1570,12 @@ static int ispif_probe(struct platform_device *pdev)
 			pr_err("%s: no valid csi_mux region\n", __func__);
 	}
 
-	//LGE_CHANGE, vdd_vfe to check if vfe is up
+	//                                           
         ispif->fs_vfe = regulator_get(&pdev->dev, "vdd_vfe");
 
 	if (ispif->fs_vfe == NULL)
 		pr_err("%s: gdsc_vfe is null\n", __func__);
+	//                                           
 
 	v4l2_subdev_init(&ispif->msm_sd.sd, &msm_ispif_subdev_ops);
 	ispif->msm_sd.sd.internal_ops = &msm_ispif_internal_ops;

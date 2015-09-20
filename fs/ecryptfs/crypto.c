@@ -147,10 +147,25 @@ static int ecryptfs_crypto_api_algify_cipher_name(char **algified_name,
 						  char *cipher_name,
 						  char *chaining_modifier)
 {
-	int cipher_name_len = strlen(cipher_name);
-	int chaining_modifier_len = strlen(chaining_modifier);
+#ifndef CONFIG_CRYPTO_DEV_KFIPS
+        int cipher_name_len = strlen(cipher_name);
+            int chaining_modifier_len = strlen(chaining_modifier);
+#else
+    int cipher_name_len;
+    int chaining_modifier_len;
+#endif
 	int algified_name_len;
 	int rc;
+
+#ifdef CONFIG_CRYPTO_DEV_KFIPS
+    if (!strcmp(cipher_name, "aes") &&
+        (!strcmp(chaining_modifier, "cbc") ||
+         !strcmp(chaining_modifier, "xts")))
+        cipher_name = "fipsaes";
+
+    cipher_name_len = strlen(cipher_name);
+    chaining_modifier_len = strlen(chaining_modifier);
+#endif
 
 	algified_name_len = (chaining_modifier_len + cipher_name_len + 3);
 	(*algified_name) = kmalloc(algified_name_len, GFP_KERNEL);

@@ -35,3 +35,10 @@ config ALLOC_BUFFERS_IN_4K_CHUNKS
 	help
           Choose this option if you want ION to allocate buffers in
           only 4KB chunks.
+
+config ION_SYSTEM_HEAP_DIRECT_FREE
+	bool "Do not use cached pool for ION system heap"
+	depends on ION
+	help
+	Choose this option if you want ION system heap to free buffers
+	directly.

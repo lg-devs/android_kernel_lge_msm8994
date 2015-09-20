@@ -19,6 +19,11 @@ config ANDROID_BINDER_IPC
 	  Android process, using Binder to identify, invoke and pass arguments
 	  between said processes.
 
+config LGE_ANDROID_BINDER_IPC_CHECK
+	bool "Additional checking for transaction"
+	depends on ANDROID_BINDER_IPC
+	default n
+
 config ANDROID_BINDER_IPC_32BIT
 	bool "Use old 32-bit binder api"
 	default y if !64BIT

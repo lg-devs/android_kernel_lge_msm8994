@@ -35,6 +35,8 @@
 #define fh_to_private(__fh) \
 	container_of(__fh, struct camera_v4l2_private, fh)
 
+static DEFINE_MUTEX(v4l2_sync_lock); /*                                                                                       */
+
 struct camera_v4l2_private {
 	struct v4l2_fh fh;
 	unsigned int stream_id;
@@ -539,6 +541,8 @@ static int camera_v4l2_open(struct file *filep)
 	unsigned int opn_idx, idx;
 	BUG_ON(!pvdev);
 
+	mutex_lock(&v4l2_sync_lock);/*                                                                                       */
+	
 	rc = camera_v4l2_fh_open(filep);
 	if (rc < 0) {
 		pr_err("%s : camera_v4l2_fh_open failed Line %d rc %d\n",
@@ -560,6 +564,7 @@ static int camera_v4l2_open(struct file *filep)
 		pm_stay_awake(&pvdev->vdev->dev);
 
 		/* create a new session when first opened */
+		pr_err("%s: msm_create_session id=%d\n", __func__, pvdev->vdev->num); /*                                                                                       */
 		rc = msm_create_session(pvdev->vdev->num, pvdev->vdev);
 		if (rc < 0) {
 			pr_err("%s : session creation failed Line %d rc %d\n",
@@ -593,6 +598,7 @@ static int camera_v4l2_open(struct file *filep)
 			goto post_fail;
 		}
 	} else {
+		pr_err("%s: msm_create_command_ack_q id=%d\n", __func__, pvdev->vdev->num); /*                                                                                       */
 		rc = msm_create_command_ack_q(pvdev->vdev->num,
 			find_first_zero_bit((const unsigned long *)&opn_idx,
 				MSM_CAMERA_STREAM_CNT_BITS));
@@ -605,6 +611,7 @@ static int camera_v4l2_open(struct file *filep)
 	idx |= (1 << find_first_zero_bit((const unsigned long *)&opn_idx,
 				MSM_CAMERA_STREAM_CNT_BITS));
 	atomic_cmpxchg(&pvdev->opened, opn_idx, idx);
+	mutex_unlock(&v4l2_sync_lock);/*                                                                                       */
 	return rc;
 
 post_fail:
@@ -617,6 +624,7 @@ session_fail:
 vb2_q_fail:
 	camera_v4l2_fh_release(filep);
 fh_open_fail:
+	mutex_unlock(&v4l2_sync_lock);/*                                                                                       */
 	return rc;
 }
 
@@ -644,8 +652,10 @@ static int camera_v4l2_close(struct file *filep)
 	unsigned int opn_idx, mask;
 	BUG_ON(!pvdev);
 
+	mutex_lock(&v4l2_sync_lock);/*                                                                                       */
+	
 	opn_idx = atomic_read(&pvdev->opened);
-	pr_debug("%s: close stream_id=%d\n", __func__, sp->stream_id);
+	pr_err("%s: close stream_id=%d\n", __func__, sp->stream_id); /*                                                                                       */
 	mask = (1 << sp->stream_id);
 	opn_idx &= ~mask;
 	atomic_set(&pvdev->opened, opn_idx);
@@ -683,6 +693,7 @@ static int camera_v4l2_close(struct file *filep)
 	camera_v4l2_vb2_q_release(filep);
 	camera_v4l2_fh_release(filep);
 
+	mutex_unlock(&v4l2_sync_lock);/*                                                                                       */
 	return rc;
 }
 

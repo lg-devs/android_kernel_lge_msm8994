@@ -266,7 +266,7 @@ struct msm_mctl_post_proc_cmd {
 #define MSM_CAMERA_LED_HIGH 2
 #define MSM_CAMERA_LED_INIT 3
 #define MSM_CAMERA_LED_RELEASE 4
-/* LGE: For torch, Video recording */
+/*                                 */
 #define MSM_CAMERA_LED_TORCH 5
 
 
@@ -1603,10 +1603,10 @@ enum msm_camera_vreg_name_t {
 	CAM_VIO,
 	CAM_VANA,
 	CAM_VAF,
-/* LGE_CHANGE_S, Add OISVDD*/
+/*                         */
 	CAM_OISVDD,
 	CAM_OISDVDD,
-/* LGE_CHANGE_E, Add OISVDD*/
+/*                         */
 	CAM_VREG_MAX,
 };
 
@@ -1710,6 +1710,8 @@ struct damping_params_t {
 enum actuator_type {
 	ACTUATOR_VCM,
 	ACTUATOR_PIEZO,
+	ACTUATOR_HVCM,
+	ACTUATOR_BIVCM,
 };
 
 enum msm_actuator_data_type {
@@ -1725,6 +1727,10 @@ enum msm_actuator_addr_type {
 enum msm_actuator_write_type {
 	MSM_ACTUATOR_WRITE_HW_DAMP,
 	MSM_ACTUATOR_WRITE_DAC,
+	MSM_ACTUATOR_WRITE,
+	MSM_ACTUATOR_WRITE_DIR_REG,
+	MSM_ACTUATOR_POLL,
+	MSM_ACTUATOR_READ_WRITE,
 };
 
 struct msm_actuator_reg_params_t {
@@ -1732,7 +1738,10 @@ struct msm_actuator_reg_params_t {
 	uint32_t hw_mask;
 	uint16_t reg_addr;
 	uint16_t hw_shift;
-	uint16_t data_shift;
+	uint16_t data_type;
+	uint16_t addr_type;
+	uint16_t reg_data;
+	uint16_t delay;
 };
 
 struct reg_settings_t {

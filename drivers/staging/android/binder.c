@@ -105,8 +105,8 @@ enum {
 	BINDER_DEBUG_PRIORITY_CAP           = 1U << 14,
 	BINDER_DEBUG_BUFFER_ALLOC_ASYNC     = 1U << 15,
 };
-static uint32_t binder_debug_mask = BINDER_DEBUG_USER_ERROR |
-	BINDER_DEBUG_FAILED_TRANSACTION | BINDER_DEBUG_DEAD_TRANSACTION;
+static uint32_t binder_debug_mask;
+
 module_param_named(debug_mask, binder_debug_mask, uint, S_IWUSR | S_IRUGO);
 
 static bool binder_debug_no_lock;
@@ -1470,6 +1470,20 @@ static void binder_transaction(struct binder_proc *proc,
 
 	trace_binder_transaction(reply, t, target_node);
 
+#ifdef CONFIG_LGE_ANDROID_BINDER_IPC_CHECK
+	//neo, check for dying process.
+	if (test_tsk_thread_flag(target_proc->tsk, TIF_MEMDIE)) {
+		binder_debug(BINDER_DEBUG_FAILED_TRANSACTION,
+			"transaction can not be guaranteed, target_proc=%d was killed by lmk or oom \n", target_proc->tsk->pid);
+	if (t->flags & TF_ONE_WAY) {
+		binder_debug(BINDER_DEBUG_FAILED_TRANSACTION,
+			"oneway transaction could not work properly for dying process(%d)\n", target_proc->tsk->pid);
+		return_error = BR_FAILED_REPLY;
+		goto err_binder_target_proc_memdie;
+		}
+	}
+#endif
+
 	t->buffer = binder_alloc_buf(target_proc, tr->data_size,
 		tr->offsets_size, !reply && (t->flags & TF_ONE_WAY));
 	if (t->buffer == NULL) {
@@ -1703,6 +1717,9 @@ err_copy_data_failed:
 	binder_transaction_buffer_release(target_proc, t->buffer, offp);
 	t->buffer->transaction = NULL;
 	binder_free_buf(target_proc, t->buffer);
+#ifdef CONFIG_LGE_ANDROID_BINDER_IPC_CHECK
+err_binder_target_proc_memdie:
+#endif
 err_binder_alloc_buf_failed:
 	kfree(tcomplete);
 	binder_stats_deleted(BINDER_STAT_TRANSACTION_COMPLETE);

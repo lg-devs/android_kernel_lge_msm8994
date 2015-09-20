@@ -55,6 +55,7 @@ struct broadcast_fc8300_ctrl_data
 #endif
 #ifdef FEATURE_DMB_USE_REGULATOR
     struct regulator*       vdd_io;
+    struct regulator*       vdd_io_l14;
 #endif
 };
 
@@ -156,7 +157,50 @@ static int broadcast_isdbt_set_regulator(int onoff)
         }
     }
 
-    printk("%s: success to set pm8994 voltage control(mode:%d)(gain off)\n", __func__,onoff);
+    printk("%s: success to set pm8994 voltage control(mode:%d)\n", __func__,onoff);
+    return rc;
+}
+
+static int broadcast_isdbt_set_regulator_l14(int onoff)
+{
+    int rc = -1;
+
+    if(!IsdbCtrlInfo.vdd_io_l14)
+    {
+        IsdbCtrlInfo.vdd_io_l14 = devm_regulator_get(&(IsdbCtrlInfo.pdev->dev),"isdbt_vdd_io_l14");
+        if(IS_ERR(IsdbCtrlInfo.vdd_io_l14)){
+            dev_err(&(IsdbCtrlInfo.pdev->dev), "[dtv]could not get regulator %s \n","isdbt_vdd_io_l14-supply");
+            return rc;
+        }
+    }
+
+    if(onoff)
+    {
+        rc = regulator_set_voltage(IsdbCtrlInfo.vdd_io_l14,1800000,1800000);
+        if(rc)
+        {
+            dev_err(&(IsdbCtrlInfo.pdev->dev), "[dtv] could not set regulator l14 ret=%d \n",rc);
+            return rc;
+        }
+
+        rc = regulator_enable(IsdbCtrlInfo.vdd_io_l14);
+        if(rc)
+        {
+            dev_err(&(IsdbCtrlInfo.pdev->dev), "[dtv]could not enable regulator l14 ret=%d\n",rc);
+            return rc;
+        }
+    }
+    else
+    {
+        rc = regulator_disable(IsdbCtrlInfo.vdd_io_l14);
+        if(rc)
+        {
+            dev_err(&(IsdbCtrlInfo.pdev->dev), "[dtv]could not disable regulator l14 %d \n",rc);
+            return rc;
+        }
+    }
+
+    printk("%s: success to set pm8994 voltage control l14 (mode:%d)(gain off)\n", __func__,onoff);
     return rc;
 }
 #endif
@@ -290,7 +334,7 @@ static int broadcast_Isdb_i2c_probe(struct i2c_client *client, const struct i2c_
 
 	/* taew00k.kang added for Device Tree Structure 2013-06-04 [start] */
 	addr = client->addr; //Slave Addr
-	pr_err("[dtv] i2c Slaveaddr [%x][%s] \n", addr, client->name);
+	pr_err("[dtv] i2c Slaveaddr [%x] \n", addr);
 
 	IsdbCtrlInfo.pclient = client;
 	//i2c_set_clientdata(client, (void*)&IsdbCtrlInfo.pclient);
@@ -310,7 +354,6 @@ static int broadcast_Isdb_i2c_probe(struct i2c_client *client, const struct i2c_
     }
     clk_disable_unprepare(IsdbCtrlInfo.xo_clk);
 #endif
-dev_err(&IsdbCtrlInfo.pclient->dev, "[dtv] get dev name\n");
 
 #ifdef FEATURE_DMB_USE_PINCTRL
     isdbt_pinctrl_init();
@@ -322,6 +365,7 @@ dev_err(&IsdbCtrlInfo.pclient->dev, "[dtv] get dev name\n");
 #ifdef FEATURE_DMB_USE_REGULATOR
     broadcast_isdbt_set_regulator(1);
     broadcast_isdbt_set_regulator(0);
+    broadcast_isdbt_set_regulator_l14(1);
 #endif
 
 #ifndef _NOT_USE_WAKE_LOCK_
@@ -345,6 +389,7 @@ static int broadcast_Isdb_i2c_remove(struct i2c_client* client)
 	return rc;
 }
 
+#if 0
 static int broadcast_Isdb_i2c_suspend(struct i2c_client* client, pm_message_t mesg)
 {
 	int rc = 0;
@@ -358,6 +403,7 @@ static int broadcast_Isdb_i2c_resume(struct i2c_client* client)
 	print_log(NULL, "[%s]\n", __func__);
 	return rc;
 }
+#endif
 
 static const struct i2c_device_id isdbt_fc8300_id[] = {
 /* taew00k.kang added for Device Tree Structure 2013-06-04 [start] */
@@ -385,8 +431,6 @@ static struct i2c_driver broadcast_Isdb_driver = {
 	.probe = broadcast_Isdb_i2c_probe,
 	.remove	= broadcast_Isdb_i2c_remove,
 	.id_table = isdbt_fc8300_id,
-	.suspend = broadcast_Isdb_i2c_suspend,
-	.resume  = broadcast_Isdb_i2c_resume,
 };
 
 int broadcast_dmb_fc8300_drv_init(void)

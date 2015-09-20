@@ -116,7 +116,7 @@ struct max17048_chip {
 	struct power_supply             *batt_psy;
 	struct power_supply             battery;
 #ifdef CONFIG_MACH_MSM8994_Z2
-	struct power_supply		*usb_psy;
+	struct power_supply		*bms_psy;
 #endif
 #endif
 };
@@ -266,9 +266,9 @@ static int max17048_get_capacity_from_soc(void)
 #ifdef CONFIG_MACH_MSM8994_Z2
 	batt_soc = max17048_capacity_evaluator((int)batt_soc);
 #else
-	if(batt_soc > 100)
+	if (batt_soc > 100)
 		batt_soc = 100;
-	else if(batt_soc < 0)
+	else if (batt_soc < 0)
 		batt_soc = 0;
 #endif
 
@@ -401,7 +401,7 @@ static void max17048_low_polling_work(struct work_struct *work)
 				__func__, chip->capacity_level, chip->voltage);
 
 		/* TODO : it should be change after verification */
-		//power_supply_changed(chip->batt_psy);
+		/* power_supply_changed(chip->batt_psy); */
 	}
 
 	schedule_delayed_work(&chip->low_polling_work,
@@ -737,9 +737,7 @@ static int max17048_set_rcomp(struct i2c_client *client, int rcomp)
 }
 
 #define IDLE_BATT_TEMP 250
-#ifdef CONFIG_MACH_MSM8994_Z2
-#define CHG_RCOMP 117	/* init rcomp 0x75 with TA */
-#endif
+
 int max17048_set_rcomp_by_temperature(struct i2c_client *client)
 {
 	int init_rcomp;
@@ -749,43 +747,17 @@ int max17048_set_rcomp_by_temperature(struct i2c_client *client)
 	int temp;
 	int rc;
 	union power_supply_propval ret = {0,};
-#ifdef CONFIG_MACH_MSM8994_Z2
-	union power_supply_propval val={0,};
-	int ta_online;
-#endif
 
 	struct max17048_chip *chip = i2c_get_clientdata(client);
 
 	/* if fuel gauge is not initialized, */
 	if (ref == NULL || chip == NULL)
-		return -1;
+		return -EPERM;
 
 	else {
-#ifdef CONFIG_MACH_MSM8994_Z2
-		if (!chip->usb_psy) {
-			chip->usb_psy = power_supply_get_by_name("usb");
-			if (!chip->usb_psy) {
-				printk(KERN_ERR "%s : usb_psy is not init yet!\n", __func__);
-				return -1;
-			}
-		}
 
-		rc = chip->usb_psy->get_property(chip->usb_psy,
-				POWER_SUPPLY_PROP_TYPE, &val);
-		if (rc < 0)
-			printk(KERN_ERR "%s :could not read USB Charge Type property, rc=%d\n",
-				__func__, rc);
-		if (val.intval == POWER_SUPPLY_TYPE_USB_DCP) {
-			ta_online = true;
-			init_rcomp = CHG_RCOMP;
-		} else {
-			ta_online = false;
-			init_rcomp = ref->model_data->rcomp;
-		}
-#else
 		init_rcomp = ref->model_data->rcomp;
-#endif
-		temp_hot =  ref->model_data->temp_co_hot;
+		temp_hot = ref->model_data->temp_co_hot;
 		temp_cold = ref->model_data->temp_co_cold;
 	}
 
@@ -793,13 +765,27 @@ int max17048_set_rcomp_by_temperature(struct i2c_client *client)
 		chip->batt_psy = power_supply_get_by_name("battery");
 		if (IS_ERR_OR_NULL(chip->batt_psy)) {
 			printk(KERN_INFO "%s : batt_psy is not init yet!\n", __func__);
-			return -1;
+			return -EPERM;
+		}
+	}
+#ifdef CONFIG_MACH_MSM8994_Z2
+	if (!chip->bms_psy) {
+		chip->bms_psy = power_supply_get_by_name("bms");
+		if (!chip->bms_psy) {
+			pr_err("%s : bms_psy is not init yet!\n", __func__);
+			return -EPERM;
 		}
 	}
 
+	rc = chip->bms_psy->get_property(chip->bms_psy,
+			POWER_SUPPLY_PROP_ORG_FG_TEMP, &ret);
+	if (rc < 0)
+		pr_err("%s : could not read original FG temp property, rc =%d\n",
+				__func__, rc);
+#else
 	chip->batt_psy->get_property(chip->batt_psy,
 			POWER_SUPPLY_PROP_TEMP, &ret);
-
+#endif
 	temp = ret.intval;
 	temp /= 10;
 
@@ -823,13 +809,9 @@ int max17048_set_rcomp_by_temperature(struct i2c_client *client)
 	else if (new_rcomp < 0)
 		new_rcomp = 0;
 
-#ifdef CONFIG_MACH_MSM8994_Z2
-	pr_err("%s : temp = %d, pre_rcomp = 0x%02X -> new_rcomp = 0x%02X, init_rcomp = %d \n"
-		, __func__ , temp, pre_rcomp, new_rcomp, init_rcomp);
-#else
 	pr_err("%s : temp = %d, pre_rcomp = 0x%02X -> new_rcomp = 0x%02X\n"
 		, __func__ , temp, pre_rcomp, new_rcomp);
-#endif
+
 	/* Write RCOMP */
 	if (new_rcomp != pre_rcomp) {
 		rc = max17048_set_rcomp(chip->client, new_rcomp);

@@ -87,6 +87,7 @@ struct mmc_ios {
 /* states to represent load on the host */
 enum mmc_load {
 	MMC_LOAD_HIGH,
+	MMC_LOAD_INIT,
 	MMC_LOAD_LOW,
 };
 
@@ -229,9 +230,9 @@ enum dev_state {
 
 
 #ifdef CONFIG_MACH_LGE
-/* LGE_CHANGE
- * define enumeration for mmc-host-driver-index.
- * 2014-09-01, Z2G4-BSP-FileSys@lge.com
+/*           
+                                                
+                                       
  */
 enum mmc_host_driver_index {
        MMC_HOST_DRIVER_INDEX_MMC0 = 0,
@@ -478,6 +479,7 @@ struct mmc_host {
 	 * actually disabling the clock from it's source.
 	 */
 	bool			card_clock_off;
+	bool			wakeup_on_idle;
 	unsigned long		private[0] ____cacheline_aligned;
 };
 

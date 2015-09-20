@@ -85,12 +85,6 @@ static DEFINE_SEMAPHORE(console_sem);
 struct console *console_drivers;
 EXPORT_SYMBOL_GPL(console_drivers);
 
-#ifdef CONFIG_MACH_LGE
-static size_t print_time(u64 ts, struct timespec time, struct tm tmresult, char *buf);
-#else
-static size_t print_time(u64 ts, char *buf);
-#endif
-
 #ifdef CONFIG_LOCKDEP
 static struct lockdep_map console_lock_dep_map = {
 	.name = "console_lock"
@@ -691,14 +685,9 @@ static ssize_t devkmsg_read(struct file *file, char __user *buf,
 		 ((user->prev & LOG_CONT) && !(msg->flags & LOG_PREFIX)))
 		cont = '+';
 
-#ifdef CONFIG_MACH_LGE
-	len = sprintf(user->buf, "<%u>", (msg->facility << 3) | msg->level);
-	len += print_time(msg->ts_nsec, msg->time, msg->tmresult, user->buf + len);
-#else
 	len = sprintf(user->buf, "%u,%llu,%llu,%c;",
 		      (msg->facility << 3) | msg->level,
 		      user->seq, ts_usec, cont);
-#endif
 	user->prev = msg->flags;
 
 	/* escape non-printable characters */

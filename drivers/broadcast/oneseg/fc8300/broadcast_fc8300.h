@@ -3,7 +3,8 @@
 
 #include "../broadcast_dmb_drv_ifdef.h"
 #include "fc8300Driver/inc/bbm.h"
-struct i2c_client*	FCI_GET_I2C_DRIVER(void);
+
+struct i2c_client*    FCI_GET_I2C_DRIVER(void);
 struct spi_device*    FCI_GET_SPI_DRIVER(void);
 
 int fc8300_power_on(void);
@@ -27,7 +28,7 @@ extern int broadcast_fc8300_drv_if_get_dmb_data(struct broadcast_dmb_data_info *
 extern int broadcast_fc8300_drv_if_reset_ch(void);
 extern int broadcast_fc8300_drv_if_user_stop(int mode);
 extern int broadcast_fc8300_drv_if_select_antenna(unsigned int sel);
-extern int broadcast_fc8300_drv_if_isr(void);
 extern int broadcast_fc8300_drv_if_read_control(char *buf, unsigned int size);
 extern int broadcast_fc8300_drv_if_get_mode(unsigned short *mode);
-#endif /*__BROADCAST_TCC3530_H__*/
+
+#endif /*__BROADCAST_FC8300_H__*/

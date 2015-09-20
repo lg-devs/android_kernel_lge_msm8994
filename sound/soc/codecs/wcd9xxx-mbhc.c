@@ -45,6 +45,11 @@
 #include "wcd9xxx-resmgr.h"
 #include "wcd9xxx-common.h"
 
+#ifdef CONFIG_SND_LGE_MBHC_BUTTON_CAL
+#include <linux/fs.h>
+#include <linux/string.h>
+#endif
+
 #define WCD9XXX_JACK_MASK (SND_JACK_HEADSET | SND_JACK_OC_HPHL | \
 			   SND_JACK_OC_HPHR | SND_JACK_LINEOUT | \
 			   SND_JACK_UNSUPPORTED | SND_JACK_MICROPHONE2)
@@ -121,7 +126,7 @@
  */
 #if 0 // QCT org
 #define WCD9XXX_CS_MEAS_INVALD_RANGE_LOW_MV 160
-#else // LGE_CHANGED
+#else //            
 #define WCD9XXX_CS_MEAS_INVALD_RANGE_LOW_MV 230
 #endif
 #define WCD9XXX_CS_MEAS_INVALD_RANGE_HIGH_MV 265
@@ -140,7 +145,7 @@
 
 #define WCD9XXX_USLEEP_RANGE_MARGIN_US 100
 
-/* LGE UPDATE ADVANCED HEADSET TYPE DETECT L impedance Range*/
+/*                                                          */
 #define LGE_ADVANCED_MIN_THD	100000
 #define LGE_ADVANCED_MAX_THD	400000
 #define LGE_SWITCH_NAME_ADVANCED	"h2w_advanced"
@@ -260,24 +265,24 @@ static void wcd9xxx_turn_onoff_override(struct wcd9xxx_mbhc *mbhc, bool on)
 			    0x04, on ? 0x04 : 0x00);
 }
 
-// LGE_CHANGE_S, separate set switch device name function.
+//                                                        
 static void lge_set_switch_device(struct wcd9xxx_mbhc *mbhc, int state)
 {
 	if(mbhc->zl > LGE_ADVANCED_MAX_THD)
-	{ //LGE UPDATE L impedance is higher than 400 ohm
+	{ //                                             
 		mbhc->sdev.name = LGE_SWITCH_NAME_AUX;
 	}
 	else if((mbhc->zl < LGE_ADVANCED_MAX_THD) && (mbhc->zl > LGE_ADVANCED_MIN_THD))
-	{ //LGE UPDATE L impedance is 100 ~ 400 ohm
+	{ //                                       
 		mbhc->sdev.name = LGE_SWITCH_NAME_ADVANCED;
 	}
 	else
-	{ //LGE UPDATE L impedance is under 100 ohm
+	{ //                                       
 		mbhc->sdev.name = LGE_SWITCH_NAME_NORMAL;
 	}
 	switch_set_state(&mbhc->sdev, (state == SND_JACK_HEADPHONE) ? LGE_HEADSET_NO_MIC  : LGE_HEADSET );
 }
-// LGE_CHANGE_E, separate set switch device name function.
+//                                                        
 
 /* called under codec_resource_lock acquisition */
 static void wcd9xxx_pause_hs_polling(struct wcd9xxx_mbhc *mbhc)
@@ -383,11 +388,6 @@ static bool __wcd9xxx_switch_micbias(struct wcd9xxx_mbhc *mbhc,
 			   0x04;
 		if (!override)
 			wcd9xxx_turn_onoff_override(mbhc, true);
-
-		snd_soc_update_bits(codec, WCD9XXX_A_MAD_ANA_CTRL,
-				    0x10, 0x00);
-		snd_soc_update_bits(codec, WCD9XXX_A_LDO_H_MODE_1,
-				    0x20, 0x00);
 		/* Adjust threshold if Mic Bias voltage changes */
 		if (d->micb_mv != VDDIO_MICBIAS_MV) {
 			cfilt_k_val = __wcd9xxx_resmgr_get_k_val(mbhc,
@@ -449,11 +449,6 @@ static bool __wcd9xxx_switch_micbias(struct wcd9xxx_mbhc *mbhc,
 		if ((!checkpolling || mbhc->polling_active) &&
 		    restartpolling)
 			wcd9xxx_pause_hs_polling(mbhc);
-
-			snd_soc_update_bits(codec, WCD9XXX_A_MAD_ANA_CTRL,
-					    0x10, 0x10);
-			snd_soc_update_bits(codec, WCD9XXX_A_LDO_H_MODE_1,
-					    0x20, 0x20);
 		/* Reprogram thresholds */
 		if (d->micb_mv != VDDIO_MICBIAS_MV) {
 			cfilt_k_val =
@@ -666,7 +661,7 @@ static void wcd9xxx_jack_report(struct wcd9xxx_mbhc *mbhc,
 	lge_uart_console_on_earjack_in();
 #endif
 
-/* LGE UPDATE ADVANCED HEADSET TYPE DETECT */
+/*                                         */
 	if (mask == WCD9XXX_JACK_MASK) {
 		if (status == SND_JACK_HEADPHONE
 				|| status == SND_JACK_HEADSET)
@@ -927,7 +922,7 @@ static void wcd9xxx_insert_detect_setup(struct wcd9xxx_mbhc *mbhc, bool ins)
 	else
 		snd_soc_write(mbhc->codec, WCD9XXX_A_MBHC_INSERT_DETECT,
 			      (0x6C | (ins ? (1 << 1) : 0)));
-	/* LGE workaround code to remove insertion noise when insert just half. */
+	/*                                                                      */
 	snd_soc_write(mbhc->codec, WCD9XXX_A_MBHC_INSERT_DETECT2,
 		      (0x10 | (ins ? 0 : (3 << 6))));
 	/* Re-enable detection */
@@ -1234,15 +1229,17 @@ static s32 __wcd9xxx_codec_sta_dce_v(struct wcd9xxx_mbhc *mbhc, s8 dce,
 				     u16 bias_value, s16 z, u32 micb_mv)
 {
 	s16 value, mb;
-	s32 mv;
+	s32 mv = 0;
 
 	value = bias_value;
 	if (dce) {
 		mb = (mbhc->mbhc_data.dce_mb);
-		mv = (value - z) * (s32)micb_mv / (mb - z);
+		if (mb - z)
+			mv = (value - z) * (s32)micb_mv / (mb - z);
 	} else {
 		mb = (mbhc->mbhc_data.sta_mb);
-		mv = (value - z) * (s32)micb_mv / (mb - z);
+		if (mb - z)
+			mv = (value - z) * (s32)micb_mv / (mb - z);
 	}
 
 	return mv;
@@ -1588,7 +1585,7 @@ wcd9xxx_cs_find_plug_type(struct wcd9xxx_mbhc *mbhc,
 		} else
 			d->_type = PLUG_TYPE_HEADSET;
 
-		/* LGE UPDATE : add debugging log */
+		/*                                */
 		printk("[LGE MBHC]: wcd9xxx_cs_find_plug_type DCE #%d, %04x, V %04d(%04d), mic_bias %d, swap_gnd %d, HPHL %d, TYPE %d\n",
 				i, d->dce, vdce, d->_vdces,d->mic_bias, d->swap_gnd, d->hphl_status & 0x01,d->_type);
 
@@ -1722,7 +1719,7 @@ wcd9xxx_cs_find_plug_type(struct wcd9xxx_mbhc *mbhc,
 exit:
 	pr_debug("%s: Plug type %d detected\n", __func__, type);
 
-	/* LGE UPDATE : add debugging log */
+	/*                                */
 	printk("[LGE MBHC]: wcd9xxx_cs_find_plug_type - Plug type %d detected \n", type);
 
 	return type;
@@ -1866,6 +1863,22 @@ wcd9xxx_find_plug_type(struct wcd9xxx_mbhc *mbhc,
 				mbhc->micbias_enable = true;
 		}
 	}
+
+#ifdef CONFIG_MACH_LGE
+	if (type == PLUG_TYPE_HIGH_HPH) {
+		wcd9xxx_detect_impedance(mbhc, &mbhc->zl, &mbhc->zr);
+
+		if (mbhc->zl < LGE_ADVANCED_MIN_THD){
+			type = PLUG_TYPE_HEADSET;
+			mbhc->micbias_enable = true;
+			pr_info("[LGE MBHC] %s : High Impedance Headset(Apple) is detected. Enable MICBIAS and report 4pin headset.\n",__func__);
+		}
+		else {
+			type = PLUG_TYPE_HEADSET;
+			pr_info("[LGE MBHC] %s: L-impedance is higher than 1000 ohm(4pin AUX). Report 4pin headset.\n",__func__);
+		}
+	}
+#endif
 exit:
 	pr_debug("%s: Plug type %d detected, micbias_enable %d\n", __func__,
 		 type, mbhc->micbias_enable);
@@ -3477,6 +3490,7 @@ static void wcd9xxx_swch_irq_handler(struct wcd9xxx_mbhc *mbhc)
 	printk("[LGE MBHC]: %s: Current plug type %d, insert %d\n", __func__,
 		 mbhc->current_plug, insert);
 	if ((mbhc->current_plug == PLUG_TYPE_NONE) && insert) {
+
 		mbhc->lpi_enabled = false;
 		wmb();
 		/* cancel detect plug */
@@ -3916,7 +3930,7 @@ irqreturn_t wcd9xxx_dce_handler(int irq, void *data)
 	pr_debug("%s: Meas HW - DCE 0x%x,%d,%d button %d\n", __func__,
 		 dce[0] & 0xFFFF, mv[0], mv_s[0], btnmeas[0]);
 
-	/* LGE UPDATE : add debugging log */
+	/*                                */
 	printk("[LGE MBHC]: Meas HW - DCE 0x%x,%d,%d button %d\n",dce[0] & 0xFFFF, mv[0], mv_s[0], btnmeas[0]);
 
 	if (n_btn_meas == 0)
@@ -3932,7 +3946,7 @@ irqreturn_t wcd9xxx_dce_handler(int irq, void *data)
 			 __func__, meas, dce[meas] & 0xFFFF, mv[meas],
 			 mv_s[meas], btnmeas[meas]);
 
-		/* LGE UPDATE : add debugging log */
+		/*                                */
 		printk("[LGE MBHC]:  Meas %d - DCE 0x%x,%d,%d button %d\n",meas, dce[meas] & 0xFFFF, mv[meas], mv_s[meas], btnmeas[meas]);
 
 		/*
@@ -4676,6 +4690,152 @@ static ssize_t codec_debug_write(struct file *filp,
 	return rc;
 }
 
+#ifdef CONFIG_SND_LGE_MBHC_BUTTON_CAL
+ssize_t codec_mbhc_button_debug_read(struct file *file, char __user *buf,
+			      size_t count, loff_t *pos)
+{
+	const int size = 768;
+	char buffer[size];
+	int n = 0, i = 0;
+	s16 *v_btn_low, *v_btn_high;
+	struct wcd9xxx_mbhc *mbhc = file->private_data;
+	struct wcd9xxx_mbhc_btn_detect_cfg *btn_det;
+	
+	btn_det = WCD9XXX_MBHC_CAL_BTN_DET_PTR(mbhc->mbhc_cfg->calibration);
+	v_btn_low = wcd9xxx_mbhc_cal_btn_det_mp(btn_det,MBHC_BTN_DET_V_BTN_LOW);
+	v_btn_high = wcd9xxx_mbhc_cal_btn_det_mp(btn_det,MBHC_BTN_DET_V_BTN_HIGH);
+
+	for (i = 0; i < btn_det->num_btn; i++) {
+		n += scnprintf(buffer + n, size - n, "v_btn_low[%d] = %d\n",i,v_btn_low[i]);
+		n += scnprintf(buffer + n, size - n, "v_btn_high[%d] = %d\n",i,v_btn_high[i]);
+	}
+	
+	return simple_read_from_buffer(buf, count, pos, buffer, n);
+}
+
+static int codec_mbhc_button_set_calibtaion_data(struct wcd9xxx_mbhc_btn_detect_cfg *btn_det,s16 *v_btn_low,s16 *v_btn_high)
+{
+
+	const char *mbhc_button_cal = "/data/mbhc_button_cal.txt";
+	struct file *filp;
+	char button_data[400];
+	char *ptr = NULL;
+	char **data = NULL;
+	char *delimeters = "\n,=";
+	char *token = NULL;
+	int read_size = 0,i = 0;
+	mm_segment_t fs = get_fs();
+
+	set_fs(get_ds());
+
+	filp = filp_open(mbhc_button_cal,O_RDONLY, 0);
+	if(IS_ERR(filp)){
+		pr_err("%s : Unable to load %s\n", __func__, mbhc_button_cal);
+		set_fs(fs);
+		return -EFAULT;
+	} else {
+		pr_info("%s : load %s\n", __func__, mbhc_button_cal);
+	}
+
+	read_size = filp->f_op->read(filp,button_data,400,&filp->f_pos);
+	if(read_size <= 0)
+	{
+		pr_err("%s: read file error",__func__);
+		set_fs(fs);
+		return -EFAULT;
+	}else{
+		ptr = button_data;
+		data = &ptr;
+	}
+	
+	for(i = 0; i <btn_det->num_btn; i++) {
+		token = strsep(data, delimeters);
+		token = strsep(data, delimeters);
+		v_btn_low[i] = (s16) simple_strtol(token,NULL,10);
+		token = strsep(data, delimeters);
+		token = strsep(data, delimeters);
+		v_btn_high[i] = (s16) simple_strtol(token,NULL,10);
+		pr_err("v_btn_low[%d] = %d, v_btn_high[%d] = %d\n",i,v_btn_low[i],i,v_btn_high[i]);
+	}	
+
+	filp_close(filp, NULL);
+	set_fs(fs);
+
+	pr_info("%s : is done.\n", __func__);  
+
+	return (int)1;
+}
+static int codec_mbhc_button_get_calibtaion_data(struct wcd9xxx_mbhc_btn_detect_cfg *btn_det,s16 *v_btn_low,s16 *v_btn_high)
+{
+	const char *mbhc_button_cal = "/data/mbhc_button_cal.txt";
+	struct file *filp;
+	char data[100];
+	int data_len = 0, i = 0;
+	mm_segment_t fs = get_fs();
+
+	set_fs(get_ds());
+
+	filp = filp_open(mbhc_button_cal,O_CREAT | O_WRONLY, 0);
+	if(IS_ERR(filp)){
+		pr_err("%s : Unable to load %s\n", __func__, mbhc_button_cal);
+		set_fs(fs);
+		return -EFAULT;
+	} else {
+		pr_info("%s : load %s\n", __func__, mbhc_button_cal);
+	}
+
+	for(i = 0; i <btn_det->num_btn; i++) {
+		sprintf(data,"v_btn_low[%d]=%d\nv_btn_high[%d]=%d\n",i,v_btn_low[i],i,v_btn_high[i]);
+		data_len = strlen(data);
+		filp->f_op->write(filp,data,data_len,&filp->f_pos);
+	}
+
+	filp_close(filp, NULL);
+	set_fs(fs);
+
+	pr_debug("%s : is done.\n", __func__);  
+
+	return (int)1;
+	
+}
+
+static ssize_t codec_mbhc_button_debug_write(struct file *file,
+				 const char __user *ubuf, size_t cnt,
+				 loff_t *ppos)
+{
+	char buf[2];
+	s16 *v_btn_low, *v_btn_high;
+	struct wcd9xxx_mbhc *mbhc = file->private_data;
+	struct wcd9xxx_mbhc_btn_detect_cfg *btn_det;
+
+	btn_det = WCD9XXX_MBHC_CAL_BTN_DET_PTR(mbhc->mbhc_cfg->calibration);
+	v_btn_low = wcd9xxx_mbhc_cal_btn_det_mp(btn_det,MBHC_BTN_DET_V_BTN_LOW);
+	v_btn_high = wcd9xxx_mbhc_cal_btn_det_mp(btn_det,MBHC_BTN_DET_V_BTN_HIGH);
+	
+	if(cnt != 2){
+		pr_err("%s : Invalid argument, only 1 charactor can be used for argument\n",__func__);
+		return -EINVAL;
+	}
+
+	if(copy_from_user(buf,ubuf,cnt))	{
+		pr_err("%s : Unable to load data from user space\n",__func__);
+		return -EFAULT;
+	}
+
+	if(buf[0] == 'w'){
+		pr_debug("%s : write mbhc button cal data\n",__func__);
+		codec_mbhc_button_set_calibtaion_data(btn_det,v_btn_low,v_btn_high);
+	} else if(buf[0] == 'r') {
+		pr_debug("%s : read mbhc button cal data\n",__func__);
+		codec_mbhc_button_get_calibtaion_data(btn_det,v_btn_low,v_btn_high);
+	} else {
+		pr_err("%s : Invalid argument, argument should be 'w' or 'r'\n",__func__);
+	}
+
+	return (ssize_t)cnt;	
+};
+#endif
+
 static const struct file_operations mbhc_trrs_debug_ops = {
 	.open = codec_debug_open,
 	.write = codec_debug_write,
@@ -4686,6 +4846,14 @@ static const struct file_operations mbhc_debug_ops = {
 	.read = codec_mbhc_debug_read,
 };
 
+#ifdef CONFIG_SND_LGE_MBHC_BUTTON_CAL
+static const struct file_operations mbhc_button_debug_ops = {
+	.open = codec_debug_open,
+	.read = codec_mbhc_button_debug_read,
+	.write = codec_mbhc_button_debug_write,
+};
+#endif
+
 static void wcd9xxx_init_debugfs(struct wcd9xxx_mbhc *mbhc)
 {
 	mbhc->debugfs_poke =
@@ -4694,12 +4862,20 @@ static void wcd9xxx_init_debugfs(struct wcd9xxx_mbhc *mbhc)
 	mbhc->debugfs_mbhc =
 	    debugfs_create_file("wcd9xxx_mbhc", S_IFREG | S_IRUGO,
 				NULL, mbhc, &mbhc_debug_ops);
+#ifdef CONFIG_SND_LGE_MBHC_BUTTON_CAL
+	mbhc->debugfs_button_cal =
+	    debugfs_create_file("mbhc_button_cal", S_IFREG | S_IRUGO,
+				NULL, mbhc, &mbhc_button_debug_ops);
+#endif
 }
 
 static void wcd9xxx_cleanup_debugfs(struct wcd9xxx_mbhc *mbhc)
 {
 	debugfs_remove(mbhc->debugfs_poke);
 	debugfs_remove(mbhc->debugfs_mbhc);
+#ifdef CONFIG_SND_LGE_MBHC_BUTTON_CAL
+	debugfs_remove(mbhc->debugfs_button_cal);
+#endif
 }
 #else
 static void wcd9xxx_init_debugfs(struct wcd9xxx_mbhc *mbhc)
@@ -4907,12 +5083,17 @@ static int wcd9xxx_event_notify(struct notifier_block *self, unsigned long val,
 {
 	int ret = 0;
 	struct wcd9xxx_mbhc *mbhc = ((struct wcd9xxx_resmgr *)data)->mbhc;
-	struct snd_soc_codec *codec = mbhc->codec;
+	struct snd_soc_codec *codec;
 	enum wcd9xxx_notify_event event = (enum wcd9xxx_notify_event)val;
 
 	pr_debug("%s: enter event %s(%d)\n", __func__,
 		 wcd9xxx_get_event_string(event), event);
 
+	if (!mbhc || !mbhc->mbhc_cfg) {
+		pr_debug("mbhc not initialized\n");
+		return 0;
+	}
+	codec = mbhc->codec;
 	mutex_lock(&mbhc->mbhc_lock);
 	switch (event) {
 	/* MICBIAS usage change */
@@ -5518,7 +5699,7 @@ static int wcd9xxx_detect_impedance(struct wcd9xxx_mbhc *mbhc, uint32_t *zl,
 		 r[0] & 0xffff, r[0], r[1] & 0xffff, r[1], r[2] & 0xffff, r[2]);
 	pr_debug("%s: RL %u milliohm, RR %u milliohm\n", __func__, *zl, *zr);
 	pr_debug("%s: Impedance detection completed\n", __func__);
-	/* LGE UPDATE : add debugging log */
+	/*                                */
 	printk("[LGE MBHC]: %s: RL %u ohm, RR %u ohm\n", __func__, *zl/1000, *zr/1000);
 	return ret;
 }

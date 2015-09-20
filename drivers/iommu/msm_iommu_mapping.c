@@ -428,6 +428,11 @@ static int __msm_map_iommu_common(
 
 	if (!iommu_meta) {
 		iommu_meta = msm_iommu_meta_create(dma_buf, table, size);
+
+		if (IS_ERR(iommu_meta)) {
+			ret = PTR_ERR(iommu_meta);
+			goto out;
+		}
 	} else {
 		/*
 		 * Drop the dma_buf reference here. We took the reference
@@ -479,7 +484,6 @@ static int __msm_map_iommu_common(
 out_unlock:
 	mutex_unlock(&iommu_meta->lock);
 out:
-
 	if (iommu_meta)
 		msm_iommu_meta_put(iommu_meta);
 	else

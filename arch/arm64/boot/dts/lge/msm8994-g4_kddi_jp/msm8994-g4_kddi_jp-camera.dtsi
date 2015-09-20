@@ -24,7 +24,7 @@
 	rpm-regulator-ldoa14 {
 		pm8994_l14: regulator-l14 {
 			regulator-min-microvolt = <1200000>;
-			regulator-max-microvolt = <1200000>;
+			regulator-max-microvolt = <1800000>;
 			qcom,init-voltage = <1200000>;
 		};
 	};
@@ -226,12 +226,11 @@
 		clock-names = "cam_src_clk", "cam_clk";
 	};
 
-	lge,camera_rev_a@6c {
+	lge,camera02@6e {
 		cell-index = <2>;
 		compatible = "qcom,imx208";
-		revision = "...rev_a";
-		reg = <0x6c>;
-		qcom,slave-id = <0x6c 0x0 0x0208>;
+		reg = <0x6e>;
+		qcom,slave-id = <0x6e 0x0 0x0208>;
 		qcom,csiphy-sd-index = <2>;
 		qcom,csid-sd-index = <2>;
 		qcom,mount-angle = <270>;
@@ -305,7 +304,7 @@ lge,camera_rev_b@6c {
 			<&clock_mmss clk_camss_mclk2_clk>;
 		clock-names = "cam_src_clk", "cam_clk";
 	};
-*/
+
 lge,camera_rev_d@6c {
 		cell-index = <2>;
 		compatible = "qcom,t4ka3";
@@ -345,4 +344,5 @@ lge,camera_rev_d@6c {
 			<&clock_mmss clk_camss_mclk2_clk>;
 		clock-names = "cam_src_clk", "cam_clk";
 	};
+*/
 };

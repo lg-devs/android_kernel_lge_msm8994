@@ -413,6 +413,9 @@ struct wcd9xxx_mbhc {
 #ifdef CONFIG_DEBUG_FS
 	struct dentry *debugfs_poke;
 	struct dentry *debugfs_mbhc;
+#ifdef CONFIG_SND_LGE_MBHC_BUTTON_CAL
+	struct dentry *debugfs_button_cal;
+#endif
 #endif
 
 	struct mutex mbhc_lock;

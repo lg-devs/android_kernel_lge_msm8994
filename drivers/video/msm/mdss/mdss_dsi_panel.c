@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2014, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-2015, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -95,8 +95,7 @@ static char *img_tune_dt_mp[] = {
 };
 static struct img_tune_cmds_desc *img_tune_cmds_set;
 
-static int is_dimming_on = 0;	/* Panel dimming 0:off 1:on */
-static int cur_plc_status = PLC_UNSET;
+static int is_dimming_on = 1;	/* Panel dimming 0:off 1:on(default : cont-splash) */
 extern struct led_classdev backlight_led;
 #endif
 
@@ -197,7 +196,12 @@ u32 mdss_dsi_panel_cmd_read(struct mdss_dsi_ctrl_pdata *ctrl, char cmd0,
 		if (ctrl->ndx != DSI_CTRL_LEFT)
 			return -EINVAL;
 	}
-
+#if defined(CONFIG_LGE_MIPI_JDI_INCELL_QHD_CMD_PANEL)
+	if (pinfo->dcs_cmd_by_right) {
+		if (ctrl->ndx != DSI_CTRL_RIGHT)
+			return -EINVAL;
+	}
+#endif
 	dcs_cmd[0] = cmd0;
 	dcs_cmd[1] = cmd1;
 	memset(&cmdreq, 0, sizeof(cmdreq));
@@ -227,6 +231,12 @@ static void mdss_dsi_panel_cmds_send(struct mdss_dsi_ctrl_pdata *ctrl,
 			return;
 	}
 
+#if defined(CONFIG_LGE_MIPI_JDI_INCELL_QHD_CMD_PANEL)
+	if (pinfo->dcs_cmd_by_right) {
+		if (ctrl->ndx != DSI_CTRL_RIGHT)
+			return;
+	}
+#endif
 	memset(&cmdreq, 0, sizeof(cmdreq));
 	cmdreq.cmds = pcmds->cmds;
 	cmdreq.cmds_cnt = pcmds->cmd_cnt;
@@ -239,6 +249,8 @@ static void mdss_dsi_panel_cmds_send(struct mdss_dsi_ctrl_pdata *ctrl,
 	else if (pcmds->link_state == DSI_HS_VIDEO_MODE)
 		cmdreq.flags  |= CMD_REQ_HS_MODE;
 #endif
+	else if (pcmds->link_state == DSI_HS_MODE)
+		cmdreq.flags |= CMD_REQ_HS_MODE;
 
 	cmdreq.rlen = 0;
 	cmdreq.cb = NULL;
@@ -274,25 +286,14 @@ if (lge_get_bootreason_with_lcd_dimming() && !fb_blank_called) {
 #endif
 
 #if defined(CONFIG_Z2_LGD_POLED_PANEL)
-	if (cur_plc_status == PLC_UNSET) {
+	if (!get_plc_status()) {
 		if (ctrl->panel_data.panel_info.blmap)
 			led_pwm1[1] = (unsigned char)ctrl->panel_data.panel_info.blmap[level];
 	} else {
-		if (level > PLC_ACTIVATION_THRESHOLD) {
-			if (ctrl->panel_data.panel_info.blmap)
-				led_pwm1[1] = (unsigned char)ctrl->panel_data.panel_info.blmap[level];
-			if (cur_plc_status == PLC_SET_DEACTIVATION)
-				mdss_dsi_panel_cmds_send(ctrl, &img_tune_cmds_set->img_tune_cmds[10]);
-			cur_plc_status = PLC_SET_ACTIVATION;
-		} else {
-			if (ctrl->panel_data.panel_info.plc_blmap)
-				led_pwm1[1] = (unsigned char)ctrl->panel_data.panel_info.plc_blmap[level];
-			if (cur_plc_status == PLC_SET_ACTIVATION)
-				mdss_dsi_panel_cmds_send(ctrl, &img_tune_cmds_set->img_tune_cmds[11]);
-			cur_plc_status = PLC_SET_DEACTIVATION;
-		}
+		if (ctrl->panel_data.panel_info.plc_blmap)
+			led_pwm1[1] = (unsigned char)ctrl->panel_data.panel_info.plc_blmap[level];
 	}
-	pr_info("%s: level=%d blmap=%d plc=%d\n", __func__, level, led_pwm1[1], cur_plc_status);
+	pr_info("%s: level=%d blmap=%d plc=%s\n", __func__, level, led_pwm1[1], get_plc_status() ? "on" : "off");
 #else
 	pr_info("%s: level=%d blmap=%d\n", __func__, level, led_pwm1[1]);
 #endif
@@ -329,6 +330,16 @@ static struct dsi_cmd_desc bc_dim_cmd = {
 	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, sizeof(bc_dim)},
 	bc_dim
 };
+
+int get_plc_status(void)
+{
+	int cur_plc_status = 0;
+	if (img_tune_mode % 2 == 0)
+		cur_plc_status = 0;		// plc off
+	else
+		cur_plc_status = 1;		// plc on
+	return cur_plc_status;
+}
 
 int mdss_dsi_panel_dimming_dcs(struct mdss_dsi_ctrl_pdata *ctrl, int enable)
 {
@@ -548,14 +559,10 @@ int mdss_dsi_panel_reset(struct mdss_panel_data *pdata, int enable)
 
 #if defined(CONFIG_LGE_MIPI_JDI_INCELL_QHD_CMD_PANEL)
 			if(ctrl_pdata->ndx && ctrl_pdata->panel_data.panel_info.panel_type == JDI_INCELL_CMD_PANEL) {
-				if(ctrl_pdata->touch_driver_registered)
-					touch_notifier_call_chain(LCD_EVENT_TOUCH_LPWG_OFF, NULL);
 				if (ctrl_pdata->dsv_manufacturer == DSV_SM5107) {
-					mdelay(20);
 					sm5107_mode_change(1);
 				}
 				else if (ctrl_pdata->dsv_manufacturer == DSV_DW8768) {
-					mdelay(20);
 					dw8768_mode_change(1);
 				}
 			}
@@ -778,9 +785,12 @@ static int mdss_dsi_set_col_page_addr(struct mdss_panel_data *pdata)
 
 			if (mdss_dsi_is_left_ctrl(ctrl)) {
 				if (pinfo->partial_update_roi_merge) {
-					/* to dsi-1 only */
+					/*
+					 * roi is the one after merged
+					 * to dsi-1 only
+					 */
 					mdss_dsi_send_col_page_addr(other,
-							&other->roi, 0);
+							&roi, 0);
 				} else {
 					mdss_dsi_send_col_page_addr(ctrl,
 							&ctrl->roi, 1);
@@ -789,9 +799,12 @@ static int mdss_dsi_set_col_page_addr(struct mdss_panel_data *pdata)
 				}
 			} else {
 				if (pinfo->partial_update_roi_merge) {
-					/* to dsi-1 only */
+					/*
+					 * roi is the one after merged
+					 * to dsi-1 only
+					 */
 					mdss_dsi_send_col_page_addr(ctrl,
-							&ctrl->roi, 0);
+							&roi, 0);
 				} else {
 					mdss_dsi_send_col_page_addr(other,
 							&other->roi, 1);
@@ -882,7 +895,7 @@ static void mdss_dsi_panel_switch_mode(struct mdss_panel_data *pdata,
 
 	mipi  = &pdata->panel_info.mipi;
 
-	if (!mipi->dynamic_switch_enabled)
+	if (!mipi->dms_mode)
 		return;
 
 	ctrl_pdata = container_of(pdata, struct mdss_dsi_ctrl_pdata,
@@ -972,6 +985,7 @@ static int mdss_dsi_panel_on(struct mdss_panel_data *pdata)
 {
 	struct mdss_dsi_ctrl_pdata *ctrl = NULL;
 	struct mdss_panel_info *pinfo;
+	struct dsi_panel_cmds *on_cmds;
 
 	if (pdata == NULL) {
 		pr_err("%s: Invalid input data\n", __func__);
@@ -992,8 +1006,20 @@ static int mdss_dsi_panel_on(struct mdss_panel_data *pdata)
 			goto end;
 	}
 
-	if (ctrl->on_cmds.cmd_cnt)
-		mdss_dsi_panel_cmds_send(ctrl, &ctrl->on_cmds);
+#if defined(CONFIG_LGE_MIPI_JDI_INCELL_QHD_CMD_PANEL)
+	if (pinfo->dcs_cmd_by_right) {
+		if (ctrl->ndx != DSI_CTRL_RIGHT)
+			goto end;
+	}
+#endif
+	on_cmds = &ctrl->on_cmds;
+
+	if ((pinfo->mipi.dms_mode == DYNAMIC_MODE_SWITCH_IMMEDIATE) &&
+			(pinfo->mipi.boot_mode != pinfo->mipi.mode))
+		on_cmds = &ctrl->post_dms_on_cmds;
+
+	if (on_cmds->cmd_cnt)
+		mdss_dsi_panel_cmds_send(ctrl, on_cmds);
 
 #if defined(CONFIG_Z2_LGD_POLED_PANEL)
 	mdss_dsi_panel_img_tune_apply(IMG_TUNE_COUNT);
@@ -1028,6 +1054,13 @@ static int mdss_dsi_panel_off(struct mdss_panel_data *pdata)
 		if (ctrl->ndx != DSI_CTRL_LEFT)
 			goto end;
 	}
+
+#if defined(CONFIG_LGE_MIPI_JDI_INCELL_QHD_CMD_PANEL)
+	if (pinfo->dcs_cmd_by_right) {
+		if (ctrl->ndx != DSI_CTRL_RIGHT)
+			goto end;
+	}
+#endif
 
 	if (ctrl->off_cmds.cmd_cnt)
 		mdss_dsi_panel_cmds_send(ctrl, &ctrl->off_cmds);
@@ -1072,7 +1105,6 @@ static int mdss_dsi_panel_low_power_config(struct mdss_panel_data *pdata,
 #if defined(CONFIG_Z2_LGD_POLED_PANEL)
 int mdss_dsi_panel_img_tune_apply(unsigned int screen_mode)
 {
-	int update_brightness = 0;
 	struct mdss_dsi_ctrl_pdata *ctrl = NULL;
 
 	if (pdata_base == NULL) {
@@ -1097,22 +1129,12 @@ int mdss_dsi_panel_img_tune_apply(unsigned int screen_mode)
 		pr_info("%s: send the screen mode on(%d) from kernel.\n", __func__, img_tune_mode);
 	} else {
 		img_tune_mode = screen_mode;
-		update_brightness = 1;
 		pr_info("%s: send the screen mode on(%d) from user.\n", __func__, img_tune_mode);
 	}
 	if (img_tune_cmds_set->img_tune_cmds[img_tune_mode].cmd_cnt) {
 		mdss_dsi_panel_cmds_send(ctrl, &img_tune_cmds_set->img_tune_cmds[img_tune_mode]);
 	}
-	if (img_tune_mode % 2 == 0) {
-		cur_plc_status = PLC_UNSET;
-	} else {
-		cur_plc_status = PLC_SET_ACTIVATION;
-	}
-	pr_info("%s: cur_plc_status=%d\n", __func__, cur_plc_status);
-	if (update_brightness) {
-		mdss_dsi_panel_bklt_dcs(ctrl, backlight_led.brightness);
-		pr_info("%s: update bl_level=%d\n", __func__, backlight_led.brightness);
-	}
+	mdss_dsi_panel_bklt_dcs(ctrl, backlight_led.brightness);
 
 	return 0;
 }
@@ -1649,6 +1671,56 @@ static void mdss_dsi_parse_roi_alignment(struct device_node *np,
 	}
 }
 
+static void mdss_dsi_parse_dms_config(struct device_node *np,
+	struct mdss_dsi_ctrl_pdata *ctrl)
+{
+	struct mdss_panel_info *pinfo = &ctrl->panel_data.panel_info;
+	const char *data;
+	bool dms_enabled;
+
+	dms_enabled = of_property_read_bool(np,
+		"qcom,dynamic-mode-switch-enabled");
+
+	if (!dms_enabled) {
+		pinfo->mipi.dms_mode = DYNAMIC_MODE_SWITCH_DISABLED;
+		goto exit;
+	}
+
+	/* default mode is suspend_resume */
+	pinfo->mipi.dms_mode = DYNAMIC_MODE_SWITCH_SUSPEND_RESUME;
+	data = of_get_property(np, "qcom,dynamic-mode-switch-type", NULL);
+	if (data && !strcmp(data, "dynamic-switch-immediate"))
+		pinfo->mipi.dms_mode = DYNAMIC_MODE_SWITCH_IMMEDIATE;
+	else
+		pr_debug("%s: default dms suspend/resume\n", __func__);
+
+	mdss_dsi_parse_dcs_cmds(np, &ctrl->video2cmd,
+		"qcom,video-to-cmd-mode-switch-commands", NULL);
+
+	mdss_dsi_parse_dcs_cmds(np, &ctrl->cmd2video,
+		"qcom,cmd-to-video-mode-switch-commands", NULL);
+
+	mdss_dsi_parse_dcs_cmds(np, &ctrl->post_dms_on_cmds,
+		"qcom,mdss-dsi-post-mode-switch-on-command",
+		"qcom,mdss-dsi-post-mode-switch-on-command-state");
+
+	if (pinfo->mipi.dms_mode == DYNAMIC_MODE_SWITCH_IMMEDIATE &&
+		!ctrl->post_dms_on_cmds.cmd_cnt) {
+		pr_warn("%s: No post dms on cmd specified\n", __func__);
+		pinfo->mipi.dms_mode = DYNAMIC_MODE_SWITCH_DISABLED;
+	}
+
+	if (!ctrl->video2cmd.cmd_cnt || !ctrl->cmd2video.cmd_cnt) {
+		pr_warn("%s: No commands specified for dynamic switch\n",
+			__func__);
+		pinfo->mipi.dms_mode = DYNAMIC_MODE_SWITCH_DISABLED;
+	}
+exit:
+	pr_info("%s: dynamic switch feature enabled: %d\n", __func__,
+		pinfo->mipi.dms_mode);
+	return;
+}
+
 static void mdss_dsi_parse_esd_params(struct device_node *np,
 	struct mdss_dsi_ctrl_pdata *ctrl)
 {
@@ -1750,9 +1822,10 @@ static int mdss_dsi_parse_panel_features(struct device_node *np,
 	pinfo->cont_splash_enabled = of_property_read_bool(np,
 		"qcom,cont-splash-enabled");
 
+	pinfo->partial_update_supported = of_property_read_bool(np,
+		"qcom,partial-update-enabled");
 	if (pinfo->mipi.mode == DSI_CMD_MODE) {
-		pinfo->partial_update_enabled = of_property_read_bool(np,
-				"qcom,partial-update-enabled");
+		pinfo->partial_update_enabled = pinfo->partial_update_supported;
 		pr_info("%s: partial_update_enabled=%d\n", __func__,
 					pinfo->partial_update_enabled);
 		if (pinfo->partial_update_enabled) {
@@ -1764,6 +1837,13 @@ static int mdss_dsi_parse_panel_features(struct device_node *np,
 
 		pinfo->dcs_cmd_by_left = of_property_read_bool(np,
 						"qcom,dcs-cmd-by-left");
+#if defined(CONFIG_LGE_MIPI_JDI_INCELL_QHD_CMD_PANEL)
+		pinfo->dcs_cmd_by_right = of_property_read_bool(np,
+						"lge,dcs-cmd-by-right");
+		if (pinfo->dcs_cmd_by_right) {
+			pr_info("%s: dcs-cmd-by-right is enabled",__func__);
+		}
+#endif
 	}
 
 	pinfo->ulps_feature_enabled = of_property_read_bool(np,
@@ -1776,24 +1856,8 @@ static int mdss_dsi_parse_panel_features(struct device_node *np,
 	pr_info("%s: ulps during suspend feature %s", __func__,
 		(pinfo->ulps_suspend_enabled ? "enabled" : "disabled"));
 
-	pinfo->mipi.dynamic_switch_enabled = of_property_read_bool(np,
-		"qcom,dynamic-mode-switch-enabled");
+	mdss_dsi_parse_dms_config(np, ctrl);
 
-	if (pinfo->mipi.dynamic_switch_enabled) {
-		mdss_dsi_parse_dcs_cmds(np, &ctrl->video2cmd,
-			"qcom,video-to-cmd-mode-switch-commands", NULL);
-
-		mdss_dsi_parse_dcs_cmds(np, &ctrl->cmd2video,
-			"qcom,cmd-to-video-mode-switch-commands", NULL);
-
-		if (!ctrl->video2cmd.cmd_cnt || !ctrl->cmd2video.cmd_cnt) {
-			pr_warn("No commands specified for dynamic switch\n");
-			pinfo->mipi.dynamic_switch_enabled = 0;
-		}
-	}
-
-	pr_info("%s: dynamic switch feature enabled: %d\n", __func__,
-		pinfo->mipi.dynamic_switch_enabled);
 	pinfo->panel_ack_disabled = of_property_read_bool(np,
 				"qcom,panel-ack-disabled");
 
@@ -2034,6 +2098,7 @@ static int mdss_panel_parse_dt(struct device_node *np,
 	data = of_get_property(np, "qcom,mdss-dsi-panel-type", NULL);
 	if (data && !strncmp(data, "dsi_cmd_mode", 12))
 		pinfo->mipi.mode = DSI_CMD_MODE;
+	pinfo->mipi.boot_mode = pinfo->mipi.mode;
 	tmp = 0;
 	data = of_get_property(np, "qcom,mdss-dsi-pixel-packing", NULL);
 	if (data && !strcmp(data, "loose"))
@@ -2301,10 +2366,6 @@ static int mdss_panel_parse_dt(struct device_node *np,
 	}
 #endif
 
-#if defined(CONFIG_MACH_LGE)
-	rc = of_property_read_u32(np, "qcom,mdss-dsi-lane-hs", &tmp);
-	pinfo->mipi.force_clk_lane_hs = (!rc ? tmp : 0);
-#endif
 	pinfo->mipi.rx_eot_ignore = of_property_read_bool(np,
 		"qcom,mdss-dsi-rx-eot-ignore");
 	pinfo->mipi.tx_eot_append = of_property_read_bool(np,
@@ -2384,6 +2445,8 @@ static int mdss_panel_parse_dt(struct device_node *np,
 	if (pdata_base == NULL)
 		pdata_base = &(ctrl_pdata->panel_data);
 #endif
+	pinfo->mipi.force_clk_lane_hs = of_property_read_bool(np,
+		"qcom,mdss-dsi-force-clock-lane-hs");
 
 	rc = mdss_dsi_parse_panel_features(np, ctrl_pdata);
 	if (rc) {
@@ -2480,6 +2543,7 @@ int mdss_dsi_panel_init(struct device_node *node,
 
 	pinfo->dynamic_switch_pending = false;
 	pinfo->is_lpm_mode = false;
+	pinfo->esd_rdy = false;
 
 	ctrl_pdata->on = mdss_dsi_panel_on;
 	ctrl_pdata->off = mdss_dsi_panel_off;
