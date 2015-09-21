@@ -67,7 +67,7 @@ static struct msm_sensor_power_setting t4ka3_power_setting[] = {
 		.delay = 2,
 	},
 };
-/*LGE add for sequence of power down */
+/*                                   */
 static struct msm_sensor_power_setting t4ka3_power_down_setting[] = {
 	{
 		.seq_type = SENSOR_I2C_MUX,
@@ -161,7 +161,7 @@ static int32_t t4ka3_platform_probe(struct platform_device *pdev)
 	pr_err("%s: E\n", __func__);
 	match = of_match_device(t4ka3_dt_match, &pdev->dev);
 
-/* LGE : WBT */
+/*           */
 	if(!match)
 	{
 		pr_err(" %s failed ",__func__);
@@ -199,7 +199,7 @@ static struct msm_sensor_ctrl_t t4ka3_s_ctrl = {
 	.sensor_i2c_client = &t4ka3_sensor_i2c_client,
 	.power_setting_array.power_setting = t4ka3_power_setting,
 	.power_setting_array.size = ARRAY_SIZE(t4ka3_power_setting),
-/*LGE add for sequence of power down */
+/*                                   */
 	.power_setting_array.power_down_setting = t4ka3_power_down_setting,
 	.power_setting_array.size_down = ARRAY_SIZE(t4ka3_power_down_setting),
 	.msm_sensor_mutex = &t4ka3_mut,

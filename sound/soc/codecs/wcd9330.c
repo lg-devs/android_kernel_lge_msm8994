@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2014, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-2015, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -57,7 +57,10 @@ enum {
 #define TOMTOM_MAD_SLIMBUS_TX_PORT 12
 #define TOMTOM_MAD_AUDIO_FIRMWARE_PATH "wcd9320/wcd9320_mad_audio.bin"
 #define TOMTOM_VALIDATE_RX_SBPORT_RANGE(port) ((port >= 16) && (port <= 23))
+#define TOMTOM_VALIDATE_TX_SBPORT_RANGE(port) ((port >= 0) && (port <= 15))
 #define TOMTOM_CONVERT_RX_SBPORT_ID(port) (port - 16) /* RX1 port ID = 0 */
+#define TOMTOM_BIT_ADJ_SHIFT_PORT1_6 4
+#define TOMTOM_BIT_ADJ_SHIFT_PORT7_10 5
 
 #define TOMTOM_HPH_PA_SETTLE_COMP_ON 5000
 #define TOMTOM_HPH_PA_SETTLE_COMP_OFF 13000
@@ -4365,12 +4368,12 @@ static int tomtom_hph_pa_event(struct snd_soc_dapm_widget *w,
 		break;
 
 	case SND_SOC_DAPM_POST_PMD:
+		/* Let MBHC module know PA turned off */
+		wcd9xxx_resmgr_notifier_call(&tomtom->resmgr, e_post_off);
 		usleep_range(pa_settle_time, pa_settle_time + 1000);
 		pr_debug("%s: sleep %d us after %s PA disable\n", __func__,
 				pa_settle_time, w->name);
 
-		/* Let MBHC module know PA turned off */
-		wcd9xxx_resmgr_notifier_call(&tomtom->resmgr, e_post_off);
 		break;
 	}
 	return 0;
@@ -5778,6 +5781,65 @@ static void tomtom_set_rxsb_port_format(struct snd_pcm_hw_params *params,
 	}
 }
 
+static void tomtom_set_tx_sb_port_format(struct snd_pcm_hw_params *params,
+					 struct snd_soc_dai *dai)
+{
+	struct snd_soc_codec *codec = dai->codec;
+	struct tomtom_priv *tomtom_p = snd_soc_codec_get_drvdata(codec);
+	struct wcd9xxx_codec_dai_data *cdc_dai;
+	struct wcd9xxx_ch *ch;
+	int port;
+	u8 bit_sel, bit_shift;
+	u16 sb_ctl_reg;
+
+	switch (params_format(params)) {
+	case SNDRV_PCM_FORMAT_S16_LE:
+		bit_sel = 0x2;
+		tomtom_p->dai[dai->id].bit_width = 16;
+		break;
+	case SNDRV_PCM_FORMAT_S24_LE:
+		bit_sel = 0x0;
+		tomtom_p->dai[dai->id].bit_width = 24;
+		break;
+	default:
+		dev_err(codec->dev, "%s: Invalid format %d\n", __func__,
+			params_format(params));
+		return;
+	}
+
+	cdc_dai = &tomtom_p->dai[dai->id];
+
+	list_for_each_entry(ch, &cdc_dai->wcd9xxx_ch_list, list) {
+		port = wcd9xxx_get_slave_port(ch->ch_num);
+
+		if (IS_ERR_VALUE(port) ||
+		    !TOMTOM_VALIDATE_TX_SBPORT_RANGE(port)) {
+			dev_warn(codec->dev,
+				 "%s: invalid port ID %d returned for TX DAI\n",
+				 __func__, port);
+			return;
+		}
+
+		if (port < 6) /* 6 = SLIMBUS TX7 */
+			bit_shift = TOMTOM_BIT_ADJ_SHIFT_PORT1_6;
+		else if (port < 10)
+			bit_shift = TOMTOM_BIT_ADJ_SHIFT_PORT7_10;
+		else {
+			dev_warn(codec->dev,
+				 "%s: port ID %d bitwidth is fixed\n",
+				 __func__, port);
+			return;
+		}
+
+		sb_ctl_reg = (TOMTOM_A_CDC_CONN_TX_SB_B1_CTL + port);
+
+		dev_dbg(codec->dev, "%s: reg %x bit_sel %x bit_shift %x\n",
+			__func__, sb_ctl_reg, bit_sel, bit_shift);
+		snd_soc_update_bits(codec, sb_ctl_reg, 0x3 <<
+				    bit_shift, bit_sel << bit_shift);
+	}
+}
+
 static int tomtom_hw_params(struct snd_pcm_substream *substream,
 			    struct snd_pcm_hw_params *params,
 			    struct snd_soc_dai *dai)
@@ -5869,6 +5931,11 @@ static int tomtom_hw_params(struct snd_pcm_substream *substream,
 					    0x20, i2s_bit_mode << 5);
 			snd_soc_update_bits(codec, TOMTOM_A_CDC_CLK_TX_I2S_CTL,
 					    0x07, tx_fs_rate);
+		} else {
+			/* only generic ports can have sample bit adjustment */
+			if (dai->id != AIF4_VIFEED &&
+			    dai->id != AIF4_MAD_TX)
+				tomtom_set_tx_sb_port_format(params, dai);
 		}
 
 		break;
@@ -7667,7 +7734,7 @@ static const struct wcd9xxx_reg_mask_val tomtom_codec_reg_init_val[] = {
 	{TOMTOM_A_INTR_MODE, 0x04, 0x04},
 
 #ifdef CONFIG_INPUT_MAX14688
-        /* LGE use NO type earjack */
+        /*                         */
         {TOMTOM_A_MBHC_INSERT_DETECT, 0x04, 0x04},
 #endif
 };
@@ -7768,9 +7835,20 @@ int tomtom_hs_detect(struct snd_soc_codec *codec,
 {
 	int rc;
 	struct tomtom_priv *tomtom = snd_soc_codec_get_drvdata(codec);
-	rc = wcd9xxx_mbhc_start(&tomtom->mbhc, mbhc_cfg);
-	if (!rc)
-		tomtom->mbhc_started = true;
+
+	if (mbhc_cfg->insert_detect) {
+		rc = wcd9xxx_mbhc_start(&tomtom->mbhc, mbhc_cfg);
+		if (!rc)
+			tomtom->mbhc_started = true;
+	} else {
+		/* MBHC is disabled, so disable Auto pulldown */
+		snd_soc_update_bits(codec, TOMTOM_A_MBHC_INSERT_DETECT2, 0xC0,
+				    0x00);
+		snd_soc_update_bits(codec, TOMTOM_A_MICB_CFILT_2_CTL, 0x01,
+				    0x00);
+		tomtom->mbhc.mbhc_cfg = NULL;
+		rc = 0;
+	}
 	return rc;
 }
 EXPORT_SYMBOL(tomtom_hs_detect);
@@ -8699,7 +8777,7 @@ static int tomtom_codec_probe(struct snd_soc_codec *codec)
 	}
 
 #ifdef CONFIG_ENABLE_MBHC
-#if defined (CONFIG_MACH_MSM8994_Z2_KR) || defined (CONFIG_MACH_MSM8994_Z2_SPR_US) || defined (CONFIG_MACH_MSM8994_Z2_USC_US) || defined (CONFIG_MACH_MSM8994_Z2_GLOBAL_ESA) || defined (CONFIG_MACH_MSM8994_Z2_GLOBAL_COM)
+#if defined (CONFIG_MACH_MSM8994_Z2_KR) || defined (CONFIG_MACH_MSM8994_Z2_SPR_US) || defined (CONFIG_MACH_MSM8994_Z2_USC_US) || defined (CONFIG_MACH_MSM8994_Z2_GLOBAL_ESA) || defined (CONFIG_MACH_MSM8994_Z2_GLOBAL_COM) || defined (CONFIG_MACH_MSM8994_Z2_ACG_US)
 		if(strncmp(rev_str[lge_get_board_revno()],"rev_a",5)!=0) // z2 use mbhc after rev_b
 #endif
 	{
@@ -8729,8 +8807,8 @@ static int tomtom_codec_probe(struct snd_soc_codec *codec)
 	tomtom_update_reg_defaults(codec);
 
 #ifdef CONFIG_INPUT_MAX14688
-	/* LGE make pull-down bits to 0 */
-#if defined (CONFIG_MACH_MSM8994_Z2_KR) || defined (CONFIG_MACH_MSM8994_Z2_SPR_US) || defined (CONFIG_MACH_MSM8994_Z2_USC_US) || defined (CONFIG_MACH_MSM8994_Z2_GLOBAL_COM)
+	/*                              */
+#if defined (CONFIG_MACH_MSM8994_Z2_KR) || defined (CONFIG_MACH_MSM8994_Z2_SPR_US) || defined (CONFIG_MACH_MSM8994_Z2_USC_US) || defined (CONFIG_MACH_MSM8994_Z2_GLOBAL_COM) || defined (CONFIG_MACH_MSM8994_Z2_ACG_US)
 	if(strncmp(rev_str[lge_get_board_revno()],"rev_a",5)==0) // z2 use max14688 on rev_a
 #endif
 		snd_soc_update_bits(codec, TOMTOM_A_MBHC_INSERT_DETECT2, 0xC0, 0x0);
@@ -8851,7 +8929,7 @@ static int tomtom_codec_remove(struct snd_soc_codec *codec)
 	tomtom_cleanup_irqs(tomtom);
 
 #ifdef CONFIG_ENABLE_MBHC
-#if defined (CONFIG_MACH_MSM8994_Z2_KR) || defined (CONFIG_MACH_MSM8994_Z2_SPR_US) || defined (CONFIG_MACH_MSM8994_Z2_USC_US) || defined (CONFIG_MACH_MSM8994_Z2_GLOBAL_COM)
+#if defined (CONFIG_MACH_MSM8994_Z2_KR) || defined (CONFIG_MACH_MSM8994_Z2_SPR_US) || defined (CONFIG_MACH_MSM8994_Z2_USC_US) || defined (CONFIG_MACH_MSM8994_Z2_GLOBAL_COM) || defined (CONFIG_MACH_MSM8994_Z2_ACG_US)
 	if(strncmp(rev_str[lge_get_board_revno()],"rev_a",5)!=0) // z2 use mbhc after rev_b
 #endif
 		/* cleanup MBHC */

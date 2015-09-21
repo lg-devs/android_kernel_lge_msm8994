@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2014, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-2015, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -26,6 +26,7 @@
 #include "ipa_hw_defs.h"
 #include "ipa_ram_mmap.h"
 #include "ipa_reg.h"
+#include "ipa_qmi_service.h"
 
 #define DRV_NAME "ipa"
 #define NAT_DEV_NAME "ipaNatTable"
@@ -39,6 +40,7 @@
 #define IPA_QMAP_HEADER_LENGTH (4)
 #define IPA_DL_CHECKSUM_LENGTH (8)
 #define IPA_NUM_DESC_PER_SW_TX (2)
+#define IPA_GENERIC_RX_POOL_SZ 32*2
 
 #define IPADBG(fmt, args...) \
 	pr_debug(DRV_NAME " %s:%d " fmt, __func__, __LINE__, ## args)
@@ -134,7 +136,7 @@
 	(((start_ofst) + IPA_HDR_PROC_CTX_TABLE_ALIGNMENT_BYTE - 1) & \
 	~(IPA_HDR_PROC_CTX_TABLE_ALIGNMENT_BYTE - 1))
 
-#define MAX_RESOURCE_TO_CLIENTS (5)
+#define MAX_RESOURCE_TO_CLIENTS (IPA_CLIENT_MAX)
 #define IPA_MEM_PART(x_) (ipa_ctx->ctrl->mem_partition.x_)
 
 struct ipa_client_names {
@@ -698,6 +700,9 @@ struct ipa_nat_mem {
 	u32 size_base_tables;
 	u32 size_expansion_tables;
 	u32 public_ip_addr;
+	void *tmp_vaddr;
+	dma_addr_t tmp_dma_handle;
+	bool is_tmp_mem;
 };
 
 /**
@@ -750,16 +755,241 @@ struct ipa_tag_completion {
 
 struct ipa_controller;
 
-/** struct ipa_uc_ctx - IPA uC context
- * @uc_inited: Indicates if uC inteface has been initialized
+/**
+ *  @brief   Enum value determined based on the feature it
+ *           corresponds to
+ *  +----------------+----------------+
+ *  |    3 bits      |     5 bits     |
+ *  +----------------+----------------+
+ *  |   HW_FEATURE   |     OPCODE     |
+ *  +----------------+----------------+
+ *
+ */
+#define FEATURE_ENUM_VAL(feature, opcode) ((feature << 5) | opcode)
+#define EXTRACT_UC_FEATURE(value) (value >> 5)
+
+#define IPA_HW_NUM_FEATURES 0x8
+
+/**
+ * enum ipa_hw_features - Values that represent the features supported in IPA HW
+ * @IPA_HW_FEATURE_COMMON : Feature related to common operation of IPA HW
+ * @IPA_HW_FEATURE_MHI : Feature related to MHI operation in IPA HW
+ * @IPA_HW_FEATURE_WDI : Feature related to WDI operation in IPA HW
+*/
+enum ipa_hw_features {
+	IPA_HW_FEATURE_COMMON = 0x0,
+	IPA_HW_FEATURE_MHI    = 0x1,
+	IPA_HW_FEATURE_WDI    = 0x3,
+	IPA_HW_FEATURE_MAX    = IPA_HW_NUM_FEATURES
+};
+
+/**
+ * struct IpaHwSharedMemCommonMapping_t - Structure referring to the common
+ * section in 128B shared memory located in offset zero of SW Partition in IPA
+ * SRAM.
+ * @cmdOp : CPU->HW command opcode. See IPA_CPU_2_HW_COMMANDS
+ * @cmdParams : CPU->HW command parameter. The parameter filed can hold 32 bits
+ * of parameters (immediate parameters) and point on structure in system memory
+ * (in such case the address must be accessible for HW)
+ * @responseOp : HW->CPU response opcode. See IPA_HW_2_CPU_RESPONSES
+ * @responseParams : HW->CPU response parameter. The parameter filed can hold 32
+ * bits of parameters (immediate parameters) and point on structure in system
+ * memory
+ * @eventOp : HW->CPU event opcode. See IPA_HW_2_CPU_EVENTS
+ * @eventParams : HW->CPU event parameter. The parameter filed can hold 32 bits of
+ * parameters (immediate parameters) and point on structure in system memory
+ * @firstErrorAddress : Contains the address of first error-source on SNOC
+ * @hwState : State of HW. The state carries information regarding the error type.
+ * @warningCounter : The warnings counter. The counter carries information regarding
+ * non fatal errors in HW
+ * @interfaceVersionCommon : The Common interface version as reported by HW
+ *
+ * The shared memory is used for communication between IPA HW and CPU.
+ */
+struct IpaHwSharedMemCommonMapping_t {
+	u8  cmdOp;
+	u8  reserved_01;
+	u16 reserved_03_02;
+	u32 cmdParams;
+	u8  responseOp;
+	u8  reserved_09;
+	u16 reserved_0B_0A;
+	u32 responseParams;
+	u8  eventOp;
+	u8  reserved_11;
+	u16 reserved_13_12;
+	u32 eventParams;
+	u32 reserved_1B_18;
+	u32 firstErrorAddress;
+	u8  hwState;
+	u8  warningCounter;
+	u16 reserved_23_22;
+	u16 interfaceVersionCommon;
+	u16 reserved_27_26;
+} __packed;
+
+/**
+ * union IpaHwFeatureInfoData_t - parameters for stats/config blob
+ *
+ * @offset : Location of a feature within the EventInfoData
+ * @size : Size of the feature
+ */
+union IpaHwFeatureInfoData_t {
+	struct IpaHwFeatureInfoParams_t {
+		u32 offset:16;
+		u32 size:16;
+	} __packed params;
+	u32 raw32b;
+} __packed;
+
+/**
+ * struct IpaHwEventInfoData_t - Structure holding the parameters for
+ * statistics and config info
+ *
+ * @baseAddrOffset : Base Address Offset of the statistics or config
+ * structure from IPA_WRAPPER_BASE
+ * @IpaHwFeatureInfoData_t : Location and size of each feature within
+ * the statistics or config structure
+ *
+ * @note    Information about each feature in the featureInfo[]
+ * array is populated at predefined indices per the IPA_HW_FEATURES
+ * enum definition
+ */
+struct IpaHwEventInfoData_t {
+	u32 baseAddrOffset;
+	union IpaHwFeatureInfoData_t featureInfo[IPA_HW_NUM_FEATURES];
+} __packed;
+
+/**
+ * struct IpaHwEventLogInfoData_t - Structure holding the parameters for
+ * IPA_HW_2_CPU_EVENT_LOG_INFO Event
+ *
+ * @featureMask : Mask indicating the features enabled in HW.
+ * Refer IPA_HW_FEATURE_MASK
+ * @circBuffBaseAddrOffset : Base Address Offset of the Circular Event
+ * Log Buffer structure
+ * @statsInfo : Statistics related information
+ * @configInfo : Configuration related information
+ *
+ * @note    The offset location of this structure from IPA_WRAPPER_BASE
+ * will be provided as Event Params for the IPA_HW_2_CPU_EVENT_LOG_INFO
+ * Event
+ */
+struct IpaHwEventLogInfoData_t {
+	u32 featureMask;
+	u32 circBuffBaseAddrOffset;
+	struct IpaHwEventInfoData_t statsInfo;
+	struct IpaHwEventInfoData_t configInfo;
+
+} __packed;
+
+/**
+ * struct ipa_uc_hdlrs - IPA uC callback functions
+ * @ipa_uc_loaded_hdlr: Function handler when uC is loaded
+ * @ipa_uc_event_hdlr: Event handler function
+ * @ipa_uc_response_hdlr: Response handler function
+ * @ipa_uc_event_log_info_hdlr: Log event handler function
+ */
+struct ipa_uc_hdlrs {
+	void (*ipa_uc_loaded_hdlr)(void);
+	void (*ipa_uc_event_hdlr)
+		(struct IpaHwSharedMemCommonMapping_t *uc_sram_mmio);
+	int (*ipa_uc_response_hdlr)
+		(struct IpaHwSharedMemCommonMapping_t *uc_sram_mmio,
+		u32 *uc_status);
+	void (*ipa_uc_event_log_info_hdlr)
+		(struct IpaHwEventLogInfoData_t *uc_event_top_mmio);
+};
+
+/**
+ * enum ipa_hw_flags - flags which defines the behavior of HW
+ *
+ * @IPA_HW_FLAG_HALT_SYSTEM_ON_ASSERT_FAILURE: Halt system in case of assert
+ *	failure.
+ * @IPA_HW_FLAG_NO_REPORT_MHI_CHANNEL_ERORR: Channel error would be reported
+ *	in the event ring only. No event to CPU.
+ * @IPA_HW_FLAG_NO_REPORT_MHI_CHANNEL_WAKE_UP: No need to report event
+ *	IPA_HW_2_CPU_EVENT_MHI_WAKE_UP_REQUEST
+ * @IPA_HW_FLAG_WORK_OVER_DDR: Perform all transaction to external addresses by
+ *	QMB (avoid memcpy)
+ * @IPA_HW_FLAG_NO_REPORT_OOB: If set do not report that the device is OOB in
+ *	IN Channel
+ * @IPA_HW_FLAG_NO_REPORT_DB_MODE: If set, do not report that the device is
+ *	entering a mode where it expects a doorbell to be rung for OUT Channel
+ * @IPA_HW_FLAG_NO_START_OOB_TIMER
+ */
+enum ipa_hw_flags {
+	IPA_HW_FLAG_HALT_SYSTEM_ON_ASSERT_FAILURE	= 0x01,
+	IPA_HW_FLAG_NO_REPORT_MHI_CHANNEL_ERORR		= 0x02,
+	IPA_HW_FLAG_NO_REPORT_MHI_CHANNEL_WAKE_UP	= 0x04,
+	IPA_HW_FLAG_WORK_OVER_DDR			= 0x08,
+	IPA_HW_FLAG_NO_REPORT_OOB			= 0x10,
+	IPA_HW_FLAG_NO_REPORT_DB_MODE			= 0x20,
+	IPA_HW_FLAG_NO_START_OOB_TIMER			= 0x40
+};
+
+/**
+ * enum ipa_hw_mhi_channel_states - MHI channel state machine
+ *
+ * Values are according to MHI specification
+ * @IPA_HW_MHI_CHANNEL_STATE_DISABLE: Channel is disabled and not processed by
+ *	the host or device.
+ * @IPA_HW_MHI_CHANNEL_STATE_ENABLE: A channel is enabled after being
+ *	initialized and configured by host, including its channel context and
+ *	associated transfer ring. While this state, the channel is not active
+ *	and the device does not process transfer.
+ * @IPA_HW_MHI_CHANNEL_STATE_RUN: The device processes transfers and doorbell
+ *	for channels.
+ * @IPA_HW_MHI_CHANNEL_STATE_SUSPEND: Used to halt operations on the channel.
+ *	The device does not process transfers for the channel in this state.
+ *	This state is typically used to synchronize the transition to low power
+ *	modes.
+ * @IPA_HW_MHI_CHANNEL_STATE_STOP: Used to halt operations on the channel.
+ *	The device does not process transfers for the channel in this state.
+ * @IPA_HW_MHI_CHANNEL_STATE_ERROR: The device detected an error in an element
+ *	from the transfer ring associated with the channel.
+ * @IPA_HW_MHI_CHANNEL_STATE_INVALID: Invalid state. Shall not be in use in
+ *	operational scenario.
+ */
+enum ipa_hw_mhi_channel_states {
+	IPA_HW_MHI_CHANNEL_STATE_DISABLE	= 0,
+	IPA_HW_MHI_CHANNEL_STATE_ENABLE		= 1,
+	IPA_HW_MHI_CHANNEL_STATE_RUN		= 2,
+	IPA_HW_MHI_CHANNEL_STATE_SUSPEND	= 3,
+	IPA_HW_MHI_CHANNEL_STATE_STOP		= 4,
+	IPA_HW_MHI_CHANNEL_STATE_ERROR		= 5,
+	IPA_HW_MHI_CHANNEL_STATE_INVALID	= 0xFF
+};
+
+/**
+ * Structure holding the parameters for IPA_CPU_2_HW_CMD_MHI_DL_UL_SYNC_INFO
+ * command. Parameters are sent as 32b immediate parameters.
+ * @isDlUlSyncEnabled: Flag to indicate if DL UL Syncronization is enabled
+ * @UlAccmVal: UL Timer Accumulation value (Period after which device will poll
+ *	for UL data)
+ * @ulMsiEventThreshold: Threshold at which HW fires MSI to host for UL events
+ * @dlMsiEventThreshold: Threshold at which HW fires MSI to host for DL events
+ */
+union IpaHwMhiDlUlSyncCmdData_t {
+	struct IpaHwMhiDlUlSyncCmdParams_t {
+		u32 isDlUlSyncEnabled:8;
+		u32 UlAccmVal:8;
+		u32 ulMsiEventThreshold:8;
+		u32 dlMsiEventThreshold:8;
+	} params;
+	u32 raw32b;
+};
+
+/**
+ * struct ipa_uc_ctx - IPA uC context
+ * @uc_inited: Indicates if uC interface has been initialized
  * @uc_loaded: Indicates if uC has loaded
  * @uc_failed: Indicates if uC has failed / returned an error
- * @uc_lock: uC inteface lock to allow only one uC interaction at a time
+ * @uc_lock: uC interface lock to allow only one uC interaction at a time
  * @uc_completation: Completion mechanism to wait for uC commands
  * @uc_sram_mmio: Pointer to uC mapped memory
  * @pending_cmd: The last command sent waiting to be ACKed
  * @uc_status: The last status provided by the uC
- * @wdi_dma_pool: DMA pool used for WDI operations
  */
 struct ipa_uc_ctx {
 	bool uc_inited;
@@ -768,12 +998,23 @@ struct ipa_uc_ctx {
 	struct mutex uc_lock;
 	struct completion uc_completion;
 	struct IpaHwSharedMemCommonMapping_t *uc_sram_mmio;
+	struct IpaHwEventLogInfoData_t *uc_event_top_mmio;
+	u32 uc_event_top_ofst;
 	u32 pending_cmd;
 	u32 uc_status;
+};
+
+/**
+ * struct ipa_uc_wdi_ctx
+ * @wdi_dma_pool: DMA pool used for WDI operations
+ * @wdi_uc_top_ofst:
+ * @wdi_uc_top_mmio:
+ * @wdi_uc_stats_ofst:
+ * @wdi_uc_stats_mmio:
+ */
+struct ipa_uc_wdi_ctx {
 	/* WDI specific fields */
 	struct dma_pool *wdi_dma_pool;
-	u32 wdi_uc_top_ofst;
-	struct IpaHwEventLogInfoData_t *wdi_uc_top_mmio;
 	u32 wdi_uc_stats_ofst;
 	struct IpaHwStatsWDIInfoData_t *wdi_uc_stats_mmio;
 };
@@ -857,6 +1098,8 @@ struct ipa_sps_pm {
  * @enable_clock_scaling: clock scaling is enabled ?
  * @curr_ipa_clk_rate: ipa_clk current rate
  * @wcstats: wlan common buffer stats
+ * @uc_ctx: uC interface context
+ * @uc_wdi_ctx: WDI specific fields for uC interface
 
  * IPA context - holds all relevant info about IPA driver and its state
  */
@@ -926,6 +1169,7 @@ struct ipa_context {
 	enum ipa_hw_type ipa_hw_type;
 	enum ipa_hw_mode ipa_hw_mode;
 	bool use_ipa_teth_bridge;
+	bool ipa_bam_remote_mode;
 	/* featurize if memory footprint becomes a concern */
 	struct ipa_stats stats;
 	void *smem_pipe_mem;
@@ -942,10 +1186,13 @@ struct ipa_context {
 
 	struct ipa_uc_ctx uc_ctx;
 
-// LGE_UPDATE_S : IPA debug patch @CN01774246, Subject:Kernel Panic in r1023.3 version (kernel BUG ipa.c 1542)
-	struct ipa_hw_pkt_status status[128];
-	u32 status_wr_idx;
-// LGE_UPDATE_E
+	struct ipa_uc_wdi_ctx uc_wdi_ctx;
+	u32 wan_rx_ring_size;
+
+//                                                                                                            
+    struct ipa_hw_pkt_status status[128];
+    u32 status_wr_idx;
+//             
 };
 
 /**
@@ -991,6 +1238,8 @@ struct ipa_plat_drv_res {
 	enum ipa_hw_type ipa_hw_type;
 	enum ipa_hw_mode ipa_hw_mode;
 	u32 ee;
+	bool ipa_bam_remote_mode;
+	u32 wan_rx_ring_size;
 };
 
 struct ipa_mem_partition {
@@ -1147,19 +1396,17 @@ int __ipa_del_rt_rule(u32 rule_hdl);
 int __ipa_del_hdr(u32 hdr_hdl);
 int __ipa_release_hdr(u32 hdr_hdl);
 int __ipa_release_hdr_proc_ctx(u32 proc_ctx_hdl);
-int _ipa_read_gen_reg_v1_0(char *buff, int max_len);
 int _ipa_read_gen_reg_v1_1(char *buff, int max_len);
 int _ipa_read_gen_reg_v2_0(char *buff, int max_len);
-int _ipa_read_ep_reg_v1_0(char *buf, int max_len, int pipe);
 int _ipa_read_ep_reg_v1_1(char *buf, int max_len, int pipe);
 int _ipa_read_ep_reg_v2_0(char *buf, int max_len, int pipe);
-void _ipa_write_dbg_cnt_v1(int option);
+void _ipa_write_dbg_cnt_v1_1(int option);
 void _ipa_write_dbg_cnt_v2_0(int option);
-int _ipa_read_dbg_cnt_v1(char *buf, int max_len);
+int _ipa_read_dbg_cnt_v1_1(char *buf, int max_len);
 int _ipa_read_dbg_cnt_v2_0(char *buf, int max_len);
-void _ipa_enable_clks_v1(void);
+void _ipa_enable_clks_v1_1(void);
 void _ipa_enable_clks_v2_0(void);
-void _ipa_disable_clks_v1(void);
+void _ipa_disable_clks_v1_1(void);
 void _ipa_disable_clks_v2_0(void);
 
 static inline u32 ipa_read_reg(void *base, u32 offset)
@@ -1203,16 +1450,16 @@ int _ipa_init_rt6_v2(void);
 int _ipa_init_flt4_v2(void);
 int _ipa_init_flt6_v2(void);
 
-int __ipa_commit_flt_v1(enum ipa_ip_type ip);
+int __ipa_commit_flt_v1_1(enum ipa_ip_type ip);
 int __ipa_commit_flt_v2(enum ipa_ip_type ip);
-int __ipa_commit_rt_v1(enum ipa_ip_type ip);
+int __ipa_commit_rt_v1_1(enum ipa_ip_type ip);
 int __ipa_commit_rt_v2(enum ipa_ip_type ip);
 int __ipa_generate_rt_hw_rule_v2(enum ipa_ip_type ip,
 	struct ipa_rt_entry *entry, u8 *buf);
 int __ipa_generate_rt_hw_rule_v2_5(enum ipa_ip_type ip,
 	struct ipa_rt_entry *entry, u8 *buf);
 
-int __ipa_commit_hdr_v1(void);
+int __ipa_commit_hdr_v1_1(void);
 int __ipa_commit_hdr_v2(void);
 int __ipa_commit_hdr_v2_5(void);
 int ipa_generate_flt_eq(enum ipa_ip_type ip,
@@ -1255,9 +1502,35 @@ int ipa_init_q6_smem(void);
 
 int ipa_sps_connect_safe(struct sps_pipe *h, struct sps_connect *connect,
 			 enum ipa_client_type ipa_client);
+
+int ipa_mhi_handle_ipa_config_req(struct ipa_config_req_msg_v01 *config_req);
+
 int ipa_uc_interface_init(void);
 int ipa_uc_reset_pipe(enum ipa_client_type ipa_client);
+int ipa_uc_state_check(void);
+int ipa_uc_send_cmd(u32 cmd, u32 opcode, u32 expected_status,
+		    bool polling_mode, unsigned long timeout_jiffies);
 void ipa_register_panic_hdlr(void);
+void ipa_uc_register_handlers(enum ipa_hw_features feature,
+			      struct ipa_uc_hdlrs *hdlrs);
 int create_nat_device(void);
 int ipa_uc_notify_clk_state(bool enabled);
+void ipa_dma_async_memcpy_notify_cb(void *priv,
+		enum ipa_dp_evt_type evt, unsigned long data);
+
+int ipa_uc_update_hw_flags(u32 flags);
+
+int ipa_uc_mhi_init(void (*ready_cb)(void), void (*wakeup_request_cb)(void));
+int ipa_uc_mhi_send_dl_ul_sync_info(union IpaHwMhiDlUlSyncCmdData_t cmd);
+int ipa_uc_mhi_init_engine(struct ipa_mhi_msi_info *msi, u32 mmio_addr,
+	u32 host_ctrl_addr, u32 host_data_addr, u32 first_ch_idx,
+	u32 first_evt_idx);
+int ipa_uc_mhi_init_channel(int ipa_ep_idx, int channelHandle,
+	int contexArrayIndex, int channelDirection);
+int ipa_uc_mhi_reset_channel(int channelHandle);
+int ipa_uc_mhi_suspend_channel(int channelHandle);
+int ipa_uc_mhi_resume_channel(int channelHandle, bool LPTransitionRejected);
+int ipa_uc_mhi_stop_event_update_channel(int channelHandle);
+int ipa_uc_mhi_print_stats(char *dbg_buff, int size);
+int ipa_uc_memcpy(phys_addr_t dest, phys_addr_t src, int len);
 #endif /* _IPA_I_H_ */

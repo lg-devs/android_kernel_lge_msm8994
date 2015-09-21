@@ -1,26 +1,26 @@
 /*****************************************************************************
-	Copyright(c) 2013 FCI Inc. All Rights Reserved
+    Copyright(c) 2013 FCI Inc. All Rights Reserved
 
-	File name : fc8300_regs.h
+    File name : fc8300_regs.h
 
-	Description : header of FC8300 register map
+    Description : header of FC8300 register map
 
-	This program is free software; you can redistribute it and/or modify
-	it under the terms of the GNU General Public License as published by
-	the Free Software Foundation; either version 2 of the License, or
-	(at your option) any later version.
+    This program is free software; you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation; either version 2 of the License, or
+    (at your option) any later version.
 
-	This program is distributed in the hope that it will be useful,
-	but WITHOUT ANY WARRANTY; without even the implied warranty of
-	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-	GNU General Public License for more details.
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+    GNU General Public License for more details.
 
-	You should have received a copy of the GNU General Public License
-	along with this program; if not, write to the Free Software
-	Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
+    You should have received a copy of the GNU General Public License
+    along with this program; if not, write to the Free Software
+    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 
-	History :
-	----------------------------------------------------------------------
+    History :
+    ----------------------------------------------------------------------
 *******************************************************************************/
 #ifndef __FC8300_REGS_H__
 #define __FC8300_REGS_H__
@@ -78,7 +78,7 @@ extern "C" {
 #define BBM_TARGET_CLK  130031
 #endif
 
-	/* SYS_MD Interrupt */
+    /* SYS_MD Interrupt */
 #define SYS_MD_NO_OFDM_DETECT       0x01
 #define SYS_MD_RESYNC_OCCUR         0x02
 #define SYS_MD_TMCC_LOCK            0x04
@@ -87,7 +87,7 @@ extern "C" {
 #define SYS_MD_C_LAYER_BER_UPDATE   0x20
 #define SYS_MD_BER_UPDATE           0x40
 
-	/* MD_INT2 Interrupt */
+    /* MD_INT2 Interrupt */
 /* TMCC EAB (Emergency Alarm Broadcast) Signal */
 #define AUX_INT_TMCC_INT_SRC        0x01
 /* The indicator to transmission switching parameter */
@@ -102,16 +102,16 @@ extern "C" {
 /* Auto switch 12/1 seg */
 #define AUX_INT_AUTO_SWITCH         0x80
 
-	/* FEC INT */
+    /* FEC INT */
 #define FEC_INT_IRQ_A_TS_ERROR      0x01
 #define FEC_INT_IRQ_B_TS_ERROR      0x02
 #define FEC_INT_IRQ_C_TS_ERROR      0x04
 
-	/* AUTO SWITCH INT */
+    /* AUTO SWITCH INT */
 #define AUTO_SWITCH_12_SEG          0x00
 #define AUTO_SWITCH_1_SEG           0x01
 
-	/* COMMON */
+    /* COMMON */
 #define BBM_SW_RESET                0x0001
 #define BBM_INT_STATUS              0x0002
 #define BBM_INT_MASK                0x0003
@@ -218,7 +218,7 @@ extern "C" {
 #define BBM_LAYER_FILTER2           0x8043
 #define BBM_BUF_READ_LENGTH         0x8064
 
-	/* INTERNAL I2C */
+    /* INTERNAL I2C */
 #define BBM_I2C_PR                  0x0030
 #define BBM_I2C_CTR                 0x0032
 #define BBM_I2C_RXR                 0x0033
@@ -226,7 +226,7 @@ extern "C" {
 #define BBM_I2C_TXR                 0x0035
 #define BBM_I2C_CR                  0x0036
 
-	/* FRONT */
+    /* FRONT */
 #define BBM_ADC_CTRL                0x1000
 #define BBM_REF_AMP                 0x1008
 #define BBM_DC_EST_EN               0x1010
@@ -259,7 +259,7 @@ extern "C" {
 #define BBM_PSAT_ON_REF_1SEG_QPSK   0x1083
 #define BBM_PSAT_ON_REF_1SEG_16QAM  0x1084
 
-	/* SYNC */
+    /* SYNC */
 #define BBM_FREQ_COMPEN_VAL0        0x2008
 #define BBM_FREQ_COMPEN_VAL1        0x2009
 #define BBM_FREQ_COMPEN_VAL2        0x200a
@@ -273,7 +273,7 @@ extern "C" {
 #define BBM_CFTSCFG_CIRGRMASKEXPSIZE_13SEG  0x2542
 #define BBM_CFTSCFG_CIRGRMASKEXPSIZE2_13SEG 0x255c
 
-	/* DEMOD */
+    /* DEMOD */
 #define BBM_SYSTEM_MODE             0x3010
 #define BBM_CENTER_CH_NUM           0x3011
 #define BBM_GMASK_AUTO              0x3022
@@ -284,12 +284,12 @@ extern "C" {
 /* 1/12-SEG auto switch's output status */
 #define BBM_OSS_MNT                 0x30ac
 
-	/* ECHO */
+    /* ECHO */
 #define BBM_ECHOC_EN                0x3100
 #define BBM_REF_DELAY_POST          0x3104
 #define BBM_RESTART_BY_TS_EN        0x3113
 
-	/* CE */
+    /* CE */
 #define BBM_WSCN_MSQ                0x4063
 #define BBM_AD_GAIN_PERIOD          0x4070
 #define BBM_FAIP_MTD_SR_SHIFT_VALUE 0x417f
@@ -309,11 +309,11 @@ extern "C" {
 #define BBM_MAN_LAYER_C_TI_LENGTH   0x41fd
 #define BBM_FD_RD_LATENCY_1SEG      0x4200
 #define BBM_FD_OUT_MODE             0x4208
-#define BBM_MSNR_FREQ_AVG_PERIOD_13	0x4242
+#define BBM_MSNR_FREQ_AVG_PERIOD_13    0x4242
 
 #define BBM_MSNR_FREQ_S_POW_MAN_VALUE3 0x4247
 
-	/* DIVERSITY */
+    /* DIVERSITY */
 #define BBM_DIVERSITY_EN            0x4300
 #define BBM_DIVERSITY_MODE          0x4301
 #define BBM_CN_WEIGHT_USE_EN        0x4304
@@ -322,7 +322,7 @@ extern "C" {
 #define BBM_COMB_OFF                0x4314
 #define BBM_COMB_CN_OK_FD_EN        0x4333
 
-	/* FEC */
+    /* FEC */
 #define BBM_BER_REQ                 0x5000
 #define BBM_FEC_LAYER               0x5002
 #define BBM_FEC_CTRL_A              0x5010
@@ -346,7 +346,7 @@ extern "C" {
 #define BBM_BER_ERR_RSPS            0x5072
 #define BBM_BER_ERR_BITS            0x5074
 
-	/* DEMAP */
+    /* DEMAP */
 #define BBM_DMP_A_BER_RXD_BITS      0x5080
 #define BBM_DMP_A_BER_ERR_BITS      0x5084
 #define BBM_DMP_B_BER_RXD_BITS      0x5090
@@ -356,7 +356,7 @@ extern "C" {
 #define BBM_DMP_BER_RXD_BITS        0x50B0
 #define BBM_DMP_BER_ERR_BITS        0x50B4
 
-	/* GPIO */
+    /* GPIO */
 #define BBM_GPIO_DATA               0x9000
 #define BBM_GPIO_DIR                0x9001
 #define BBM_GPIO_SENSE              0x9002
@@ -367,7 +367,7 @@ extern "C" {
 #define BBM_GPIO_MASKED_STATUS      0x9007
 #define BBM_GPIO_INTERRUPT_CLEAR    0x9008
 
-	/* B-CAS DESCRAMBLER */
+    /* B-CAS DESCRAMBLER */
 #define BBM_BCAS_ENABLE             0xa000
 #define BBM_BCAS_ROUND              0xa001
 #define BBM_BCAS_PID0_DKEY0         0xa020
@@ -386,10 +386,10 @@ extern "C" {
 #define BBM_BCAS_SYS_KEY6           0xa0c0
 #define BBM_BCAS_SYS_KEY7           0xa0c4
 
-	/* DM */
+    /* DM */
 #define BBM_DM_DATA                 0xf000
 
-	/*  BUFFER CONFIGURATION */
+    /*  BUFFER CONFIGURATION */
 #define TS0_BUF_START               (0x0000)
 #define TS0_BUF_LENGTH              (188 * 320) /* 188 x 640 */
 #define TS0_BUF_END                 (TS0_BUF_START + TS0_BUF_LENGTH - 1)
@@ -435,4 +435,3 @@ extern "C" {
 #endif
 
 #endif /* __FC8300_REGS_H__ */
-

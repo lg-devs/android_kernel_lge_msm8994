@@ -37,6 +37,9 @@
 	qcom,ext-sense-type;
 	qcom,battery-data = <&lge_batterydata>;
 	qcom,sw-rbias-control;
+	qcom,fg-iterm-ma = <400>;
+	qcom,fg-cutoff-voltage-mv = <3200>;
+	qcom,irq-volt-empty-mv = <2500>;
 	qcom,thermal-coefficients = [D2 85 0E 4A A5 35];
 };
 

@@ -44,4 +44,4 @@ int debug_pmic_register_for_usb(void);
 int set_diag_enable_status(int);
 #endif
 
-#endif /* __U_LGEUSB_H__ */
+#endif /*                */

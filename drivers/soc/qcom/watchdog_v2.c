@@ -33,6 +33,9 @@
 #ifdef CONFIG_LGE_HANDLE_PANIC
 #include <soc/qcom/lge/lge_handle_panic.h>
 #endif
+#ifdef CONFIG_LGE_PM_DEBUG
+#include <soc/qcom/lge/board_lge.h>
+#endif
 
 #define MODULE_NAME "msm_watchdog"
 #define WDT0_ACCSCSSNBARK_INT 0
@@ -330,6 +333,9 @@ static void pet_watchdog_work(struct work_struct *work)
 	if (enable)
 		queue_delayed_work(wdog_wq,
 				&wdog_dd->dogwork_struct, delay_time);
+#ifdef CONFIG_LGE_PM_DEBUG
+	xo_therm_logging();
+#endif
 }
 
 static int wdog_cpu_pm_notify(struct notifier_block *self,

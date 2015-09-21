@@ -103,7 +103,6 @@ int dw8768_lgd_dsv_setting(int enable)
 		return -EINVAL;
 
 	if (enable) {
-		/* FIXME : workaround FD OFF*/
 		ret = lion_dsv_write_byte(lion_dsv_base, 0x00, 0x0F);
 		ret+= lion_dsv_write_byte(lion_dsv_base, 0x01, 0x0F);
 		ret+= lion_dsv_write_byte(lion_dsv_base, 0x03, 0x87);
@@ -112,7 +111,6 @@ int dw8768_lgd_dsv_setting(int enable)
 		pr_info("DW DSV Normal mode set, ret = %d\n",ret);
 
 	} else {
-		/* FIXME : workaround DSV voltage 5.5V*/
 		ret = lion_dsv_write_byte(lion_dsv_base, 0x00, 0x05);
 		ret+= lion_dsv_write_byte(lion_dsv_base, 0x01, 0x05);
 		ret+= lion_dsv_write_byte(lion_dsv_base, 0x03, 0x84);

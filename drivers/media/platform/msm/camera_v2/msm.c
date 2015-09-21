@@ -390,6 +390,8 @@ int msm_create_command_ack_q(unsigned int session_id, unsigned int stream_id)
 				__func__, __LINE__);
 		return -EINVAL;
 	}
+	pr_err("%s: session_id = %d, stream_id = %d\n", __func__,session_id,stream_id); /*                                                                                       */
+	
 	mutex_lock(&session->lock);
 	cmd_ack = kzalloc(sizeof(*cmd_ack), GFP_KERNEL);
 	if (!cmd_ack) {
@@ -420,6 +422,9 @@ void msm_delete_command_ack_q(unsigned int session_id, unsigned int stream_id)
 		list, __msm_queue_find_session, &session_id);
 	if (!session)
 		return;
+
+	pr_err("%s: session_id = %d, stream_id = %d\n", __func__,session_id,stream_id); /*                                                                                       */
+
 	mutex_lock(&session->lock);
 
 	cmd_ack = msm_queue_find(&session->command_ack_q,
@@ -508,6 +513,8 @@ int msm_destroy_session(unsigned int session_id)
 	struct v4l2_subdev *buf_mgr_subdev;
 	struct msm_sd_close_ioctl session_info;
 
+	pr_err("%s: session_id = %d\n", __func__,session_id); /*                                                                                       */
+	
 	session = msm_queue_find(msm_session_q, struct msm_session,
 		list, __msm_queue_find_session, &session_id);
 	if (!session)
@@ -747,11 +754,11 @@ int msm_post_event(struct v4l2_event *event, int timeout)
 			pr_err("%s: Timed out\n", __func__);
 			msm_print_event_error(event);
 			mutex_unlock(&session->lock);
-/* LGE_CHANGE_S, Camera Recovery Code, 2014-12-25, yousung.kang@lge.com */
+/*                                                                      */
                         pr_err("%s: ===== Camera Recovery Start! ===== \n", __func__);
                         dump_stack();
                         send_sig(SIGKILL, current, 0);
-/* LGE_CHANGE_E, Camera Recovery Code, 2014-12-25, yousung.kang@lge.com */
+/*                                                                      */
 			return -ETIMEDOUT;
 		} else {
 			pr_err("%s: Error: No timeout but list empty!",

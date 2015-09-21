@@ -594,3 +594,9 @@ config SND_SOC_ZDET_ENABLE
 	default n
 	help
 	 Recalibrates dce_z and sta_z parameters. Say Y here to enable
+	 
+config SND_LGE_MBHC_BUTTON_CAL
+	bool "LGE MBHC Button Calibration"
+	default n
+	help
+	 To support MBHC button calibration using DEBUG_FS

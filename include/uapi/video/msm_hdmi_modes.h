@@ -188,7 +188,19 @@ struct msm_hdmi_mode_timing_info {
 #define HDMI_VFRMT_1920x1200p60_16_10	ETIII_OFF(8)
 #define ETIII_VFRMT_END			HDMI_VFRMT_1920x1200p60_16_10
 
-#define HDMI_VFRMT_MAX			(ETIII_VFRMT_END + 1)
+#define RESERVE_OFF(x)			(ETIII_VFRMT_END + x)
+
+#define HDMI_VFRMT_RESERVE1		RESERVE_OFF(1)
+#define HDMI_VFRMT_RESERVE2		RESERVE_OFF(2)
+#define HDMI_VFRMT_RESERVE3		RESERVE_OFF(3)
+#define HDMI_VFRMT_RESERVE4		RESERVE_OFF(4)
+#define HDMI_VFRMT_RESERVE5		RESERVE_OFF(5)
+#define HDMI_VFRMT_RESERVE6		RESERVE_OFF(6)
+#define HDMI_VFRMT_RESERVE7		RESERVE_OFF(7)
+#define HDMI_VFRMT_RESERVE8		RESERVE_OFF(8)
+#define RESERVE_VFRMT_END		HDMI_VFRMT_RESERVE8
+
+#define HDMI_VFRMT_MAX			(RESERVE_VFRMT_END + 1)
 #define HDMI_VFRMT_FORCE_32BIT		0x7FFFFFFF
 
 /* Timing information for supported modes */
@@ -397,5 +409,10 @@ do {	\
 			HDMI_VFRMT_1280x800p60_16_10);	\
 	}	\
 } while (0)
+
+#define MSM_HDMI_MODES_GET_DETAILS(mode, MODE) do {		\
+	struct msm_hdmi_mode_timing_info info = MODE##_TIMING;	\
+	*mode = info;						\
+	} while (0)
 
 #endif /* _UAPI_MSM_HDMI_MODES_H__ */

@@ -93,11 +93,11 @@ MODULE_PARM_DESC(
 	"MMC/SD cards are removable and may be removed during suspend");
 
 /*
- * LGE_CHANGE_S
- * Date     : 2014.03.19
- * Author   : bohyun.jung@lge.com
- * Comment  : Dynamic MMC log
- *            set mmc log level by accessing '/sys/module/mmc_core/parameters/debug_level' through adb shell.
+               
+                        
+                                 
+                             
+                                                                                                             
  */
 #if defined(CONFIG_LGE_MMC_DYNAMIC_LOG)
 
@@ -108,7 +108,7 @@ MODULE_PARM_DESC(
     debug_level,
     "MMC/SD cards debug_level");
 
-#endif  /* end of LGE_CHANGE_E */
+#endif  /*                     */
 
 #define MMC_UPDATE_BKOPS_STATS_HPI(stats)	\
 	do {					\
@@ -425,7 +425,9 @@ EXPORT_SYMBOL(mmc_blk_init_bkops_statistics);
  */
 void mmc_start_delayed_bkops(struct mmc_card *card)
 {
-	if (!card || !card->ext_csd.bkops_en || mmc_card_doing_bkops(card))
+	if (!card ||
+		!(mmc_card_get_bkops_en_manual(card)) ||
+		mmc_card_doing_bkops(card))
 		return;
 
 	if (card->bkops_info.sectors_changed <
@@ -462,7 +464,7 @@ void mmc_start_bkops(struct mmc_card *card, bool from_exception)
 	int err;
 
 	BUG_ON(!card);
-	if (!card->ext_csd.bkops_en)
+	if (!(mmc_card_get_bkops_en_manual(card)))
 		return;
 
 	if ((card->bkops_info.cancel_delayed_work) && !from_exception) {
@@ -1161,10 +1163,10 @@ int mmc_interrupt_hpi(struct mmc_card *card)
 
 out:
 #ifdef CONFIG_MACH_LGE
-	/* LGE_CHANGE
-	 * add debug code
-	 * 2014-09-01, Z2G4-BSP-FileSys@lge.com
-	 */
+	/*           
+                  
+                                        
+  */
 	if (err)
 		pr_err("%s: mmc_interrupt_hpi() failed. err: (%d)\n",	mmc_hostname(card->host), err);
 #endif
@@ -1378,12 +1380,12 @@ void mmc_set_data_timeout(struct mmc_data *data, const struct mmc_card *card)
 			limit_us = 3000000;
 		else
 			#ifdef CONFIG_MACH_LGE
-			/* LGE_CHANGE
-			 * Although we already applied enough time,
-			 * timeout-error occurs until now with several-ultimate-crappy-memory.
-			 * So, we give more time than before.
-			 * 2014-09-01, Z2G4-BSP-FileSys@lge.com
-			 */
+			/*           
+                                              
+                                                                         
+                                        
+                                          
+    */
 			limit_us = 300000;
 			#else
 			limit_us = 100000;
@@ -2143,10 +2145,10 @@ void mmc_power_up(struct mmc_host *host)
 	 * time required to reach a stable voltage.
 	 */
 #ifdef CONFIG_MACH_LGE
-	/* LGE_CHANGE
-	 * Augmenting delay-time for some crappy card.
-	 * 2014-09-01, Z2G4-BSP-FileSys@lge.com
-	 */
+	/*           
+                                               
+                                        
+  */
 	mmc_delay(20);
 #else
 	mmc_delay(10);
@@ -2162,10 +2164,10 @@ void mmc_power_off(struct mmc_host *host)
 {
 	if (host->ios.power_mode == MMC_POWER_OFF)
 	#ifdef CONFIG_MACH_LGE
-	/* LGE_CHANGE
-	 * If it is already power-off, skip below.
-	 * 2014-09-01, Z2G4-BSP-FileSys@lge.com
-	 */
+	/*           
+                                           
+                                        
+  */
 	{
 		printk(KERN_INFO "[LGE][MMC][%-18s( )] host->index:%d, already power-off, skip below\n", __func__, host->index);
 		return;
@@ -3262,6 +3264,8 @@ out:
 void mmc_disable_clk_scaling(struct mmc_host *host)
 {
 	cancel_delayed_work_sync(&host->clk_scaling.work);
+	if (host->ops->notify_load)
+		host->ops->notify_load(host, MMC_LOAD_LOW);
 	host->clk_scaling.enable = false;
 }
 EXPORT_SYMBOL_GPL(mmc_disable_clk_scaling);
@@ -3293,8 +3297,8 @@ void mmc_init_clk_scaling(struct mmc_host *host)
 	INIT_DELAYED_WORK(&host->clk_scaling.work, mmc_clk_scale_work);
 	host->clk_scaling.curr_freq = mmc_get_max_frequency(host);
 	if (host->ops->notify_load)
-		host->ops->notify_load(host, MMC_LOAD_HIGH);
-	host->clk_scaling.state = MMC_LOAD_HIGH;
+		host->ops->notify_load(host, MMC_LOAD_INIT);
+	host->clk_scaling.state = MMC_LOAD_INIT;
 	mmc_reset_clk_scale_stats(host);
 	host->clk_scaling.enable = true;
 	host->clk_scaling.initialized = true;
@@ -3311,6 +3315,8 @@ EXPORT_SYMBOL_GPL(mmc_init_clk_scaling);
 void mmc_exit_clk_scaling(struct mmc_host *host)
 {
 	cancel_delayed_work_sync(&host->clk_scaling.work);
+	if (host->ops->notify_load)
+		host->ops->notify_load(host, MMC_LOAD_LOW);
 	memset(&host->clk_scaling, 0, sizeof(host->clk_scaling));
 }
 EXPORT_SYMBOL_GPL(mmc_exit_clk_scaling);
@@ -3432,10 +3438,10 @@ void mmc_rescan(struct work_struct *work)
 	bool extend_wakelock = false;
 
 #ifdef CONFIG_MACH_LGE
-	/* LGE_CHANGE
-	* Adding Print
-	* 2014-09-01, Z2G4-BSP-FileSys@lge.com
-	*/
+	/*           
+               
+                                       
+ */
 	printk(KERN_INFO "[LGE][MMC][%-18s( ) START!] mmc%d\n", __func__, host->index);
 #endif
 
@@ -3684,9 +3690,11 @@ int mmc_flush_cache(struct mmc_card *card)
 			pr_err("%s: cache flush timeout\n",
 					mmc_hostname(card->host));
 			rc = mmc_interrupt_hpi(card);
-			if (rc)
+			if (rc) {
 				pr_err("%s: mmc_interrupt_hpi() failed (%d)\n",
 						mmc_hostname(host), rc);
+				err = -ENODEV;
+			}
 		} else if (err) {
 			pr_err("%s: cache flush error %d\n",
 					mmc_hostname(card->host), err);

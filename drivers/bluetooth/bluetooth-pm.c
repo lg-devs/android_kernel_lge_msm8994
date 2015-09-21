@@ -129,6 +129,15 @@ static struct tasklet_struct hostwake_task;
 static struct timer_list tx_timer;
 
 
+//BT_S : [CONBT-1475] LGC_BT_COMMON_IMP_KERNEL_UART_HCI_COMMAND_TIMEOUT
+static struct timer_list uart_control_timer;
+static unsigned long uart_off_jiffies;
+static unsigned long uart_on_jiffies;
+
+#define UART_CONTROL_BLOCK_TIME    50
+//BT_E : [CONBT-1475] LGC_BT_COMMON_IMP_KERNEL_UART_HCI_COMMAND_TIMEOUT
+
+
 /** Lock for state transitions */
 static spinlock_t rw_lock;
 
@@ -143,13 +152,13 @@ struct proc_dir_entry *bluetooth_dir, *sleep_dir;
 static void hsuart_power(int on)
 {	
 	if (on) {
-		printk("%s, (1)", __func__);
+		printk("%s, (1)\n", __func__);
 		msm_hs_request_clock_on(bsi->uport);
-		printk("%s, (msm_hs_request_clock_on)", __func__);
+		//printk("%s, (msm_hs_request_clock_on)\n", __func__);
 		msm_hs_set_mctrl(bsi->uport, TIOCM_RTS);
-		printk("%s, (msm_hs_set_mctrl)", __func__);
+		//printk("%s, (msm_hs_set_mctrl)\n", __func__);
 	} else {
-		printk("%s, (0)", __func__);
+		printk("%s, (0)\n", __func__);
 		msm_hs_set_mctrl(bsi->uport, 0);
 		msm_hs_request_clock_off(bsi->uport);
 	}
@@ -171,14 +180,68 @@ static inline int bluetooth_pm_can_sleep(void)
 }
 
 
-void bluetooth_pm_sleep_wakeup(void)
+//BT_S : [CONBT-1475] LGC_BT_COMMON_IMP_KERNEL_UART_HCI_COMMAND_TIMEOUT
+//return TRUE : uart_control available
+//return FALSE : uart control unavailable
+bool check_uart_control_available(unsigned long diff_jeffies_0, unsigned long diff_jeffies_1)
 {
+	unsigned long diff_milli_second;
+	bool ret = true;
+
+	if(diff_jeffies_0 == 0 || diff_jeffies_1 == 0)
+	{
+		printk("%s, RETURN TRUE\n", __func__);
+		return ret;
+	}
+
+	diff_milli_second = jiffies_to_msecs(diff_jeffies_1) - jiffies_to_msecs(diff_jeffies_0);
+
+	//printk("=======================================\n");
+	printk("diff_milli_second = %lu\n", diff_milli_second);
+	//printk("=======================================\n");
+
+	if(diff_milli_second <= UART_CONTROL_BLOCK_TIME)
+	{
+		//printk("%s, RETURN FALSE\n", __func__);
+		ret = false;
+	}
+	//else
+	//{
+	//	printk("%s, RETURN TRUE\n", __func__);
+	//}
+
+	return ret;
+}
+//BT_E : [CONBT-1475] LGC_BT_COMMON_IMP_KERNEL_UART_HCI_COMMAND_TIMEOUT
+
+
+
+void bluetooth_pm_wakeup(void)
+{
+	unsigned long irq_flags;
+
+	//printk("+++ %s\n", __func__);
+
+	spin_lock_irqsave(&rw_lock, irq_flags);
+
 	if (test_bit(BT_ASLEEP, &flags)) {
 		printk("%s, waking up...\n", __func__);
 
-		wake_lock(&bsi->wake_lock);		
+//BT_S : [CONBT-1475] LGC_BT_COMMON_IMP_KERNEL_UART_HCI_COMMAND_TIMEOUT
+		uart_on_jiffies = jiffies;
 
-		clear_bit(BT_ASLEEP, &flags);	
+		if(check_uart_control_available(uart_off_jiffies, uart_on_jiffies) == false)
+		{
+			mod_timer(&uart_control_timer, jiffies + msecs_to_jiffies(UART_CONTROL_BLOCK_TIME));
+			spin_unlock_irqrestore(&rw_lock, irq_flags);
+			printk("--- %s - UART control unavailable Return\n", __func__);
+			return;
+		}
+//BT_E : [CONBT-1475] LGC_BT_COMMON_IMP_KERNEL_UART_HCI_COMMAND_TIMEOUT
+
+		clear_bit(BT_ASLEEP, &flags);
+
+		spin_unlock_irqrestore(&rw_lock, irq_flags);
 
 #ifdef QOS_REQUEST_MSM
 		if(bsi->dma_qos_request == REQUESTED) {
@@ -191,6 +254,13 @@ void bluetooth_pm_sleep_wakeup(void)
 			pm_qos_update_request(&bsi->resume_cpu_freq_req,
 						bsi->resume_min_frequency);
 #endif/*QOS_REQUEST_TEGRA*/
+
+		//printk("%s, WAKE_LOCK_START\n", __func__);
+
+		wake_lock(&bsi->wake_lock);
+
+		//printk("%s, WAKE_LOCK_END\n", __func__);
+
 #ifdef UART_CONTROL_MSM
 		/*Activating UART */
 		hsuart_power(1);
@@ -202,90 +272,128 @@ void bluetooth_pm_sleep_wakeup(void)
 		wake = gpio_get_value(bsi->ext_wake);
 		host_wake = gpio_get_value(bsi->host_wake);
 
-		printk("%s, %d, %d\n", __func__, wake, host_wake);
+		spin_unlock_irqrestore(&rw_lock, irq_flags);
+
+		//printk("%s, %d, %d\n", __func__, wake, host_wake);
 	
 		if(wake == DEASSERT && host_wake == ASSERT)
 		{
-			printk("%s, Start Timer : check hostwake status when timer expired\n", __func__);
+			printk("%s - Start Timer : check hostwake status when timer expired\n", __func__);
 			mod_timer(&tx_timer, jiffies + (TX_TIMER_INTERVAL * HZ));
 		}
 
 #ifdef UART_CONTROL_MSM	
-		printk("%s, Workaround for uart runtime suspend : Check UART Satus", __func__);
-		
-		if(bsi->uport != NULL && msm_hs_get_bt_uport_clock_state(bsi->uport) == CLOCK_REQUEST_AVAILABLE)
-		{			
-			printk("%s, Enter abnormal status, HAVE to Call hsuart_power(1)!", __func__);		
-			hsuart_power(1);						
-		}		
+		//printk("%s, Workaround for uart runtime suspend : Check UART Satus", __func__);
+
+		//if(bsi->uport != NULL && msm_hs_get_bt_uport_clock_state(bsi->uport) == CLOCK_REQUEST_AVAILABLE)
+		//{
+		//	printk("%s, Enter abnormal status, HAVE to Call hsuart_power(1)!", __func__);
+		//	hsuart_power(1);
+		//}
+#endif /*UART_CONTROL_MSM*/
+	}
+
+	//printk("--- %s\n", __func__);
+}
+
+
+void bluetooth_pm_sleep(void)
+{
+	unsigned long irq_flags;
+
+	//printk("+++ %s\n", __func__);
+
+	spin_lock_irqsave(&rw_lock, irq_flags);
+
+	/* already asleep, this is an error case */
+	if (test_bit(BT_ASLEEP, &flags)) {
+		spin_unlock_irqrestore(&rw_lock, irq_flags);
+		printk("--- %s, already asleep return\n", __func__);
+		return;
+	}
+
+//BT_S : [CONBT-1475] LGC_BT_COMMON_IMP_KERNEL_UART_HCI_COMMAND_TIMEOUT
+	uart_off_jiffies = jiffies;
+
+	if(check_uart_control_available(uart_on_jiffies, uart_off_jiffies) == false)
+	{
+		mod_timer(&uart_control_timer, jiffies + msecs_to_jiffies(UART_CONTROL_BLOCK_TIME));
+		spin_unlock_irqrestore(&rw_lock, irq_flags);
+		printk("--- %s - UART control unavailable Return\n", __func__);
+		return;
+	}
+//BT_E : [CONBT-1475] LGC_BT_COMMON_IMP_KERNEL_UART_HCI_COMMAND_TIMEOUT
+
+	set_bit(BT_ASLEEP, &flags);
+
+	spin_unlock_irqrestore(&rw_lock, irq_flags);
+
+	printk("%s, going to sleep...\n", __func__);
+
+	//printk("%s, WAKE_UNLOCK_START\n", __func__);
+
+	wake_unlock(&bsi->wake_lock);
+
+	//printk("%s, WAKE_UNLOCK_END\n", __func__);
+
+#ifdef UART_CONTROL_MSM
+	/*Deactivating UART */
+	hsuart_power(0);
 #endif /*UART_CONTROL_MSM*/
 
+#ifdef QOS_REQUEST_MSM
+	if(bsi->dma_qos_request == REQUESTED) {
+		pm_qos_update_request(&bsi->dma_qos, 0x7FFFFFF);
 	}
+#endif /* QOS_REQUEST_MSM */
+
+#ifdef QOS_REQUEST_TEGRA
+	pm_qos_update_request(&bsi->resume_cpu_freq_req,
+				PM_QOS_DEFAULT_VALUE);
+#endif/*QOS_REQUEST_TEGRA*/
+
+	//printk("--- %s\n", __func__);
 }
 
 
 static void bluetooth_pm_sleep_work(struct work_struct *work)
 {
-	printk("+++ %s\n", __func__);
+	//printk("+++ %s\n", __func__);
 
 	if (bluetooth_pm_can_sleep()) {
-		printk("%s, bluetooth_pm_can_sleep is true\n", __func__);
-		/* already asleep, this is an error case */
-		if (test_bit(BT_ASLEEP, &flags)) {
-			printk("%s, already asleep\n", __func__);
-			return;
-		}
-		
-		printk("%s, going to sleep...\n", __func__);
-		set_bit(BT_ASLEEP, &flags);		
-
-#ifdef UART_CONTROL_MSM		
-		/*Deactivating UART */
-		hsuart_power(0);
-#endif /*UART_CONTROL_MSM*/
-
-#ifdef QOS_REQUEST_MSM
-		if(bsi->dma_qos_request == REQUESTED) {
-			pm_qos_update_request(&bsi->dma_qos, 0x7FFFFFF);
-		}
-#endif /* QOS_REQUEST_MSM */
-
-#ifdef QOS_REQUEST_TEGRA
-		pm_qos_update_request(&bsi->resume_cpu_freq_req,
-					PM_QOS_DEFAULT_VALUE);
-#endif/*QOS_REQUEST_TEGRA*/
-
-		wake_lock_timeout(&bsi->wake_lock, HZ / 2);
+		printk("%s, bluetooth_pm_can_sleep is true. Call BT Sleep\n", __func__);
+		bluetooth_pm_sleep();
 	} else {
-		printk("%s, bluetooth_pm_can_sleep is false. call BT Wake Up\n", __func__);
-		bluetooth_pm_sleep_wakeup();
+		printk("%s, bluetooth_pm_can_sleep is false. Call BT Wake Up\n", __func__);
+		bluetooth_pm_wakeup();
 	}
 
-	printk("--- %s\n", __func__);
+	//printk("--- %s\n", __func__);
 }
 
 
 static void bluetooth_pm_hostwake_task(unsigned long data)
 {
-	printk("+++ %s\n", __func__);
+	printk("%s\n", __func__);
 
 	spin_lock(&rw_lock);
 
-	if(gpio_get_value(bsi->host_wake) == ASSERT)
-	{
-		printk("%s, hostwake GPIO ASSERT(Low)\n", __func__);
+	//if(gpio_get_value(bsi->host_wake) == ASSERT)
+	//{
+		//printk("%s, hostwake GPIO ASSERT(Low)\n", __func__);
+
 		bluetooth_pm_rx_busy();
 
-		mod_timer(&tx_timer, jiffies + (TX_TIMER_INTERVAL * HZ));
-	}
-	else
-	{
-		printk("%s, hostwake GPIO High\n", __func__);
-	}
+		mod_timer(&tx_timer, jiffies + (TX_TIMER_INTERVAL * HZ));		
+	//}
+	//else
+	//{
+	//	printk("%s, hostwake GPIO DEASSERT(High)\n", __func__);
+	//}
 
 	spin_unlock(&rw_lock);
 
-	printk("+++ %s\n", __func__);	
+	//printk("--- %s\n", __func__);
 }
 
 
@@ -310,21 +418,32 @@ static void bluetooth_pm_tx_timer_expire(unsigned long data)
 }
 
 
+//BT_S : [CONBT-1475] LGC_BT_COMMON_IMP_KERNEL_UART_HCI_COMMAND_TIMEOUT
+static void bluetooth_pm_uart_control_timer_expire(unsigned long data)
+{
+	printk("%s, UART Control Timer expired\n", __func__);
+
+	bluetooth_pm_tx_busy();
+}
+//BT_E : [CONBT-1475] LGC_BT_COMMON_IMP_KERNEL_UART_HCI_COMMAND_TIMEOU
+
+
 static irqreturn_t bluetooth_pm_hostwake_isr(int irq, void *dev_id)
 {
 	/* schedule a tasklet to handle the change in the host wake line */
 	int wake, host_wake;
 	wake = gpio_get_value(bsi->ext_wake);
 	host_wake = gpio_get_value(bsi->host_wake);
-	printk("%s, bluesleep_hostwake_isr ext_wake : %d,     host_wake : %d\n", __func__, wake, host_wake);
+	printk("%s, wake : (%d), host_wake : (%d)\n", __func__, wake, host_wake);
 
 	irq_set_irq_type(irq, host_wake ? IRQF_TRIGGER_LOW : IRQF_TRIGGER_HIGH);
 
 	if(host_wake == ASSERT)
 	{
-		printk("%s, bluesleep_hostwake_isr : Registration Tasklet\n", __func__);
+		//printk("%s, bluesleep_hostwake_isr : Registration Tasklet\n", __func__);
 		tasklet_schedule(&hostwake_task);
 	}
+
 	return IRQ_HANDLED;
 }
 
@@ -384,6 +503,12 @@ static int bluetooth_pm_sleep_start(void)
 	}
 	set_bit(BT_PROTO, &flags);
 	wake_lock(&bsi->wake_lock);
+
+//BT_S : [CONBT-1475] LGC_BT_COMMON_IMP_KERNEL_UART_HCI_COMMAND_TIMEOUT
+	uart_off_jiffies = 0;
+	uart_on_jiffies = 0;
+//BT_E : [CONBT-1475] LGC_BT_COMMON_IMP_KERNEL_UART_HCI_COMMAND_TIMEOUT
+
 	return 0;
 fail:
 	atomic_inc(&open_count);
@@ -410,6 +535,13 @@ static void bluetooth_pm_sleep_stop(void)
 	printk("%s\n", __func__);	
 
 	del_timer(&tx_timer);
+
+//BT_S : [CONBT-1475] LGC_BT_COMMON_IMP_KERNEL_UART_HCI_COMMAND_TIMEOUT
+	uart_off_jiffies = 0;
+	uart_on_jiffies = 0;
+
+	del_timer(&uart_control_timer);
+//BT_E : [CONBT-1475] LGC_BT_COMMON_IMP_KERNEL_UART_HCI_COMMAND_TIMEOUT
 
 	clear_bit(BT_PROTO, &flags);
 
@@ -446,9 +578,19 @@ static void bluetooth_pm_sleep_stop(void)
 }
 
 
+//BT_S : [CONBT-1572] LGC_BT_COMMON_IMP_KERNEL_UART_SHUTDOWN_EXCEPTION_HANDLING
+void bluetooth_pm_sleep_stop_by_uart(void)
+{
+	printk("%s\n", __func__);
+	bluetooth_pm_sleep_stop();
+}
+EXPORT_SYMBOL(bluetooth_pm_sleep_stop_by_uart);
+//BT_E : [CONBT-1572] LGC_BT_COMMON_IMP_KERNEL_UART_SHUTDOWN_EXCEPTION_HANDLING
+
+
 static int check_proc_bt_wake_show(struct seq_file *m, void *v)
 {	
-	BT_INFO("");
+	//BT_INFO("");
 	seq_printf(m, "btwake:%u\n", gpio_get_value(bsi->ext_wake));
 	return 0;
 }
@@ -456,8 +598,8 @@ static int check_proc_bt_wake_show(struct seq_file *m, void *v)
 
 static int proc_bt_wake_open(struct inode *inode, struct file  *file)
 {	
-	BT_INFO("");
-	BT_INFO("bsi->ext_wake : %d,  gpio_get_value(bsi->ext_wake) : %d",bsi->ext_wake,gpio_get_value(bsi->ext_wake));
+	//BT_INFO("");
+	//BT_INFO("bsi->ext_wake : %d,  gpio_get_value(bsi->ext_wake) : %d",bsi->ext_wake,gpio_get_value(bsi->ext_wake));
 	return single_open(file,check_proc_bt_wake_show,NULL);
 }
 
@@ -467,7 +609,20 @@ static ssize_t proc_bt_wake_write(struct file *file, const char __user *buf,
 {
 	char *buffer;
 
-	BT_INFO("");
+//BT_S : [CONBT-1572] LGC_BT_COMMON_IMP_KERNEL_UART_SHUTDOWN_EXCEPTION_HANDLING
+	unsigned long irq_flags;
+
+	//BT_INFO("");
+	spin_lock_irqsave(&rw_lock, irq_flags);
+
+	if (!test_bit(BT_PROTO, &flags)) {
+		printk("%s, Proto is not started.\n", __func__);
+		spin_unlock_irqrestore(&rw_lock, irq_flags);
+		return -EFAULT;
+	}
+
+	spin_unlock_irqrestore(&rw_lock, irq_flags);
+//BT_E : [CONBT-1572] LGC_BT_COMMON_IMP_KERNEL_UART_SHUTDOWN_EXCEPTION_HANDLING
 
 	if (length < 1)
 		return -EINVAL;
@@ -485,7 +640,8 @@ static ssize_t proc_bt_wake_write(struct file *file, const char __user *buf,
 		BT_DBG("BT WAKE Set to Wake");
 		gpio_set_value(bsi->ext_wake, 0);
 
-		bluetooth_pm_sleep_wakeup();
+		bluetooth_pm_tx_busy();
+		//bluetooth_pm_wakeup();
 
 	} else if (buffer[0] == '1') {
 		BT_DBG("BT WAKE Set to Sleep");
@@ -506,16 +662,16 @@ static int check_proc_proto_show(struct seq_file *m, void *v)
 {	
 	unsigned int proto;
 
-	BT_INFO("");
+	//BT_INFO("");
 	proto = test_bit(BT_PROTO, &flags) ? 1 : 0;
-	printk("%s: proto = %u \n",__func__,proto);
+	//printk("%s: proto = %u \n",__func__,proto);
 	seq_printf(m, "proto:%u\n", proto);
 	return 0;
 }
 
 static int proc_bt_proto_open(struct inode *inode, struct file  *file)
 {	
-	BT_INFO("");
+	//BT_INFO("");
 	return single_open(file,check_proc_proto_show,NULL);
 }
 
@@ -546,7 +702,7 @@ static int check_proc_asleep_show(struct seq_file *m, void *v)
 {	
 	unsigned int asleep;
 	
-	BT_INFO("");
+	//BT_INFO("");
 	asleep = test_bit(BT_ASLEEP, &flags) ? 1 : 0;
 	seq_printf(m, "asleep:%u\n", asleep);
 	return 0;
@@ -554,22 +710,22 @@ static int check_proc_asleep_show(struct seq_file *m, void *v)
 
 static int proc_bt_asleep_open(struct inode *inode, struct file  *file)
 {	
-	BT_INFO("");
+	//BT_INFO("");
 	return single_open(file,check_proc_asleep_show,NULL);
 }
 
 static int check_proc_hostwake_show(struct seq_file *m, void *v)
 {	
 	BT_INFO("");
-	printk("%s:   bsi->host_wake=%d  \n",__func__,bsi->host_wake);
+	//printk("%s:   bsi->host_wake=%d  \n",__func__,bsi->host_wake);
 	seq_printf(m, "hostwake:%u\n", gpio_get_value(bsi->host_wake));
 	return 0;
 }
 
 static int proc_bt_hostwake_open(struct inode *inode, struct file  *file)
 {	
-	BT_INFO("");
-	BT_INFO("bsi->host_wake : %d,  gpio_get_value(bsi->host_wake) : %d",bsi->host_wake,gpio_get_value(bsi->host_wake));
+	//BT_INFO("");
+	//BT_INFO("bsi->host_wake : %d,  gpio_get_value(bsi->host_wake) : %d",bsi->host_wake,gpio_get_value(bsi->host_wake));
 	return single_open(file,check_proc_hostwake_show,NULL);
 }
 
@@ -578,16 +734,16 @@ static int check_proc_preproto_show(struct seq_file *m, void *v)
 {
 	unsigned int preproto;
 
-	BT_INFO("");
+	//BT_INFO("");
 	preproto = test_bit(BT_PREPROTO, &flags) ? 1 : 0;
-	printk("%s: preproto = %u \n",__func__,preproto);
+	//printk("%s: preproto = %u \n",__func__,preproto);
 	seq_printf(m, "preproto:%u\n", preproto);
 	return 0;
 }
 
 static int proc_bt_preproto_open(struct inode *inode, struct file  *file)
 {
-	BT_INFO("");
+	//BT_INFO("");
 	return single_open(file,check_proc_preproto_show,NULL);
 }
 
@@ -604,14 +760,14 @@ static ssize_t proc_bt_preproto_write(struct file *file, const char __user *buf,
 	if (copy_from_user(&preproto, buf, 1))
 		return -EFAULT;
 
-	if (preproto == '1'){
-		if(bsi->uport == NULL){
+	if (preproto == '1') {
+		if(bsi->uport == NULL) {
 			BT_INFO("NULL");
 			bsi->uport = msm_hs_get_bt_uport(BT_PORT_NUM);
 		} else {
 			BT_INFO("NOT NULL");
-              }
-              hsuart_power(1);
+		}
+		hsuart_power(1);
 	}
 	/* claim that we wrote everything */
 	return length;
@@ -672,7 +828,7 @@ static int bluetooth_pm_write_proc_btwake(struct file *file, const char *buffer,
 	
 		gpio_set_value(bsi->ext_wake, 0);
 
-		bluetooth_pm_sleep_wakeup();	
+		bluetooth_pm_wakeup();
 	} else if (buf[0] == '1') {
 		printk("%s, BT WAKE Set to Sleep", __func__);
 		
@@ -987,6 +1143,7 @@ static const struct file_operations btwake_proc = {
 .owner		= THIS_MODULE,
 .open 		= proc_bt_wake_open,
 .read		= seq_read,
+.release	= single_release,
 .write		= proc_bt_wake_write,
 };
 
@@ -995,6 +1152,7 @@ static const struct file_operations proto_proc = {
 .owner		= THIS_MODULE,
 .open 		= proc_bt_proto_open,
 .read		= seq_read,
+.release	= single_release,
 .write		= proc_bt_proto_write,
 };
 
@@ -1002,12 +1160,14 @@ static const struct file_operations asleep_proc = {
 .owner		= THIS_MODULE,
 .open		= proc_bt_asleep_open,
 .read		= seq_read,
+.release	= single_release,
 };
 
 static const struct file_operations hostwake_proc = {
 .owner		= THIS_MODULE,
 .open		= proc_bt_hostwake_open,
 .read		= seq_read,
+.release	= single_release,
 };
 
 //BT_S : [CONBT-966] Fix to Bluetooth sleep & uart driver
@@ -1015,12 +1175,12 @@ static const struct file_operations preproto_proc = {
 .owner		= THIS_MODULE,
 .open 		= proc_bt_preproto_open,
 .read		= seq_read,
+.release	= single_release,
 .write		= proc_bt_preproto_write,
 };
 //BT_E : [CONBT-966] Fix to Bluetooth sleep & uart driver
 
-static int bluetooth_pm_suspend(struct platform_device *pdev,
-						pm_message_t state)
+static int bluetooth_pm_suspend(struct platform_device *pdev, pm_message_t state)
 {
 	printk("%s:\n", __func__);
 
@@ -1107,6 +1267,12 @@ static int bluetooth_pm_create_bt_proc_interface(void)
 	init_timer(&tx_timer);
 	tx_timer.function = bluetooth_pm_tx_timer_expire;
 	tx_timer.data = 0;
+
+//BT_S : [CONBT-1475] LGC_BT_COMMON_IMP_KERNEL_UART_HCI_COMMAND_TIMEOUT
+	init_timer(&uart_control_timer);
+	uart_control_timer.function = bluetooth_pm_uart_control_timer_expire;
+	uart_control_timer.data = 0;
+//BT_E : [CONBT-1475] LGC_BT_COMMON_IMP_KERNEL_UART_HCI_COMMAND_TIMEOUT
 
 	/* initialize host wake tasklet */
 	tasklet_init(&hostwake_task, bluetooth_pm_hostwake_task, 0);
@@ -1367,6 +1533,9 @@ static int bluetooth_pm_remove(struct platform_device *pdev)
 			printk("%s, Couldn't disable hostwake IRQ wakeup mode \n", __func__);
 		free_irq(bsi->host_wake_irq, NULL);
 		del_timer(&tx_timer);
+//BT_S : [CONBT-1475] LGC_BT_COMMON_IMP_KERNEL_UART_HCI_COMMAND_TIMEOUT
+		del_timer(&uart_control_timer);
+//BT_E : [CONBT-1475] LGC_BT_COMMON_IMP_KERNEL_UART_HCI_COMMAND_TIMEOUT
 	}
 
 	bluetooth_pm_remove_bt_proc_interface();
@@ -1420,7 +1589,6 @@ static int __init bluetooth_pm_init(void)
 	
 	printk("+++bluetooth_pm_init\n");
 	ret = platform_driver_register(&bluetooth_pm_driver);
-	bluetooth_pm_create_bt_proc_interface(); 
 	if (ret)
 		printk("Fail to register bluetooth_pm platform driver\n");
 	printk("---bluetooth_pm_init done\n");

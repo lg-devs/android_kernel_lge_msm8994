@@ -109,4 +109,8 @@ int mdss_i2c_byte_read(struct i2c_client *client, uint8_t slave_addr,
 int mdss_i2c_byte_write(struct i2c_client *client, uint8_t slave_addr,
 			uint8_t reg_offset, uint8_t *value);
 
+#ifdef CONFIG_Z2_LGD_POLED_PANEL
+int camera_is_power_on(void);
+int get_plc_status(void);
+#endif
 #endif /* __MDSS_IO_UTIL_H__ */

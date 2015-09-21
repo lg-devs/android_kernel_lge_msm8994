@@ -24,15 +24,15 @@
 
 #define NO_SET_RATE -1
 #define INIT_RATE -2
-/* LGE_CHANGE, jaehan.jeong, 2014.11.17, Changed to inline/macro  function for RTB logging */
-//#define LGE_RTB_ENABLED
+/*                                                                                         */
+//                       
 struct msm_gpio_set_tbl {
 	unsigned gpio;
 	unsigned long flags;
 	uint32_t delay;
 };
 
-/* LGE_CHANGE_S, jaehan.jeong, 2014.11.17, Changed to inline/macro  function for RTB logging */
+/*                                                                                           */
 #ifdef LGE_RTB_ENABLED
 #define msm_camera_io_w(data, addr)				\
 do {								\
@@ -66,11 +66,12 @@ void msm_camera_io_w_mb(u32 data, void __iomem *addr);
 u32 msm_camera_io_r(void __iomem *addr);
 u32 msm_camera_io_r_mb(void __iomem *addr);
 #endif
-/* LGE_CHANGE_E, jaehan.jeong, 2014.11.17, Changed to inline/macro  function for RTB logging */
+/*                                                                                           */
 void msm_camera_io_dump(void __iomem *addr, int size);
 void msm_camera_io_memcpy(void __iomem *dest_addr,
 		void __iomem *src_addr, u32 len);
-
+void msm_camera_io_memcpy_mb(void __iomem *dest_addr,
+	void __iomem *src_addr, u32 len);
 int msm_cam_clk_sel_src(struct device *dev, struct msm_cam_clk_info *clk_info,
 		struct msm_cam_clk_info *clk_src_info, int num_clk);
 int msm_cam_clk_enable(struct device *dev, struct msm_cam_clk_info *clk_info,

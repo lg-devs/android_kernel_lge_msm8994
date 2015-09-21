@@ -26,7 +26,9 @@
 #include <linux/printk.h>
 #include <linux/hrtimer.h>
 #include "governor.h"
-
+#if defined(CONFIG_Z2_LGD_POLED_PANEL)
+#include <linux/mdss_io_util.h>
+#endif
 static struct class *devfreq_class;
 
 /*
@@ -823,6 +825,15 @@ static ssize_t store_freq(struct device *dev,
 	ret = sscanf(buf, "%lu", &value);
 	if (ret != 1)
 		return -EINVAL;
+
+#if defined(CONFIG_Z2_LGD_POLED_PANEL)
+	if (!get_plc_status()) { // auto-adjust screen tone off
+		if (!camera_is_power_on()) {
+			pr_info("%s: dfps disabled cause of plc off and camera off\n", __func__);
+			value = 58;
+		}
+	}
+#endif
 
 	if(!df) {
 		dev_err(dev,"Can't find devfreq device.\n");

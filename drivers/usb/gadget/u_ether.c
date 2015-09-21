@@ -464,7 +464,7 @@ clean:
 	}
 
 	if (queue)
-		queue_work_on(0, uether_wq, &dev->rx_work);
+		queue_work(uether_wq, &dev->rx_work);
 }
 
 static int prealloc(struct list_head *list,
@@ -1867,11 +1867,7 @@ void gether_disconnect(struct gether *link)
 			kfree(req->buf);
 			req->buf = NULL;
 		}
-#ifdef CONFIG_USB_G_LGE_ANDROID_NCM
-		if (dev->gadget->sg_supported && dev->sg_enabled) {
-#else
-        if (dev->sg_enabled) {
-#endif
+		if (dev->sg_enabled) {
 			kfree(req->context);
 			kfree(req->sg);
 		}
@@ -2016,7 +2012,7 @@ static void uether_debugfs_exit(struct eth_dev *dev)
 
 static int __init gether_init(void)
 {
-	uether_wq = alloc_workqueue("uether", WQ_CPU_INTENSIVE, 1);
+	uether_wq  = create_singlethread_workqueue("uether");
 	if (!uether_wq) {
 		pr_err("%s: Unable to create workqueue: uether\n", __func__);
 		return -ENOMEM;

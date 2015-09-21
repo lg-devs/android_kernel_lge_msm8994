@@ -73,6 +73,7 @@
 	qcom,smb-vadc = <&pm8994_vadc>;
 	qcom,dc-psy-type;
 	qcom,bmd-pin-src="bpd_none";
+	vddcx-supply = <&pm8994_s1_corner>; /* VDD_CX_VOTE */
 };
 
 &soc {
@@ -95,7 +96,7 @@
 			interrupt-parent = <&msm_gpio>;
 			interrupts = <0x4c 0x0>;
 			max17048,alert_gpio = <&msm_gpio 0x4c 0x0>;
-			max17048,rcomp = <105>;
+			max17048,rcomp = <117>;
 			max17048,temp_co_hot = <1350>;
 			max17048,temp_co_cold = <7625>;
 			max17048,alert_threshold = <0x2>;
@@ -111,6 +112,8 @@
 };
 
 &pm8994_vadc {
+	qcom,vadc-xo-monitor;
+
 	chan@14{
 		status = "ok";
 		label ="mpp5_adc";

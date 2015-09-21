@@ -4,7 +4,7 @@
  * Provides type definitions and function prototypes used to link the
  * DHD OS, bus, and protocol modules.
  *
- * Copyright (C) 1999-2014, Broadcom Corporation
+ * Copyright (C) 1999-2015, Broadcom Corporation
  * 
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -24,7 +24,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: dhd.h 515169 2014-11-13 13:19:49Z $
+ * $Id: dhd.h 522006 2014-12-19 08:44:54Z $
  */
 
 /****************
@@ -64,11 +64,6 @@ int get_scheduler_policy(struct task_struct *p);
 #include <wdf.h>
 #include <WdfMiniport.h>
 #endif /* (BCMWDF)  */
-
-#if defined(WL11U) && !defined(MFP)
-// plz define MFP in makefile
-//#define MFP /* Applying interaction with MFP by spec HS2.0 REL2 */
-#endif /* WL11U */
 
 #if defined(KEEP_ALIVE)
 /* Default KEEP_ALIVE Period is 55 sec to prevent AP from sending Keep Alive probe frame */
@@ -169,10 +164,10 @@ enum dhd_prealloc_index {
 	DHD_PREALLOC_DHD_INFO = 7,
 	DHD_PREALLOC_DHD_WLFC_INFO = 8,
 	DHD_PREALLOC_IF_FLOW_LKUP = 9,
-	DHD_PREALLOC_FLOWRING = 10
+	DHD_PREALLOC_FLOWRING = 10,
 #if defined(CUSTOMER_HW10)
-	,DHD_PREALLOC_DHD_WLFC_HANGER = 11
-#endif
+	DHD_PREALLOC_DHD_WLFC_HANGER = 11
+#endif /* defined(CUSTOMER_HW10) */
 };
 
 /* Packet alignment for most efficient SDIO (can change based on platform) */
@@ -435,6 +430,8 @@ typedef struct dhd_pub {
 #if defined(WLTDLS) && defined(PCIE_FULL_DONGLE)
 	tdls_peer_tbl_t peer_tbl;
 #endif /* defined(WLTDLS) && defined(PCIE_FULL_DONGLE) */
+	uint8 *soc_ram;
+	uint32 soc_ram_length;
 } dhd_pub_t;
 #if defined(CUSTOMER_HW4)
 #define MAX_RESCHED_CNT 600
@@ -766,6 +763,10 @@ extern int dhd_get_instance(dhd_pub_t *pub);
 extern int dhd_keep_alive_onoff(dhd_pub_t *dhd);
 #endif /* KEEP_ALIVE */
 
+#ifdef DHD_DEBUG
+void dhd_schedule_memdump(dhd_pub_t *dhdp, uint8 *buf, uint32 size);
+#endif /* DHD_DEBUG */
+
 #ifdef SUPPORT_AP_POWERSAVE
 extern int dhd_set_ap_powersave(dhd_pub_t *dhdp, int ifidx, int enable);
 #endif
@@ -880,6 +881,8 @@ extern void dhd_del_sta(void *pub, int ifidx, void *ea);
 extern int dhd_get_ap_isolate(dhd_pub_t *dhdp, uint32 idx);
 extern int dhd_set_ap_isolate(dhd_pub_t *dhdp, uint32 idx, int val);
 extern int dhd_bssidx2idx(dhd_pub_t *dhdp, uint32 bssidx);
+extern int dhd_os_d3ack_wait(dhd_pub_t * pub, uint * condition, bool * pending);
+extern int dhd_os_d3ack_wake(dhd_pub_t * pub);
 
 extern bool dhd_is_concurrent_mode(dhd_pub_t *dhd);
 extern int dhd_iovar(dhd_pub_t *pub, int ifidx, char *name, char *cmd_buf, uint cmd_len, int set);
@@ -1178,6 +1181,7 @@ typedef struct wl_io_pport {
 	uint ifidx;
 } wl_io_pport_t;
 
+extern void dhd_save_fwdump(dhd_pub_t *dhd_pub, void * buffer, uint32 length);
 extern void *dhd_pub_wlinfo(dhd_pub_t *dhd_pub);
 #ifdef CONFIG_MACH_UNIVERSAL5433
 extern int check_rev(void);

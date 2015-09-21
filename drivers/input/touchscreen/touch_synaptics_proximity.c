@@ -369,7 +369,7 @@ f12_found:
 static int prox_set_hover_finger_en(bool enable)
 {
 	int retval;
-	unsigned char object_report_enable;
+	unsigned char object_report_enable = 0;
 	struct synaptics_ts_data *ts = prox->ts_data;
 
 	TOUCH_PROX_MSG("\n");

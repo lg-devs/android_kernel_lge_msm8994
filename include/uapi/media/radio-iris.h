@@ -33,50 +33,52 @@
 #include <linux/atomic.h>
 #include <media/radio-iris-commands.h>
 
-extern const unsigned char MIN_TX_TONE_VAL;
-extern const unsigned char MAX_TX_TONE_VAL;
-extern const unsigned char MIN_HARD_MUTE_VAL;
-extern const unsigned char MAX_HARD_MUTE_VAL;
-extern const unsigned char MIN_SRCH_MODE;
-extern const unsigned char MAX_SRCH_MODE;
-extern const unsigned char MIN_SCAN_DWELL;
-extern const unsigned char MAX_SCAN_DWELL;
-extern const unsigned char MIN_SIG_TH;
-extern const unsigned char MAX_SIG_TH;
-extern const unsigned char MIN_PTY;
-extern const unsigned char MAX_PTY;
-extern const unsigned short MIN_PI;
-extern const unsigned short MAX_PI;
-extern const unsigned char MIN_SRCH_STATIONS_CNT;
-extern const unsigned char MAX_SRCH_STATIONS_CNT;
-extern const unsigned char MIN_CHAN_SPACING;
-extern const unsigned char MAX_CHAN_SPACING;
-extern const unsigned char MIN_EMPHASIS;
-extern const unsigned char MAX_EMPHASIS;
-extern const unsigned char MIN_RDS_STD;
-extern const unsigned char MAX_RDS_STD;
-extern const unsigned char MIN_ANTENNA_VAL;
-extern const unsigned char MAX_ANTENNA_VAL;
-extern const unsigned char MIN_TX_PS_REPEAT_CNT;
-extern const unsigned char MAX_TX_PS_REPEAT_CNT;
-extern const unsigned char MIN_SOFT_MUTE;
-extern const unsigned char MAX_SOFT_MUTE;
-extern const unsigned char MIN_PEEK_ACCESS_LEN;
-extern const unsigned char MAX_PEEK_ACCESS_LEN;
-extern const unsigned char MIN_RESET_CNTR;
-extern const unsigned char MAX_RESET_CNTR;
-extern const unsigned char MIN_HLSI;
-extern const unsigned char MAX_HLSI;
-extern const unsigned char MIN_NOTCH_FILTER;
-extern const unsigned char MAX_NOTCH_FILTER;
-extern const unsigned char MIN_INTF_DET_OUT_LW_TH;
-extern const unsigned char MAX_INTF_DET_OUT_LW_TH;
-extern const unsigned char MIN_INTF_DET_OUT_HG_TH;
-extern const unsigned char MAX_INTF_DET_OUT_HG_TH;
-extern const signed char MIN_SINR_TH;
-extern const signed char MAX_SINR_TH;
-extern const unsigned char MIN_SINR_SAMPLES;
-extern const unsigned char MAX_SINR_SAMPLES;
+const unsigned char MIN_TX_TONE_VAL = 0x00;
+const unsigned char MAX_TX_TONE_VAL = 0x07;
+const unsigned char MIN_HARD_MUTE_VAL = 0x00;
+const unsigned char MAX_HARD_MUTE_VAL = 0x03;
+const unsigned char MIN_SRCH_MODE = 0x00;
+const unsigned char MAX_SRCH_MODE = 0x09;
+const unsigned char MIN_SCAN_DWELL = 0x00;
+const unsigned char MAX_SCAN_DWELL = 0x0F;
+const unsigned char MIN_SIG_TH = 0x00;
+const unsigned char MAX_SIG_TH = 0x03;
+const unsigned char MIN_PTY = 0X00;
+const unsigned char MAX_PTY = 0x1F;
+const unsigned short MIN_PI = 0x0000;
+const unsigned short MAX_PI = 0xFFFF;
+const unsigned char MIN_SRCH_STATIONS_CNT = 0x00;
+const unsigned char MAX_SRCH_STATIONS_CNT = 0x14;
+const unsigned char MIN_CHAN_SPACING = 0x00;
+const unsigned char MAX_CHAN_SPACING = 0x02;
+const unsigned char MIN_EMPHASIS = 0x00;
+const unsigned char MAX_EMPHASIS = 0x01;
+const unsigned char MIN_RDS_STD = 0x00;
+const unsigned char MAX_RDS_STD = 0x02;
+const unsigned char MIN_ANTENNA_VAL = 0x00;
+const unsigned char MAX_ANTENNA_VAL = 0x01;
+const unsigned char MIN_TX_PS_REPEAT_CNT = 0x01;
+const unsigned char MAX_TX_PS_REPEAT_CNT = 0x0F;
+const unsigned char MIN_SOFT_MUTE = 0x00;
+const unsigned char MAX_SOFT_MUTE = 0x01;
+const unsigned char MIN_PEEK_ACCESS_LEN = 0x01;
+const unsigned char MAX_PEEK_ACCESS_LEN = 0xF9;
+const unsigned char MIN_RESET_CNTR = 0x00;
+const unsigned char MAX_RESET_CNTR = 0x01;
+const unsigned char MIN_HLSI = 0x00;
+const unsigned char MAX_HLSI = 0x02;
+const unsigned char MIN_NOTCH_FILTER = 0x00;
+const unsigned char MAX_NOTCH_FILTER = 0x02;
+const unsigned char MIN_INTF_DET_OUT_LW_TH = 0x00;
+const unsigned char MAX_INTF_DET_OUT_LW_TH = 0xFF;
+const unsigned char MIN_INTF_DET_OUT_HG_TH = 0x00;
+const unsigned char MAX_INTF_DET_OUT_HG_TH = 0xFF;
+const signed char MIN_SINR_TH = -128;
+const signed char MAX_SINR_TH = 127;
+const unsigned char MIN_SINR_SAMPLES = 0x01;
+const unsigned char MAX_SINR_SAMPLES = 0xFF;
+const signed char MIN_BLEND_HI = -128;
+const signed char MAX_BLEND_HI = 127;
 
 
 /* ---- HCI Packet structures ---- */
@@ -129,6 +131,7 @@ extern const unsigned char MAX_SINR_SAMPLES;
 #define FM_AF_LIST_MAX_SIZE   200
 #define AF_LIST_MAX     (FM_AF_LIST_MAX_SIZE / 4) /* Each AF frequency consist
 							of sizeof(int) bytes */
+#define MAX_BLEND_INDEX 49
 /* HCI timeouts */
 #define RADIO_HCI_TIMEOUT	(10000)	/* 10 seconds */
 
@@ -215,6 +218,8 @@ void radio_hci_event_packet(struct radio_hci_dev *hdev, struct sk_buff *skb);
 #define HCI_OCF_FM_SET_EVENT_MASK           0x0016
 #define HCI_OCF_FM_SET_CH_DET_THRESHOLD     0x0017
 #define HCI_OCF_FM_GET_CH_DET_THRESHOLD     0x0018
+#define HCI_OCF_FM_SET_BLND_TBL             0x001B
+#define HCI_OCF_FM_GET_BLND_TBL             0x001C
 /* HCI trans control commans opcode*/
 #define HCI_OCF_FM_ENABLE_TRANS_REQ         0x0001
 #define HCI_OCF_FM_DISABLE_TRANS_REQ        0x0002
@@ -287,6 +292,7 @@ void radio_hci_event_packet(struct radio_hci_dev *hdev, struct sk_buff *skb);
 #define HCI_FM_DISABLE_TRANS_CMD 14
 #define HCI_FM_GET_TX_CONFIG 15
 #define HCI_FM_GET_DET_CH_TH_CMD 16
+#define HCI_FM_GET_BLND_TBL_CMD 17
 
 /* Defines for FM TX*/
 #define TX_PS_DATA_LENGTH 108
@@ -413,6 +419,18 @@ struct hci_fm_ch_det_threshold {
 	__u8 low_th;
 	__u8 high_th;
 
+} __packed;
+
+struct hci_fm_blend_table {
+	__u8 ucBlendType;
+	__u8 ucBlendRampRateUp;
+	__u8 ucBlendDebounceNumSampleUp;
+	__u8 ucBlendDebounceIdxUp;
+	__u8 ucBlendSinrIdxSkipStep;
+	__u8 scBlendSinrHi;
+	__u8 scBlendRmssiHi;
+	__u8 ucBlendIndexHi;
+	__u8 ucBlendIndex[MAX_BLEND_INDEX];
 } __packed;
 
 /*HCI events*/
@@ -1087,6 +1105,14 @@ static inline int is_valid_sinr_samples(int samples_cnt)
 static inline int is_valid_fm_state(int state)
 {
 	if ((state >= 0) && (state < FM_MAX_NO_STATES))
+		return 1;
+	else
+		return 0;
+}
+
+static inline int is_valid_blend_value(int val)
+{
+	if ((val >= MIN_BLEND_HI) && (val <= MAX_BLEND_HI))
 		return 1;
 	else
 		return 0;

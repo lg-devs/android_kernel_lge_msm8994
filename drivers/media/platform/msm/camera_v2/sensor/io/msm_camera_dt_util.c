@@ -19,6 +19,9 @@
 #define CAM_SENSOR_PINCTRL_STATE_DEFAULT "cam_default"
 /*#define CONFIG_MSM_CAMERA_DT_DEBUG*/
 
+#define VALIDATE_VOLTAGE(min, max, config_val) ((config_val) && \
+	(config_val >= min) && (config_val <= max))
+
 #undef CDBG
 #define CDBG(fmt, args...) pr_debug(fmt, ##args)
 
@@ -53,6 +56,14 @@ int msm_camera_fill_vreg_params(struct camera_vreg_t *cam_vreg,
 					pr_err("%s:%d i %d j %d cam_vdig\n",
 						__func__, __LINE__, i, j);
 					power_setting[i].seq_val = j;
+					if (VALIDATE_VOLTAGE(
+						cam_vreg[j].min_voltage,
+						cam_vreg[j].max_voltage,
+						power_setting[i].config_val)) {
+						cam_vreg[j].min_voltage =
+						cam_vreg[j].max_voltage =
+						power_setting[i].config_val;
+					}
 					break;
 				}
 			}
@@ -64,6 +75,14 @@ int msm_camera_fill_vreg_params(struct camera_vreg_t *cam_vreg,
 					pr_err("%s:%d i %d j %d cam_vio\n",
 						__func__, __LINE__, i, j);
 					power_setting[i].seq_val = j;
+					if (VALIDATE_VOLTAGE(
+						cam_vreg[j].min_voltage,
+						cam_vreg[j].max_voltage,
+						power_setting[i].config_val)) {
+						cam_vreg[j].min_voltage =
+						cam_vreg[j].max_voltage =
+						power_setting[i].config_val;
+					}
 					break;
 				}
 			}
@@ -75,6 +94,14 @@ int msm_camera_fill_vreg_params(struct camera_vreg_t *cam_vreg,
 					pr_err("%s:%d i %d j %d cam_vana\n",
 						__func__, __LINE__, i, j);
 					power_setting[i].seq_val = j;
+					if (VALIDATE_VOLTAGE(
+						cam_vreg[j].min_voltage,
+						cam_vreg[j].max_voltage,
+						power_setting[i].config_val)) {
+						cam_vreg[j].min_voltage =
+						cam_vreg[j].max_voltage =
+						power_setting[i].config_val;
+					}
 					break;
 				}
 			}
@@ -86,6 +113,14 @@ int msm_camera_fill_vreg_params(struct camera_vreg_t *cam_vreg,
 					pr_err("%s:%d i %d j %d cam_vaf\n",
 						__func__, __LINE__, i, j);
 					power_setting[i].seq_val = j;
+					if (VALIDATE_VOLTAGE(
+						cam_vreg[j].min_voltage,
+						cam_vreg[j].max_voltage,
+						power_setting[i].config_val)) {
+						cam_vreg[j].min_voltage =
+						cam_vreg[j].max_voltage =
+						power_setting[i].config_val;
+					}
 					break;
 				}
 			}
@@ -98,6 +133,14 @@ int msm_camera_fill_vreg_params(struct camera_vreg_t *cam_vreg,
 					pr_err("%s:%d i %d j %d cam_vcustom1\n",
 						__func__, __LINE__, i, j);
 					power_setting[i].seq_val = j;
+					if (VALIDATE_VOLTAGE(
+						cam_vreg[j].min_voltage,
+						cam_vreg[j].max_voltage,
+						power_setting[i].config_val)) {
+						cam_vreg[j].min_voltage =
+						cam_vreg[j].max_voltage =
+						power_setting[i].config_val;
+					}
 					break;
 				}
 			}
@@ -110,12 +153,20 @@ int msm_camera_fill_vreg_params(struct camera_vreg_t *cam_vreg,
 					pr_err("%s:%d i %d j %d cam_vcustom2\n",
 						__func__, __LINE__, i, j);
 					power_setting[i].seq_val = j;
+					if (VALIDATE_VOLTAGE(
+						cam_vreg[j].min_voltage,
+						cam_vreg[j].max_voltage,
+						power_setting[i].config_val)) {
+						cam_vreg[j].min_voltage =
+						cam_vreg[j].max_voltage =
+						power_setting[i].config_val;
+					}
 					break;
 				}
 			}
 			break;
 
-/* LGE_CHANGE_S, caemra bringup */
+/*                              */
 		case CAM_OISVDD:
 			for (j = 0; j < num_vreg; j++) {
 				if (!strcmp(cam_vreg[j].reg_name, "cam_oisvdd")) {
@@ -136,7 +187,7 @@ int msm_camera_fill_vreg_params(struct camera_vreg_t *cam_vreg,
 				}
 			}
 			break;
-/* LGE_CHANGE_E, camera bringup */
+/*                              */
 		default:
 			pr_err("%s:%d invalid seq_val %d\n", __func__,
 				__LINE__, power_setting[i].seq_val);
@@ -640,9 +691,9 @@ ERROR2:
 	kfree(array);
 ERROR1:
 	kfree(ps);
-/* LGE_CHANGE_S, EEPROM bring-up*/
+/*                              */
 	power_info->power_setting = NULL;
-/* LGE_CHANGE_E, EEPROM bring-up*/
+/*                              */
 	power_setting_size = 0;
 	return rc;
 }
@@ -1057,7 +1108,7 @@ int msm_camera_init_gpio_pin_tbl(struct device_node *of_node,
 		} else {
 			rc = 0;
 		}
-//LGE imx234 bringup
+//                  
 		rc = of_property_read_u32(of_node, "qcom,gpio-ois-reset", &val);
 			if (rc != -EINVAL) {
 				if (rc < 0) {

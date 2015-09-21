@@ -1,4 +1,5 @@
-/* Copyright (c) 2009-2014, The Linux Foundation. All rights reserved.
+/*
+ * Copyright (c) 2009-2015, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -31,6 +32,7 @@
 #include <soc/qcom/socinfo.h>
 #include <soc/qcom/smem.h>
 #include <soc/qcom/boot_stats.h>
+#include <soc/qcom/clock-krait.h>
 
 #define BUILD_ID_LENGTH 32
 #define SMEM_IMAGE_VERSION_BLOCKS_COUNT 32
@@ -473,16 +475,20 @@ static struct msm_soc_info cpu_of_id[] = {
 
 	/* 8909 IDs */
 	[245] = {MSM_CPU_8909, "MSM8909"},
+	[258] = {MSM_CPU_8909, "MSM8209"},
+	[259] = {MSM_CPU_8909, "MSM8208"},
+	[265] = {MSM_CPU_8909, "APQ8009"},
+	[275] = {MSM_CPU_8909, "MSM8609"},
 	[260] = {MSM_CPU_8909, "MDMFERRUM"},
 	[261] = {MSM_CPU_8909, "MDMFERRUM"},
 	[262] = {MSM_CPU_8909, "MDMFERRUM"},
 
-	/* ZIRC IDs */
-	[234] = {MSM_CPU_ZIRC, "MSMZIRC"},
-	[235] = {MSM_CPU_ZIRC, "MSMZIRC"},
-	[236] = {MSM_CPU_ZIRC, "MSMZIRC"},
-	[237] = {MSM_CPU_ZIRC, "MSMZIRC"},
-	[238] = {MSM_CPU_ZIRC, "MSMZIRC"},
+	/* 9640 IDs */
+	[234] = {MSM_CPU_9640, "MDM9640"},
+	[235] = {MSM_CPU_9640, "MDM9640"},
+	[236] = {MSM_CPU_9640, "MDM9640"},
+	[237] = {MSM_CPU_9640, "MDM9640"},
+	[238] = {MSM_CPU_9640, "MDM9640"},
 
 	/* 8994 ID */
 	[207] = {MSM_CPU_8994, "MSM8994"},
@@ -499,6 +505,15 @@ static struct msm_soc_info cpu_of_id[] = {
 
 	/* Tellurium ID */
 	[264] = {MSM_CPU_TELLURIUM, "MSMTELLURIUM"},
+
+	/* Terbium ID */
+	[266] = {MSM_CPU_TERBIUM, "MSMTERBIUM"},
+
+	/* 8929 IDs */
+	[268] = {MSM_CPU_8929, "MSM8929"},
+	[269] = {MSM_CPU_8929, "MSM8629"},
+	[270] = {MSM_CPU_8929, "MSM8229"},
+	[271] = {MSM_CPU_8929, "APQ8029"},
 
 	/* Uninitialized IDs are not known to run Linux.
 	   MSM_CPU_UNKNOWN is set to 0 to ensure these IDs are
@@ -920,6 +935,39 @@ msm_select_image(struct device *dev, struct device_attribute *attr,
 	return count;
 }
 
+#define QFPROM_RAW_SERIAL_NUM_LSB 0xFC4B81F0
+static ssize_t socinfo_show_msm_serial(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	unsigned int serial = 0;
+	void *addr = ioremap(QFPROM_RAW_SERIAL_NUM_LSB, SZ_4K);
+
+	if (!addr)
+		return 0;
+
+	serial = readl_relaxed(addr);
+
+	iounmap(addr);
+	return snprintf(buf, PAGE_SIZE, "%08x\n", serial);
+}
+
+static ssize_t socinfo_show_a53_speed_bin(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	int a53_speed;
+
+	get_a53_speed_bin(&a53_speed);
+	return snprintf(buf, PAGE_SIZE, "%u\n", a53_speed);
+}
+
+static ssize_t socinfo_show_a57_speed_bin(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	int a57_speed;
+
+	get_a57_speed_bin(&a57_speed);
+	return snprintf(buf, PAGE_SIZE, "%u\n", a57_speed);
+}
 
 static struct device_attribute msm_soc_attr_raw_version =
 	__ATTR(raw_version, S_IRUGO, msm_get_raw_version,  NULL);
@@ -984,6 +1032,15 @@ static struct device_attribute select_image =
 	__ATTR(select_image, S_IRUGO | S_IWUSR,
 			msm_get_image_number, msm_select_image);
 
+static struct device_attribute msm_soc_attr_msm_serial =
+	__ATTR(msm_serial, S_IRUGO, socinfo_show_msm_serial, NULL);
+
+static struct device_attribute msm_soc_attr_a53_speed_bin =
+	__ATTR(a53_speed_bin, S_IRUGO, socinfo_show_a53_speed_bin, NULL);
+
+static struct device_attribute msm_soc_attr_a57_speed_bin =
+	__ATTR(a57_speed_bin, S_IRUGO, socinfo_show_a57_speed_bin, NULL);
+
 static void * __init setup_dummy_socinfo(void)
 {
 	if (early_machine_is_apq8084()) {
@@ -1010,9 +1067,13 @@ static void * __init setup_dummy_socinfo(void)
 		dummy_socinfo.id = 233;
 		strlcpy(dummy_socinfo.build_id, "msm8936 - ",
 			sizeof(dummy_socinfo.build_id));
-	} else if (early_machine_is_msmzirc()) {
+	} else if (early_machine_is_mdm9640()) {
 		dummy_socinfo.id = 238;
-		strlcpy(dummy_socinfo.build_id, "msmzirc - ",
+		strlcpy(dummy_socinfo.build_id, "mdm9640 - ",
+			sizeof(dummy_socinfo.build_id));
+	} else if (early_machine_is_msmvpipa()) {
+		dummy_socinfo.id = 238;
+		strlcpy(dummy_socinfo.build_id, "msmvpipa - ",
 			sizeof(dummy_socinfo.build_id));
 	} else if (early_machine_is_msm8994()) {
 		dummy_socinfo.id = 207;
@@ -1022,9 +1083,17 @@ static void * __init setup_dummy_socinfo(void)
 		dummy_socinfo.id = 251;
 		strlcpy(dummy_socinfo.build_id, "msm8992 - ",
 			sizeof(dummy_socinfo.build_id));
+	} else if (early_machine_is_msmterbium()) {
+		dummy_socinfo.id = 266;
+		strlcpy(dummy_socinfo.build_id, "msmterbium - ",
+			sizeof(dummy_socinfo.build_id));
 	} else if (early_machine_is_msmtellurium()) {
 		dummy_socinfo.id = 264;
 		strlcpy(dummy_socinfo.build_id, "msmtellurium - ",
+			sizeof(dummy_socinfo.build_id));
+	} else if (early_machine_is_msm8929()) {
+		dummy_socinfo.id = 268;
+		strlcpy(dummy_socinfo.build_id, "msm8929 - ",
 			sizeof(dummy_socinfo.build_id));
 	}
 
@@ -1076,6 +1145,12 @@ static void __init populate_soc_sysfs_files(struct device *msm_soc_device)
 	case 1:
 		device_create_file(msm_soc_device,
 					&msm_soc_attr_build_id);
+		device_create_file(msm_soc_device,
+					&msm_soc_attr_msm_serial);
+		device_create_file(msm_soc_device,
+					&msm_soc_attr_a53_speed_bin);
+		device_create_file(msm_soc_device,
+					&msm_soc_attr_a57_speed_bin);
 		break;
 	default:
 		pr_err("%s:Unknown socinfo format:%u\n", __func__,

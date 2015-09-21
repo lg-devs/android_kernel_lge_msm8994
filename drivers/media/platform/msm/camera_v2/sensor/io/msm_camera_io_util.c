@@ -25,7 +25,7 @@
 #undef CDBG
 #define CDBG(fmt, args...) pr_debug(fmt, ##args)
 
-/* LGE_CHANGE_S, jaehan.jeong, 2014.11.17, Changed to inline/macro  function for RTB logging */
+/*                                                                                           */
 #ifndef LGE_RTB_ENABLED
 void msm_camera_io_w(u32 data, void __iomem *addr)
 {
@@ -102,6 +102,17 @@ void msm_camera_io_memcpy(void __iomem *dest_addr,
 	CDBG("%s: %p %p %d\n", __func__, dest_addr, src_addr, len);
 	msm_camera_io_memcpy_toio(dest_addr, src_addr, len / 4);
 	msm_camera_io_dump(dest_addr, len);
+}
+
+void msm_camera_io_memcpy_mb(void __iomem *dest_addr,
+	void __iomem *src_addr, u32 len)
+{
+	int i;
+	u32 *d = (u32 *) dest_addr;
+	u32 *s = (u32 *) src_addr;
+
+	for (i = 0; i < (len / 4); i++)
+		msm_camera_io_w_mb(*s++, d++);
 }
 
 int msm_cam_clk_sel_src(struct device *dev, struct msm_cam_clk_info *clk_info,

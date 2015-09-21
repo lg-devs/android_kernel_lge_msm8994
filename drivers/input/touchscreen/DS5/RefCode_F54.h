@@ -31,8 +31,6 @@ extern int SensorSpeedUpperImage[32][32];
 extern int SensorSpeedLowerImage[32][32];
 extern int ADCUpperImage[32][32];
 extern int ADCLowerImage[32][32];
-extern int RspLowerSlope[32][32];
-extern int RspUpperSlope[32][32];
 extern int RspNoise[32][32];
 extern unsigned char RxChannelCount;
 extern unsigned char TxChannelCount;

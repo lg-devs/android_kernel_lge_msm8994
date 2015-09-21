@@ -1,4 +1,4 @@
-/* Copyright (c) 2002,2007-2014, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2002,2007-2015, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -235,15 +235,16 @@ static int _load_firmware(struct kgsl_device *device, const char *fwfile,
 	return (*data != NULL) ? 0 : -ENOMEM;
 }
 
-void adreno_ringbuffer_read_pm4_ucode(struct kgsl_device *device)
+int adreno_ringbuffer_read_pm4_ucode(struct kgsl_device *device)
 {
 	struct adreno_device *adreno_dev = ADRENO_DEVICE(device);
+	int ret;
 
 	if (adreno_dev->pm4_fw == NULL) {
 		int len;
 		void *ptr;
 
-		int ret = _load_firmware(device,
+		ret = _load_firmware(device,
 			adreno_dev->gpucore->pm4fw_name, &ptr, &len);
 
 		if (ret)
@@ -254,6 +255,7 @@ void adreno_ringbuffer_read_pm4_ucode(struct kgsl_device *device)
 			KGSL_DRV_ERR(device, "Bad pm4 microcode size: %d\n",
 				len);
 			kfree(ptr);
+			ret = -ENOMEM;
 			goto err;
 		}
 
@@ -262,14 +264,15 @@ void adreno_ringbuffer_read_pm4_ucode(struct kgsl_device *device)
 		adreno_dev->pm4_fw_version = adreno_dev->pm4_fw[1];
 	}
 
-	return;
+	return 0;
 
 err:
 #ifdef CONFIG_MACH_LGE
 	if (system_state != SYSTEM_RESTART)
 #endif
-	KGSL_DRV_FATAL(device, "Failed to read pm4 microcode %s\n",
+	KGSL_DRV_CRIT(device, "Failed to read pm4 microcode %s\n",
 		adreno_dev->gpucore->pm4fw_name);
+	return ret;
 }
 
 /**
@@ -295,15 +298,16 @@ static inline int adreno_ringbuffer_load_pm4_ucode(struct kgsl_device *device,
 	return 0;
 }
 
-void adreno_ringbuffer_read_pfp_ucode(struct kgsl_device *device)
+int adreno_ringbuffer_read_pfp_ucode(struct kgsl_device *device)
 {
 	struct adreno_device *adreno_dev = ADRENO_DEVICE(device);
+	int ret;
 
 	if (adreno_dev->pfp_fw == NULL) {
 		int len;
 		void *ptr;
 
-		int ret = _load_firmware(device,
+		ret = _load_firmware(device,
 			adreno_dev->gpucore->pfpfw_name, &ptr, &len);
 		if (ret)
 			goto err;
@@ -313,6 +317,7 @@ void adreno_ringbuffer_read_pfp_ucode(struct kgsl_device *device)
 			KGSL_DRV_ERR(device, "Bad PFP microcode size: %d\n",
 				len);
 			kfree(ptr);
+			ret = -ENOMEM;
 			goto err;
 		}
 
@@ -321,7 +326,7 @@ void adreno_ringbuffer_read_pfp_ucode(struct kgsl_device *device)
 		adreno_dev->pfp_fw_version = adreno_dev->pfp_fw[5];
 	}
 
-	return;
+	return 0;
 
 err:
 #ifdef CONFIG_MACH_LGE
@@ -330,6 +335,7 @@ err:
 
 	KGSL_DRV_FATAL(device, "Failed to read pfp microcode %s\n",
 		adreno_dev->gpucore->pfpfw_name);
+	return ret;
 }
 
 /**
@@ -484,8 +490,14 @@ static int _ringbuffer_bootstrap_ucode(struct adreno_ringbuffer *rb,
 	/* idle device to validate bootstrap */
 	ret = adreno_spin_idle(device);
 
-	/* Clear the chicken bit for speed up on A430 cores */
-	if (adreno_is_a430(adreno_dev))
+	if (ret) {
+		KGSL_DRV_ERR(rb->device,
+		"microcode bootstrap failed to idle\n");
+		kgsl_device_snapshot(device, NULL);
+	}
+
+	/* Clear the chicken bit for speed up on A430 and its derivatives */
+	if (!adreno_is_a420(adreno_dev))
 		kgsl_regwrite(device, A4XX_CP_DEBUG,
 					A4XX_CP_DEBUG_DEFAULT & ~(1 << 14));
 
@@ -558,7 +570,13 @@ static int _ringbuffer_start_common(struct adreno_ringbuffer *rb)
 		return status;
 
 	/* idle device to validate ME INIT */
-	return adreno_spin_idle(device);
+	status = adreno_spin_idle(device);
+	if (status) {
+		KGSL_DRV_ERR(rb->device,
+		"ringbuffer initialization failed to idle\n");
+		kgsl_device_snapshot(device, NULL);
+	}
+	return status;
 }
 
 /**

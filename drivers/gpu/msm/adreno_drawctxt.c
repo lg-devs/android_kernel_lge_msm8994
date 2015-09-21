@@ -1,4 +1,4 @@
-/* Copyright (c) 2002,2007-2014, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2002,2007-2015, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -67,7 +67,8 @@ void adreno_drawctxt_dump(struct kgsl_device *device,
 	kgsl_readtimestamp(device, context, KGSL_TIMESTAMP_CONSUMED, &start);
 	kgsl_readtimestamp(device, context, KGSL_TIMESTAMP_RETIRED, &retire);
 
-	spin_lock(&drawctxt->lock);
+	if (!test_bit(ADRENO_CONTEXT_CMDBATCH_FLAG_FENCE_LOG, &drawctxt->flags))
+		spin_lock(&drawctxt->lock);
 	dev_err(device->dev,
 		"  context[%d]: queue=%d, submit=%d, start=%d, retire=%d\n",
 		context->id, queue, drawctxt->submitted_timestamp,
@@ -84,7 +85,12 @@ void adreno_drawctxt_dump(struct kgsl_device *device,
 			goto stats;
 		}
 
-		spin_lock(&cmdbatch->lock);
+		/*
+		 * We may have cmdbatch timer running, which also uses same
+		 * lock, take a lock with software interrupt disabled (bh)
+		 * to avoid spin lock recursion.
+		 */
+		spin_lock_bh(&cmdbatch->lock);
 
 		if (!list_empty(&cmdbatch->synclist)) {
 			dev_err(device->dev,
@@ -93,7 +99,7 @@ void adreno_drawctxt_dump(struct kgsl_device *device,
 
 			kgsl_dump_syncpoints(device, cmdbatch);
 		}
-		spin_unlock(&cmdbatch->lock);
+		spin_unlock_bh(&cmdbatch->lock);
 	}
 
 stats:
@@ -116,7 +122,8 @@ stats:
 	dev_err(device->dev, "  context[%d]: submit times: %s\n",
 		context->id, buf);
 
-	spin_unlock(&drawctxt->lock);
+	if (!test_bit(ADRENO_CONTEXT_CMDBATCH_FLAG_FENCE_LOG, &drawctxt->flags))
+		spin_unlock(&drawctxt->lock);
 }
 
 /**
@@ -344,7 +351,7 @@ adreno_drawctxt_create(struct kgsl_device_private *dev_priv,
 	if (!kgsl_mmu_is_secured(&dev_priv->device->mmu) &&
 			(local & KGSL_CONTEXT_SECURE)) {
 		KGSL_DEV_ERR_ONCE(device, "Secure context not supported\n");
-		return ERR_PTR(-EINVAL);
+		return ERR_PTR(-EOPNOTSUPP);
 	}
 
 	drawctxt = kzalloc(sizeof(struct adreno_context), GFP_KERNEL);

@@ -1,8 +1,8 @@
 #ifndef __LEDS_QPNP_PATTERN_H_INCLUDED
 #define __LEDS_QPNP_PATTERN_H_INCLUDED
 
-#include <led-pattern.h>
 #include <linux/qpnp/pwm.h>
+#include "led-pattern.h"
 
 /*  Pattern data structure
  *

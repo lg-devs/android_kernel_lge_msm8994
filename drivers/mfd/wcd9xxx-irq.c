@@ -132,17 +132,18 @@ static void wcd9xxx_irq_disable(struct irq_data *data)
 
 static void wcd9xxx_irq_ack(struct irq_data *data)
 {
-        int wcd9xxx_irq = 0;
-        struct wcd9xxx_core_resource *wcd9xxx_res =
-        irq_data_get_irq_chip_data(data);
-        if (wcd9xxx_res == NULL) {
-        pr_err("%s: wcd9xxx_res is NULL\n", __func__);
-        return;
-        }
-        wcd9xxx_irq = virq_to_phyirq(wcd9xxx_res, data->irq);
-        pr_debug("%s: IRQ_ACK called for WCD9XXX IRQ: %d\n",
-                    __func__, wcd9xxx_irq);
-        }
+	int wcd9xxx_irq = 0;
+	struct wcd9xxx_core_resource *wcd9xxx_res =
+			irq_data_get_irq_chip_data(data);
+
+	if (wcd9xxx_res == NULL) {
+		pr_err("%s: wcd9xxx_res is NULL\n", __func__);
+		return;
+	}
+	wcd9xxx_irq = virq_to_phyirq(wcd9xxx_res, data->irq);
+	pr_debug("%s: IRQ_ACK called for WCD9XXX IRQ: %d\n",
+				__func__, wcd9xxx_irq);
+}
 
 static void wcd9xxx_irq_mask(struct irq_data *d)
 {
@@ -156,7 +157,7 @@ static struct irq_chip wcd9xxx_irq_chip = {
 	.irq_disable = wcd9xxx_irq_disable,
 	.irq_enable = wcd9xxx_irq_enable,
 	.irq_mask = wcd9xxx_irq_mask,
-        .irq_ack = wcd9xxx_irq_ack,
+	.irq_ack = wcd9xxx_irq_ack,
 };
 
 bool wcd9xxx_lock_sleep(
@@ -170,6 +171,11 @@ bool wcd9xxx_lock_sleep(
 	 * but btn0_lpress_fn is not wcd9xxx_irq_thread's subroutine and
 	 * It can race with wcd9xxx_irq_thread.
 	 * So need to embrace wlock_holders with mutex.
+	 *
+	 * If system didn't resume, we can simply return false so codec driver's
+	 * IRQ handler can return without handling IRQ.
+	 * As interrupt line is still active, codec will have another IRQ to
+	 * retry shortly.
 	 */
 	mutex_lock(&wcd9xxx_res->pm_lock);
 	if (wcd9xxx_res->wlock_holders++ == 0) {

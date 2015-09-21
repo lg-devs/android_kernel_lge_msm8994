@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2014-2015, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -32,11 +32,15 @@
 #include <soc/qcom/clock-pll.h>
 #include <soc/qcom/clock-local2.h>
 #include <soc/qcom/clock-alpha-pll.h>
+#include <soc/qcom/clock-krait.h>
 
 #include <dt-bindings/clock/msm-clocks-8994.h>
+#include <dt-bindings/clock/msm-clocks-8992.h>
 
 #include "clock.h"
 #include "vdd-level-8994.h"
+
+#define A53OFFSET (56)
 
 enum {
 	C0_PLL_BASE,
@@ -62,7 +66,6 @@ static char *base_names[] = {
 static void *vbases[NUM_BASES];
 u32 cci_phys_base = 0xF9112000;
 static void sanity_check_clock_tree(u32 regval, struct mux_clk *mux);
-static struct mux_clk a53_hf_mux_v2;
 
 static DEFINE_VDD_REGULATORS(vdd_dig, VDD_DIG_NUM, 1, vdd_corner, NULL);
 
@@ -162,6 +165,7 @@ DEFINE_EXT_CLK(xo_ao, NULL);
 DEFINE_EXT_CLK(sys_apcsaux_clk, NULL);
 
 static bool msm8994_v2;
+static bool msm8992;
 
 static struct pll_clk a57_pll0 = {
 	.mode_reg = (void __iomem *)C1_PLL_MODE,
@@ -323,7 +327,6 @@ static int cpudiv_get_div(struct div_clk *divclk)
 
 	return regval + 1;
 }
-
 
 static void __cpudiv_set_div(struct div_clk *divclk, int div)
 {
@@ -757,6 +760,7 @@ static struct mux_clk a57_lf_mux_v2 = {
 		{ &sys_apcsaux_clk.c,  3 },
 	),
 	.low_power_sel = 3,
+	.en_mask = 3,
 	.ops = &cpu_mux_ops,
 	.mask = 0x3,
 	.shift = 1,
@@ -779,6 +783,7 @@ static struct mux_clk a57_hf_mux_v2 = {
 		{ &a57_pll0.c,       3 },
 	),
 	.low_power_sel = 0,
+	.en_mask = 0,
 	.ops = &cpu_mux_ops,
 	.mask = 0x3,
 	.shift = 3,
@@ -901,7 +906,6 @@ static struct cpu_clk_8994 a57_clk = {
 
 #define LFMUX_SHIFT 1
 #define HFMUX_SHIFT 3
-#define LFDIV_SHIFT 5
 
 #define LFMUX_SEL 0
 #define PLL0_MAIN_SEL 2
@@ -922,7 +926,7 @@ void sanity_check_clock_tree(u32 muxval, struct mux_clk *mux)
 	int cur_uv, req_uv;
 	int *uv;
 
-	if (!msm8994_v2)
+	if (!(msm8994_v2 || msm8992))
 		return;
 
 	if (mux->base == &vbases[ALIAS0_GLB_BASE]) {
@@ -1226,6 +1230,7 @@ static struct clk_lookup cpu_clocks_8994[] = {
 	CLK_LIST(cpu_debug_mux),
 };
 
+/* List of clocks applicable to both 8994v2 and 8992 */
 
 static struct clk_lookup cpu_clocks_8994_v2[] = {
 	CLK_LIST(a53_clk),
@@ -1635,6 +1640,7 @@ static void init_v2_data(void)
 }
 
 static int a57speedbin;
+static int a53speedbin;
 struct platform_device *cpu_clock_8994_dev;
 
 /* Low power mux code begins here */
@@ -1939,16 +1945,39 @@ static void low_power_mux_init(void)
 	idle_notifier_register(&clock_cpu_8994_idle_nb);
 }
 
+static int a53_speed, a57_speed;
+
+void set_a53_speed_bin(int speed)
+{
+	a53_speed = speed;
+}
+
+void set_a57_speed_bin(int speed)
+{
+	a57_speed = speed;
+}
+
+void get_a53_speed_bin(int *speed)
+{
+	*speed = a53_speed;
+}
+
+void get_a57_speed_bin(int *speed)
+{
+	*speed = a57_speed;
+}
+
 static int cpu_clock_8994_driver_probe(struct platform_device *pdev)
 {
 	int ret, cpu;
 	unsigned long a53rate, a57rate, ccirate;
 	bool v2;
 	int pvs_ver = 0;
-	u32 pte_efuse;
+	u64 pte_efuse;
 	char a57speedbinstr[] = "qcom,a57-speedbinXX-vXX";
+	char a53speedbinstr[] = "qcom,a53-speedbinXX-vXX";
 
-	v2 = msm8994_v2;
+	v2 = msm8994_v2 | msm8992;
 
 	a53_pll0_main.c.flags = CLKFLAG_NO_RATE_CACHE;
 	a57_pll0_main.c.flags = CLKFLAG_NO_RATE_CACHE;
@@ -1966,14 +1995,34 @@ static int cpu_clock_8994_driver_probe(struct platform_device *pdev)
 	if (!v2)
 		perform_v1_fixup();
 
-	ret = of_get_fmax_vdd_class(pdev, &a53_clk.c, "qcom,a53-speedbin0-v0");
+	if (msm8992) {
+		pte_efuse = readq_relaxed(vbases[EFUSE_BASE]);
+		a53speedbin = (pte_efuse >> A53OFFSET) & 0x3;
+		dev_info(&pdev->dev, "using A53 speed bin %u and pvs_ver %d\n",
+			 a53speedbin, pvs_ver);
+
+		snprintf(a53speedbinstr, ARRAY_SIZE(a53speedbinstr),
+			"qcom,a53-speedbin%d-v%d", a53speedbin, pvs_ver);
+	} else if (v2)
+		pte_efuse = readl_relaxed(vbases[EFUSE_BASE]);
+
+	snprintf(a53speedbinstr, ARRAY_SIZE(a53speedbinstr),
+			"qcom,a53-speedbin%d-v%d", a53speedbin, pvs_ver);
+
+	set_a53_speed_bin(a53speedbin);
+
+	ret = of_get_fmax_vdd_class(pdev, &a53_clk.c, a53speedbinstr);
 	if (ret) {
-		dev_err(&pdev->dev, "Can't get speed bin for a53\n");
-		return ret;
+		dev_err(&pdev->dev, "Can't get speed bin for a53. Falling back to zero.\n");
+		ret = of_get_fmax_vdd_class(pdev, &a53_clk.c,
+					    "qcom,a53-speedbin0-v0");
+		if (ret) {
+			dev_err(&pdev->dev, "Unable to retrieve plan for A53. Bailing...\n");
+			return ret;
+		}
 	}
 
 	if (v2) {
-		pte_efuse = readl_relaxed(vbases[EFUSE_BASE]);
 		a57speedbin = pte_efuse & 0x7;
 		dev_info(&pdev->dev, "using A57 speed bin %u and pvs_ver %d\n",
 			 a57speedbin, pvs_ver);
@@ -1981,6 +2030,8 @@ static int cpu_clock_8994_driver_probe(struct platform_device *pdev)
 
 	snprintf(a57speedbinstr, ARRAY_SIZE(a57speedbinstr),
 			"qcom,a57-speedbin%d-v%d", a57speedbin, pvs_ver);
+
+	set_a57_speed_bin(a57speedbin);
 
 	ret = of_get_fmax_vdd_class(pdev, &a57_clk.c, a57speedbinstr);
 	if (ret) {
@@ -2099,6 +2150,7 @@ static int cpu_clock_8994_driver_probe(struct platform_device *pdev)
 static struct of_device_id match_table[] = {
 	{ .compatible = "qcom,cpu-clock-8994" },
 	{ .compatible = "qcom,cpu-clock-8994-v2" },
+	{ .compatible = "qcom,cpu-clock-8992" },
 	{}
 };
 
@@ -2141,9 +2193,8 @@ int __init cpu_clock_8994_init_a57_v2(void)
 {
 	int ret = 0;
 
-	pr_info("clock-cpu-8994-v2: configuring clocks for the A57 cluster\n");
-
-	msm8994_v2 = true;
+	pr_info("%s: configuring clocks for the A57 cluster\n",
+		msm8992 ? "msm8992" : "msm8994-v2");
 
 	vbases[ALIAS0_GLB_BASE] = ioremap(ALIAS0_GLB_BASE_PHY, SZ_4K);
 	if (!vbases[ALIAS0_GLB_BASE]) {
@@ -2207,7 +2258,8 @@ int __init cpu_clock_8994_init_a57_v2(void)
 	mb();
 	udelay(5);
 
-	pr_cont("clock-cpu-8994-v2: finished configuring A57 cluster clocks.\n");
+	pr_cont("%s: finished configuring A57 cluster clocks.\n",
+		msm8992 ? "msm8992" : "msm8994-v2");
 
 iomap_c1_pll_fail:
 	iounmap(vbases[C0_PLL_BASE]);
@@ -2229,6 +2281,14 @@ int __init cpu_clock_8994_init_a57(void)
 	ofnode = of_find_compatible_node(NULL, NULL,
 					 "qcom,cpu-clock-8994-v2");
 	if (ofnode)
+		msm8994_v2 = true;
+
+	ofnode = of_find_compatible_node(NULL, NULL,
+					 "qcom,cpu-clock-8992");
+	if (ofnode)
+		msm8992 = true;
+
+	if (msm8994_v2 || msm8992)
 		return cpu_clock_8994_init_a57_v2();
 
 	ofnode = of_find_compatible_node(NULL, NULL,

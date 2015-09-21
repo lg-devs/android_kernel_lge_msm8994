@@ -7,7 +7,7 @@
 
  History :
  ----------------------------------------------------------------------
- 2009/09/13 	jason		initial
+ 2009/09/13     jason        initial
 *******************************************************************************/
 
 #include <stdio.h>
@@ -16,19 +16,18 @@
 
 void print_log(char *fmt,...)
 {
-	va_list ap;
-	char str[256];
+    va_list ap;
+    char str[256];
 
-	va_start(ap,fmt);
-	vsprintf(str,fmt,ap);
+    va_start(ap,fmt);
+    vsprintf(str,fmt,ap);
 
-	printf("%s", str);
+    printf("%s", str);
 
-	va_end(ap);
+    va_end(ap);
 }
 
 void msWait(int ms)
 {
-	usleep(ms*1000);
+    usleep(ms*1000);
 }
-

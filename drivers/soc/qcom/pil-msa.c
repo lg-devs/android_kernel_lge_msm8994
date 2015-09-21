@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2014, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-2015, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -24,6 +24,9 @@
 #include <linux/regulator/consumer.h>
 #include <linux/dma-mapping.h>
 #include <soc/qcom/scm.h>
+#if defined(CONFIG_PRE_SELF_DIAGNOSIS)
+#include <soc/qcom/lge/board_lge.h>
+#endif
 
 #include "peripheral-loader.h"
 #include "pil-q6v5.h"
@@ -50,8 +53,8 @@
 #define RMB_PMI_META_DATA		0x10
 #define RMB_PMI_CODE_START		0x14
 #define RMB_PMI_CODE_LENGTH		0x18
-#define RMB_PROTOCOL_VERSION		0x1C 
-#define RMB_MBA_DEBUG_INFORMATION	0x20 
+#define RMB_PROTOCOL_VERSION		0x1C
+#define RMB_MBA_DEBUG_INFORMATION	0x20
 
 #define POLL_INTERVAL_US		50
 
@@ -69,11 +72,17 @@
 #define MSS_RESTART_PARAM_ID		0x2
 #define MSS_RESTART_ID			0xA
 
+#define MSS_MAGIC			0XAABADEAD
+
 static int pbl_mba_boot_timeout_ms = 1000;
 module_param(pbl_mba_boot_timeout_ms, int, S_IRUGO | S_IWUSR);
 
 static int modem_auth_timeout_ms = 10000;
 module_param(modem_auth_timeout_ms, int, S_IRUGO | S_IWUSR);
+
+/* If set to 0xAABADEAD, MBA failures trigger a kernel panic */
+static uint modem_trigger_panic;
+module_param(modem_trigger_panic, uint, S_IRUGO | S_IWUSR);
 
 static void modem_log_rmb_regs(void __iomem *base)
 {
@@ -88,10 +97,13 @@ static void modem_log_rmb_regs(void __iomem *base)
 				readl_relaxed(base + RMB_PMI_CODE_START));
 	pr_err("RMB_PMI_CODE_LENGTH: %08x\n",
 				readl_relaxed(base + RMB_PMI_CODE_LENGTH));
-	pr_err("RMB_PROTOCOL_VERSION: %08x\n", 
-				readl_relaxed(base + RMB_PROTOCOL_VERSION)); 
-	pr_err("RMB_MBA_DEBUG_INFORMATION: %08x\n", 
-				readl_relaxed(base + RMB_MBA_DEBUG_INFORMATION)); 
+	pr_err("RMB_PROTOCOL_VERSION: %08x\n",
+				readl_relaxed(base + RMB_PROTOCOL_VERSION));
+	pr_err("RMB_MBA_DEBUG_INFORMATION: %08x\n",
+			readl_relaxed(base + RMB_MBA_DEBUG_INFORMATION));
+
+	if (modem_trigger_panic == MSS_MAGIC)
+		panic("%s: System ramdump is needed!!!\n", __func__);
 }
 
 static int pil_mss_power_up(struct q6v5_data *drv)
@@ -177,8 +189,8 @@ static int pil_mss_restart_reg(struct q6v5_data *drv, u32 mss_restart)
 	int scm_ret = 0;
 	struct scm_desc desc = {0};
 
-	desc.args[0] = MSS_RESTART_PARAM_ID;
-	desc.args[1] = mss_restart;
+	desc.args[0] = mss_restart;
+	desc.args[1] = 0;
 	desc.arginfo = SCM_ARGS(2);
 
 	if (drv->restart_reg && !drv->restart_reg_sec) {
@@ -297,6 +309,12 @@ int pil_mss_deinit_image(struct pil_desc *pil)
 
 	if (q6_drv->ahb_clk_vote)
 		clk_disable_unprepare(q6_drv->ahb_clk);
+
+	if (system_state == SYSTEM_RESTART ||
+		system_state == SYSTEM_POWER_OFF) {
+		pr_err("Leaking MBA memory to prevent access during lockdown\n");
+		return ret;
+	}
 
 	/* In case of any failure where reclaim MBA memory
 	 * could not happen, free the memory here */
@@ -591,6 +609,9 @@ static int pil_msa_mba_auth(struct pil_desc *pil)
 		dev_err(pil->dev, "MBA authentication of image timed out\n");
 	} else if (status < 0) {
 		dev_err(pil->dev, "MBA returned error %d for image\n", status);
+#if defined(CONFIG_PRE_SELF_DIAGNOSIS)
+		lge_pre_self_diagnosis((char *) "modem",17,(char *) "modem failed", (char *) "MBA return error", 20002);
+#endif
 		ret = -EINVAL;
 	}
 

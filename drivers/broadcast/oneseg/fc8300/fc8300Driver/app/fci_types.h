@@ -1,9 +1,9 @@
 /*****************************************************************************
  Copyright(c) 2012 FCI Inc. All Rights Reserved
- 
+
  File name : fci_types.h
- 
- Description : 
+
+ Description :
 *******************************************************************************/
 
 #ifndef __FCI_TYPES_H__
@@ -17,12 +17,12 @@ extern "C" {
 typedef int        HANDLE;
 #endif
 
-#define BBM_HPI		0
-#define BBM_SPI		1
-#define BBM_USB		2
-#define BBM_I2C		3
-#define BBM_PPI		4
-#define BBM_SPIB	5
+#define BBM_HPI        0
+#define BBM_SPI        1
+#define BBM_USB        2
+#define BBM_I2C        3
+#define BBM_PPI        4
+#define BBM_SPIB    5
 
 #define s8          signed char
 #define s16         signed short int
@@ -30,7 +30,7 @@ typedef int        HANDLE;
 #define u8          unsigned char
 #define u16         unsigned short
 #define u32         unsigned int
-#define TRUE        1	
+#define TRUE        1
 #define FALSE       0
 
 #ifndef NULL

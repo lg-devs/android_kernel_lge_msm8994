@@ -19,7 +19,7 @@
 #define LGE_TOUCH_CORE_H
 #include <linux/wakelock.h>
 
-//#define LGE_TOUCH_TIME_DEBUG
+//                            
 
 #define MAX_FINGER	10
 #define MAX_BUTTON	4
@@ -376,6 +376,7 @@ struct touch_device_driver {
 		u32 code, int64_t value, struct point *data);
 	void (*ime_drumming)(struct i2c_client *client, int ime_status);
 	enum window_status(*inspection_crack)(struct i2c_client *client);
+	void (*sleepmode_change)(struct i2c_client *client);
 	int (*register_sysfs)(struct kobject * k);
 	int (*get_type_bl)(struct i2c_client *client);
 };
@@ -397,6 +398,7 @@ struct lge_touch_data {
 	struct delayed_work		work_trigger_handle;
 	struct delayed_work             work_thermal;
 	struct delayed_work             work_crack;
+	struct delayed_work             work_sleepmode;
 	struct bouncing_filter_info	bouncing_filter;
 	struct grip_filter_info		grip_filter;
 	struct accuracy_filter_info	accuracy_filter;
@@ -533,6 +535,7 @@ enum {
 
 enum {
 	NOTIFY_TA_CONNECTION = 1,
+	NOTIFY_HDMI_CONNECTION,
 	NOTIFY_TEMPERATURE_CHANGE,
 	NOTIFY_PROXIMITY,
 	NOTIFY_HALL_IC,

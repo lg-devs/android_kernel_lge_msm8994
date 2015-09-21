@@ -48,6 +48,10 @@ ifeq ($(CONFIG_MACH_MSM8994_Z2_USC_US),y)
 DTS_TARGET := z2_usc_us
 endif
 
+ifeq ($(CONFIG_MACH_MSM8994_Z2_ACG_US),y)
+DTS_TARGET := z2_acg_us
+endif
+
 ifeq ($(CONFIG_MACH_MSM8994_Z2_ATT_US),y)
 DTS_TARGET := z2_att_us
 endif

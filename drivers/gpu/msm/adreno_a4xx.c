@@ -1,4 +1,4 @@
-/* Copyright (c) 2013-2014, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2013-2015, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -37,8 +37,8 @@ const unsigned int a4xx_registers[] = {
 	0x0028, 0x002B, 0x002E, 0x0034, 0x0037, 0x0044, 0x0047, 0x0066,
 	0x0068, 0x0095, 0x009C, 0x0170, 0x0174, 0x01AF,
 	/* CP */
-	0x0200, 0x0233, 0x0240, 0x0250, 0x04C0, 0x04DD, 0x0500, 0x050B,
-	0x0578, 0x058F,
+	0x0200, 0x0226, 0x0228, 0x0233, 0x0240, 0x0250, 0x04C0, 0x04D0,
+	0x04D2, 0x04DD, 0x0500, 0x050B, 0x0578, 0x058F,
 	/* VSC */
 	0x0C00, 0x0C03, 0x0C08, 0x0C41, 0x0C50, 0x0C51,
 	/* GRAS */
@@ -380,7 +380,7 @@ static void a4xx_regulator_enable(struct adreno_device *adreno_dev)
 {
 	unsigned int reg;
 	struct kgsl_device *device = &adreno_dev->dev;
-	if (!adreno_is_a430(adreno_dev))
+	if (!(adreno_is_a430(adreno_dev) || adreno_is_a418(adreno_dev)))
 		return;
 
 	/* Set the default register values; set SW_COLLAPSE to 0 */
@@ -402,7 +402,7 @@ static void a4xx_regulator_enable(struct adreno_device *adreno_dev)
 static void a4xx_regulator_disable(struct adreno_device *adreno_dev)
 {
 	struct kgsl_device *device = &adreno_dev->dev;
-	if (!adreno_is_a430(adreno_dev))
+	if (!(adreno_is_a430(adreno_dev) || adreno_is_a418(adreno_dev)))
 		return;
 
 	/* Set the default register values; set SW_COLLAPSE to 1 */
@@ -596,8 +596,10 @@ static void a4xx_enable_hwcg(struct kgsl_device *device)
 	 * Disabling HW clock gating + NAP enabled combination has
 	 * minimal power impact. So this option is chosen over disabling
 	 * SP/TP power collapse.
+	 * Revisions of A430 which chipid 2 and above do not have the issue.
 	 */
-	if (adreno_is_a430(adreno_dev))
+	if (adreno_is_a430(adreno_dev) &&
+		(ADRENO_CHIPID_PATCH(adreno_dev->chipid) < 2))
 		kgsl_regwrite(device, A4XX_RBBM_CLOCK_CTL, 0);
 	else
 		kgsl_regwrite(device, A4XX_RBBM_CLOCK_CTL, 0xAAAAAAAA);
@@ -647,24 +649,13 @@ static void a4xx_protect_init(struct adreno_device *adreno_dev)
 	/* VPC registers */
 	adreno_set_protected_registers(adreno_dev, &index, 0xE60, 1);
 
-	if (adreno_is_a430(adreno_dev)) {
+	if (adreno_is_a430(adreno_dev) || adreno_is_a420(adreno_dev) ||
+		adreno_is_a418(adreno_dev)) {
 		/*
-		* Protect additional registers that should not be
-		* accessed by GPU
-		*/
+		 * Protect registers that might cause XPU violation if
+		 * accessed by GPU
+		 */
 		adreno_set_protected_registers(adreno_dev, &index, 0x2c00, 10);
-		adreno_set_protected_registers(adreno_dev, &index, 0x3000, 7);
-		adreno_set_protected_registers(adreno_dev, &index, 0x3080, 6);
-		adreno_set_protected_registers(adreno_dev, &index, 0x3140, 11);
-		adreno_set_protected_registers(adreno_dev, &index, 0x3940, 10);
-		adreno_set_protected_registers(adreno_dev, &index, 0x3D40, 9);
-		adreno_set_protected_registers(adreno_dev, &index, 0x3F40, 7);
-		adreno_set_protected_registers(adreno_dev, &index, 0x3FC0, 6);
-	} else if (adreno_is_a420(adreno_dev)) {
-		/*
-		* Protect XPU range and range of registers that may fall
-		* under XPU protection
-		*/
 		adreno_set_protected_registers(adreno_dev, &index, 0x3300, 8);
 	}
 
@@ -743,8 +734,11 @@ static void a4xx_start(struct adreno_device *adreno_dev)
 	/* On A420 cores turn on SKIP_IB2_DISABLE in addition to the default */
 	if (adreno_is_a420(adreno_dev))
 		cp_debug |= (1 << 29);
-	/* Set chicken bit to disable the speed up of bootstrap on A430 */
-	else if (adreno_is_a430(adreno_dev))
+	/*
+	 * Set chicken bit to disable the speed up of bootstrap on A430
+	 * and its derivatives
+	 */
+	else
 		cp_debug |= (1 << 14);
 
 	kgsl_regwrite(device, A4XX_CP_DEBUG, cp_debug);
@@ -1044,6 +1038,7 @@ static unsigned int a4xx_register_offsets[ADRENO_REG_REGISTER_MAX] = {
 	ADRENO_REG_DEFINE(ADRENO_REG_CP_PROTECT_STATUS, A4XX_CP_PROTECT_STATUS),
 	ADRENO_REG_DEFINE(ADRENO_REG_CP_SCRATCH_REG6, A4XX_CP_SCRATCH_REG6),
 	ADRENO_REG_DEFINE(ADRENO_REG_CP_SCRATCH_REG7, A4XX_CP_SCRATCH_REG7),
+	ADRENO_REG_DEFINE(ADRENO_REG_CP_PROTECT_REG_0, A4XX_CP_PROTECT_REG_0),
 	ADRENO_REG_DEFINE(ADRENO_REG_RBBM_STATUS, A4XX_RBBM_STATUS),
 	ADRENO_REG_DEFINE(ADRENO_REG_RBBM_PERFCTR_CTL, A4XX_RBBM_PERFCTR_CTL),
 	ADRENO_REG_DEFINE(ADRENO_REG_RBBM_PERFCTR_LOAD_CMD0,

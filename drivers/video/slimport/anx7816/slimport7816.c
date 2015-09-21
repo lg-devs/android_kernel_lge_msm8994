@@ -39,9 +39,9 @@
 #ifdef CONFIG_SLIMPORT_DYNAMIC_HPD
 #include "../../msm/mdss/mdss_hdmi_slimport.h"
 #endif
-/* LGE NOTICE,
- * Use device tree structure data when defined "CONFIG_OF"
- * 2012-10-17, jihyun.seong@lge.com
+/*            
+                                                          
+                                   
  */
 #include <linux/of_gpio.h>
 #include <linux/of_platform.h>
@@ -58,11 +58,11 @@ int external_block_en = 0;
 /* to access global platform data */
 static struct anx7816_platform_data *g_pdata;
 
-/* LGE_CHANGE,
- * to apply High voltage to HDMI_SWITCH_EN
- * which can select MHL or SlimPort on LGPS11
- * this feature should be enable only when board has hdmi switch chip.
- * 2012-10-31, jihyun.seong@lge.com
+/*            
+                                          
+                                             
+                                                                      
+                                   
  */
 /* #define USE_HDMI_SWITCH */
 #define TRUE 1
@@ -73,6 +73,10 @@ static int hdmi_switch_gpio = 64;
 
 //static int slimport7816_avdd_power(unsigned int onoff);
 static int slimport7816_dvdd_power(unsigned int onoff);
+
+#if defined (CONFIG_TOUCHSCREEN_SYNAPTICS_I2C_RMI4)
+void update_status(int code, int value);
+#endif
 
 struct i2c_client *anx7816_client;
 
@@ -105,6 +109,9 @@ void slimport_set_hdmi_hpd(int on)
 		rc = hdmi_slimport_ops->set_upstream_hpd(g_pdata->hdmi_pdev, 1);
 		pr_info("%s %s: hpd on = %s\n", LOG_TAG, __func__,
 				rc ? "failed" : "passed");
+#if defined (CONFIG_TOUCHSCREEN_SYNAPTICS_I2C_RMI4)
+		update_status(2, 1);
+#endif
 		if (rc) {
 			msleep(2000);
 			rc = hdmi_slimport_ops->set_upstream_hpd(g_pdata->hdmi_pdev, 1);
@@ -114,6 +121,9 @@ void slimport_set_hdmi_hpd(int on)
 		rc = hdmi_slimport_ops->set_upstream_hpd(g_pdata->hdmi_pdev, 0);
 		pr_info("%s %s: hpd off = %s\n", LOG_TAG, __func__,
 				rc ? "failed" : "passed");
+#if defined (CONFIG_TOUCHSCREEN_SYNAPTICS_I2C_RMI4)
+		update_status(2, 0);
+#endif
 	}
 	pr_info("%s %s:-\n", LOG_TAG, __func__);
 
@@ -172,9 +182,9 @@ bool slimport_is_check(void)
 }
 EXPORT_SYMBOL(slimport_is_check);
 
-/* LGE_CHANGE,
- * power control
- * 2012-10-17, jihyun.seong@lge.com
+/*            
+                
+                                   
  */
 #if 0
 static int slimport7816_avdd_power(unsigned int onoff)

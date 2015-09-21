@@ -409,10 +409,10 @@ int mmc_add_card(struct mmc_card *card)
 	}
 
 #ifdef CONFIG_MACH_LGE
-	/* LGE_CHANGE
-	 * Adding Print for more information.
-	 * 2014-09-01, Z2G4-BSP-FileSys@lge.com
-	 */
+	/*           
+                                      
+                                        
+  */
 	printk(KERN_INFO "[LGE][MMC][%-18s( )] mmc_hostname:%s, type:%s\n", __func__, mmc_hostname(card->host), type);
 #endif
 
@@ -436,10 +436,10 @@ int mmc_add_card(struct mmc_card *card)
 	}
 	ret = device_add(&card->dev);
 #ifdef CONFIG_MACH_LGE
-	/* LGE_CHANGE
-	 * Adding Print for more information.
-	 * 2014-09-01, Z2G4-BSP-FileSys@lge.com
-	 */
+	/*           
+                                      
+                                        
+  */
 	if (ret) {
 		printk(KERN_INFO "[LGE][MMC][%-18s( )] device_add & uevent posting fail!, ret:%d \n", __func__, ret);
 		return ret;

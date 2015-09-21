@@ -173,7 +173,7 @@ bool bHaveF54Query36;
 bool bHaveF54Query37;
 bool bHaveF54Query38;
 
-static const int RSP_COLLECT_FRAMES = 50;
+static const int RSP_COLLECT_FRAMES = 20;
 static const int RSP_MAX_ROW = 32;
 static const int RSP_MAX_COL = 18;
 static const int RSP_MAX_PIXELS = 576;
@@ -184,7 +184,6 @@ unsigned char F51ControlBase;
 int RspRawImage[32][18];
 int RspImageStack[50][32][18];
 int RspAvgImage[32][18];
-int RspSlopeImage[32][18];
 int oneDArray[50][576];
 int twoDShortArray[32][18];
 int shortArray[576];
@@ -193,6 +192,13 @@ enum EReportType
 {
 	eRT_Image = 20, /* Full Raw Capacitance with Receiver Offset Removed */
 	eRT_RSPGroupTest = 83 /* RSP ADC */
+};
+enum RspFreq
+{
+	f0,
+	f1,
+	f2,
+	f_LPWG
 };
 /*RSP Product Test*/
 unsigned char F54DataBase;
@@ -254,7 +260,6 @@ short NoiseDeltaMin[TRX_MAX][TRX_MAX];
 short NoiseDeltaMax[TRX_MAX][TRX_MAX];
 short NoiseLimitLow = -16;
 short NoiseLimitHigh = 16;
-int RspShortLimit = 15;
 
 enum {
 	STARTTIME,
@@ -813,7 +818,7 @@ void RspReadImageReport(void)
 		}
 	}
 	/*Reset Device*/
-	Reset();
+	/*Reset();*/
 }
 /* Construct data with Report Type #20 data*/
 int ReadImageReport(void)
@@ -1451,8 +1456,6 @@ void RspReadReport(enum EReportType input)
 	if (data & 0x01)
 		TOUCH_INFO_MSG("Getreport = 1\n");
 
-	data = (int)(input);
-	Write8BitRegisters(F54DataBase, &data, 1);
 	data = 0x01;
 	Write8BitRegisters(F54CommandBase, &data, 1);
 
@@ -2439,40 +2442,6 @@ bool RspTestPreparation(void)
 {
 	unsigned char data = 0;
 	unsigned char addr = 0;
-	unsigned char count = 0;
-
-	switchPage(0x01);
-	msleep(10);
-
-	/* Turn off CBC.*/
-	if (bHaveF54Ctrl07) {
-		addr = F54ControlBase + F54Ctrl07Offset;
-		Read8BitRegisters(addr, &data, 1);
-		/* data = data & 0xEF;*/
-		data = 0;
-		Write8BitRegisters(addr, &data, 1);
-	} else if (bHaveCtrl88) {
-		addr = F54ControlBase + F54Ctrl88Offset;
-		Read8BitRegisters(addr, &data, 1);
-		data = data & 0xDF;
-		Write8BitRegisters(addr, &data, 1);
-	}
-	/* Turn off CBC2 */
-	if (bHaveF54Ctrl149)
-	{
-		addr = F54ControlBase + F54Ctrl149Offset;
-		Read8BitRegisters(addr, &data, 1);
-		data = data & 0xFE;
-		Write8BitRegisters(addr, &data, 1);
-	}
-	/* Turn off 0D CBC.*/
-	if (bHaveF54Ctrl57) {
-		addr = F54ControlBase + F54Ctrl57Offset;
-		Read8BitRegisters(addr, &data, 1);
-		/*data = data & 0xEF;*/
-		data = 0;
-		Write8BitRegisters(addr, &data, 1);
-	}
 
 	/* Turn off SignalClarity.
 	   ForceUpdate is required for the change to be effective */
@@ -2481,45 +2450,6 @@ bool RspTestPreparation(void)
 		Read8BitRegisters(addr, &data, 1);
 		data = data | 0x01;
 		Write8BitRegisters(addr, &data, 1);
-	}
-
-	/* Apply ForceUpdate.*/
-	Read8BitRegisters(F54CommandBase, &data, 1);
-	data = data | 0x04;
-	Write8BitRegisters(F54CommandBase, &data, 1);
-
-	/* Wait complete*/
-	do {
-		Read8BitRegisters(F54CommandBase, &data, 1);
-		msleep(1);
-		count++;
-	} while (data != 0x00 && (count < DefaultTimeout));
-	if(count >= DefaultTimeout){
-		outbuf += snprintf(f54_wlog_buf+outbuf, sizeof(f54_wlog_buf)-outbuf,
-				"Timeout -- ForceUpdate can not complete\n");
-		TOUCH_INFO_MSG("Timeout -- ForceUpdate can not complete\n");
-		Reset();
-		return -EAGAIN;
-	}
-
-	/* Apply ForceCal.*/
-	Read8BitRegisters(F54CommandBase, &data, 1);
-	data = data | 0x02;
-	Write8BitRegisters(F54CommandBase, &data, 1);
-
-	/* Wait complete*/
-	count = 0;
-	do {
-		Read8BitRegisters(F54CommandBase, &data, 1);
-		msleep(1);
-		count++;
-	} while (data != 0x00 && (count < DefaultTimeout));
-	if(count >= DefaultTimeout){
-		outbuf += snprintf(f54_wlog_buf+outbuf, sizeof(f54_wlog_buf)-outbuf,
-				"Timeout -- ForceCal can not complete\n");
-		TOUCH_INFO_MSG("Timeout -- ForceUpdate can not complete\n");
-		Reset();
-		return -EAGAIN;
 	}
 
 	return true;
@@ -2964,6 +2894,8 @@ int RspRawDataTest(void)
 		}
 	}
 
+	outbuf = 0;
+
 	/* Divid each pixel by 50 for average & save average raw data*/
 	outbuf += snprintf(f54_wlog_buf+outbuf, sizeof(f54_wlog_buf)-outbuf, "RSP Full Raw Capacitance Image Data :\n");
 	outbuf += snprintf(f54_wlog_buf+outbuf, sizeof(f54_wlog_buf)-outbuf, "\nInfo: RSP Row = %d Col = %d\n",
@@ -3015,56 +2947,11 @@ int RspRawDataTest(void)
 		outbuf += snprintf(f54_wlog_buf+outbuf, sizeof(f54_wlog_buf)-outbuf,
 				"RSP Full Raw Capacitance Image Test failed.\n\n\n");
 	}
-
+	write_log(NULL, f54_wlog_buf);
 	TOUCH_INFO_MSG("RSP Raw Data Test - Completed\n");
 	return (isPassed)? 1:0;
 }
-int RspRawSlopeTest(void)
-{
-	bool isPassed = true;
-	int r = 0;
-	int c = 0;
-	TOUCH_INFO_MSG("%s\n", __func__);
-	outbuf += snprintf(f54_wlog_buf+outbuf, sizeof(f54_wlog_buf)-outbuf,
-			"RSP Raw Slope Test\n");
 
-	/* Cs_slope=Cs_abs(c,r)/AVG{Cs_abs(c,r-1), Cs_abs(c,r+1)}*100 */
-    for (r = 1; r < RSP_MAX_ROW - 1; r++) /* Exclude the first and last row */
-    {
-        for (c = 0; c < RSP_MAX_COL; c++)
-        {
-            RspSlopeImage[r][c] = abs(RspAvgImage[r][c])*100/
-                                ((abs(RspAvgImage[r - 1][c]) + abs(RspAvgImage[r + 1][c]))/2);
-        }
-    }
-
-	/* Compare the limits */
-	for (r = 1; r < RSP_MAX_ROW-1; r++)
-	{
-		for (c = 0; c < RSP_MAX_COL; c++)
-		{
-			if (RspSlopeImage[r][c] < RspSlopeDataMin[r][c] || RspSlopeImage[r][c] > RspSlopeDataMax[r][c])
-			{
-				TOUCH_INFO_MSG("Failed 2D area : Row [%2d] Col [%2d] Value : %3d\n", r, c, RspSlopeImage[r][c]);
-				outbuf += snprintf(f54_wlog_buf+outbuf, sizeof(f54_wlog_buf)-outbuf,
-					"Failed 2D area : Row [%2d] Col [%2d] Value : %3d\n", r, c, RspSlopeImage[r][c]);
-				isPassed = false;
-			}
-		}
-	}
-	if (isPassed){
-		TOUCH_INFO_MSG("RSP Raw Slope Test Passed");
-		outbuf += snprintf(f54_wlog_buf+outbuf, sizeof(f54_wlog_buf)-outbuf,
-				"\nRSP Raw Slope Test passed.\n\n\n");
-	} else {
-		TOUCH_INFO_MSG("RSP Raw Slope Test Failed.\n");
-		outbuf += snprintf(f54_wlog_buf+outbuf, sizeof(f54_wlog_buf)-outbuf,
-				"\nRSP Raw Slope Test Failed.\n\n\n");
-	}
-	write_log(NULL, f54_wlog_buf);
-	TOUCH_INFO_MSG ("RSP Raw Slope Test - Completed\n");
-	return (isPassed)? 1:0;
-}
 int GetP2PMin(int row, int col)
 {
 	int min = 0;
@@ -3108,6 +2995,7 @@ int RspNoiseP2PTest(void)
 	/* Loops through all pixel and applies the calc. through all frames
 	     Cs_pp=Max(Cs_abs(c,r)) - Min(Cs_abs(c,r))
 	     where c=0, 1 ... 17 & r=1, 2 ... 31 */
+	out_buf = 0;
 	out_buf += snprintf(wlog_buf+out_buf, sizeof(wlog_buf)-out_buf, "\nRSP Noise P-P Test Data :\n");
 	out_buf += snprintf(wlog_buf+out_buf, sizeof(wlog_buf)-out_buf,
 		"==========================================================================================================\n         :");
@@ -3163,130 +3051,89 @@ int RspNoiseP2PTest(void)
 	return (isPassed)? 1:0;
 }
 
-int RspShortTest(void)
-{
-	bool isPassed = true;
-	int f = 0;
-	int k = 0;
-	int c = 0;
-	int r = 0;
-	int i = 0;
-
-	TOUCH_INFO_MSG("%s\n", __func__);
-
-	/* Step 1 - Convert the RspImageStack into 50 frames of 1D arrays */
-	for (f = 0; f < RSP_COLLECT_FRAMES; f++)
-	{
-		k = 0;
-		for (c = RSP_MAX_COL - 1; c >= 0; c--)
-		{
-			for (r = RSP_MAX_ROW - 1; r >= 0; r--)
-			{
-				oneDArray[f][k++] = RspImageStack[f][r][c];
-			}
-		}
-	}
-
-	/* Step 2 - Compare the oneDArray[i] vs. oneDArray[i+1].
-	 If the two pixels have the same value then shortArray[i] += 1; */
-	/* Step 3 - Repeat step 2 for all 50 frames */
-	for (f = 0; f < RSP_COLLECT_FRAMES; f++)
-	{
-		for (i = 1; i < RSP_MAX_PIXELS; i++)
-		{
-			if (oneDArray[f][i-1] == oneDArray[f][i])
-			{
-				shortArray[i-1] += 1;
-			}
-		}
-	}
-
-	/* Step 4 - Convert the oneDArray back to twoDShortArray */
-	for (k = 0; k < RSP_MAX_PIXELS; k++)
-	{
-		for (c = RSP_MAX_COL - 1; c >= 0; c--)
-		{
-			for (r = RSP_MAX_ROW - 1; r >= 0; r--)
-			{
-				twoDShortArray[r][c] = shortArray[k];
-			}
-		}
-	}
-
-	/* Step 5 - Compare each pixel from the twoDArray with the limit */
-	for (c = RSP_MAX_COL - 1; c >= 0; c--)
-	{
-		for (r = RSP_MAX_ROW - 1; r >= 0; r--)
-		{
-			if (twoDShortArray[r][c] > RspShortLimit)
-			{
-				TOUCH_INFO_MSG("Failed 2D area : Row [%2d] Col [%2d] Value : %3d\n",
-									r, c, twoDShortArray[r][c]);
-				out_buf += snprintf(wlog_buf+out_buf, sizeof(wlog_buf)-out_buf,
-									"Failed 2D area : Row [%2d] Col [%2d] Value : %3d\n",
-									r, c, twoDShortArray[r][c]);
-				isPassed = false;
-			}
-		}
-	}
-	if (isPassed) {
-		TOUCH_INFO_MSG("RSP Short Test Passed");
-		out_buf += snprintf(wlog_buf+out_buf, sizeof(wlog_buf)-out_buf,
-				"\nRSP Short Test passed.\n\n\n");
-	} else {
-		TOUCH_INFO_MSG("RSP Short Test Result - Short Limit Value : %d\n", RspShortLimit);
-		TOUCH_INFO_MSG("RSP Short Test Failed\n");
-		out_buf += snprintf(wlog_buf+out_buf, sizeof(wlog_buf)-out_buf,
-				"\nRSP Short Test Result - Short Limit Value : %d\n", RspShortLimit);
-		out_buf += snprintf(wlog_buf+out_buf, sizeof(wlog_buf)-out_buf,
-				"\nRSP Short Test Failed.\n\n\n");
-	}
-	write_log(NULL, f54_wlog_buf);
-	write_log(NULL, wlog_buf);
-	msleep(50);
-	TOUCH_INFO_MSG("RSP Short Test - Completed\n");
-	return (isPassed)? 1:0;
-}
 int RspGroupTest(void)
 {
 	int result = 0;
 	TOUCH_INFO_MSG("%s\n", __func__);
 	result += RspRawDataTest();
-	result += RspRawSlopeTest();
 	result += RspNoiseP2PTest();
-	if (result == 3)
+
+	if (result == 2)
 		return 1;
 	else
 		return 0;
 }
-void RspSetFreq(int i)
+void RspSetFreq(unsigned char i)
 {
+	unsigned char setValue = 0;
+	unsigned char data = 0;
+	int addr = 0 ;
+
 	TOUCH_INFO_MSG("%s\n", __func__);
-	switch(i)
-	{
-		case 0: /* f0 */
-			break;
-		case 1: /* f1 */
-			break;
-		case 2: /* f2 */
-			break;
-		case 3: /* LPWG */
-			break;
+
+	switchPage(0x01);
+	msleep(10);
+
+	setValue = i << 2;
+	if(i <= 3) {
+	addr = F54ControlBase + 35;
+	Read8BitRegisters(addr, &data, 1);
+	setValue = data | setValue;
+	Write8BitRegisters(addr, &setValue, 1);
+	} else {
+		addr = F12ControlBase + 35;
+		Read8BitRegisters(addr, &data, 1);
+		setValue = data | setValue;
+		Write8BitRegisters(addr, &setValue, 1);
 	}
 }
+/* Set F51_ANALOGUE_CTRL188 bit 1 */
+void RspSetProductionTest(void)
+{
+	unsigned char data = 0;
+	unsigned char setValue = 0;
+	int addr = 0;
+
+	TOUCH_INFO_MSG("%s\n", __func__);
+
+	addr = F54ControlBase + 35;
+	Read8BitRegisters(addr, &data, 1);
+	setValue = data | 0x10;
+	Write8BitRegisters(addr, &setValue, 1);
+}
+
+void RspSetReportType(unsigned char setValue)
+{
+	TOUCH_INFO_MSG("%s\n", __func__);
+
+	Write8BitRegisters(F54DataBase, &setValue, 1);
+}
+
+void RspResetReportAddress(void)
+{
+	unsigned char data = 0;
+	int addr = 0;
+
+	TOUCH_INFO_MSG("%s\n", __func__);
+
+	addr = F54DataBase + 1;
+	Write8BitRegisters(addr, &data, 1);
+	addr++;
+	Write8BitRegisters(addr, &data, 1);
+}
+
 void RspCollectRawData(void)
 {
 	int i = 0;
 	int j = 0;
 	int k = 0;
-	unsigned char data = 0;
+
 	TOUCH_INFO_MSG("%s\n", __func__);
 	for (i = 0; i < RSP_COLLECT_FRAMES; i++)
 	{
 		if(RspTestPreparation())
 		{
-			data = 20;
-			Write8BitRegisters(F54DataBase, &data, 1);
+			msleep(1);
 			RspReadReport(eRT_RSPGroupTest);
 		}
 		for (j = 0; j < RSP_MAX_ROW; j++)
@@ -3301,35 +3148,279 @@ void RspCollectRawData(void)
 	TOUCH_INFO_MSG("Collect raw data image completed.\n");
 }
 
-int GroupNormalTest(void)
+void RspResetShortTestRow(void)
+{
+	unsigned char data = 0;
+	int addr = 0;
+
+	TOUCH_INFO_MSG("%s\n", __func__);
+
+	addr = F54DataBase + 0x0E;
+	Read8BitRegisters(addr, &data, 1);
+	data &= 0x03;  /* Reset the Row field */
+	Write8BitRegisters(addr, &data, 1);
+}
+
+void RspShortTestCalibration(void)
+{
+	unsigned char data;
+	int addr = 0;
+
+	addr = F54ControlBase+35;
+	Read8BitRegisters(addr, &data, 1);
+	data |= 0x40;
+	Write8BitRegisters(addr, &data, 1);
+
+	/* polling 'Complete Calibration' command */
+	count = 0;
+	do {
+		Read8BitRegisters(addr, &data, 1);
+		msleep(1);
+		count++;
+	} while ((data & 0x40) && (count < DefaultTimeout));
+	if(count == DefaultTimeout)
+	{
+		TOUCH_INFO_MSG("Short Test Calibration is failed\n");
+	}
+}
+
+void RspGetShortTestRawData(void)
+{
+	int i = 0;
+	int j = 0;
+	int k = 0;
+
+	TOUCH_INFO_MSG("%s\n", __func__);
+
+	for(i = 0; i < 5; i++)
+	{
+		RspShortTestCalibration();
+		msleep(1);
+		RspReadReport(eRT_RSPGroupTest);
+		for (j = 0; j < RSP_MAX_ROW; j++)
+		{
+			for (k = 0; k < RSP_MAX_COL; k++)
+			{
+				RspImageStack[i][j][k] = RspRawImage[j][k];
+			}
+		}
+	}
+}
+
+
+bool ShortCheck(int page, int row, int num_of_row)
+{
+	int i = 0;
+	int j = 0;
+	bool result = true;
+
+	for(i = 0; i < num_of_row; i++)
+	{
+		for(j = 0; j < RSP_MAX_COL; j++)
+		{
+			if(RspImageStack[page][row+i][j] <= 0xF)
+					{
+						out_buf += snprintf(wlog_buf+out_buf, sizeof(wlog_buf)-out_buf,
+									"Short area : Row [%2d] Col [%2d] Value : %3d\n",
+						row+i, j, RspImageStack[page][row+i][j]);
+				result = false;
+			}
+		}
+	}
+	return result;
+}
+int RspShortTestCheckData(void)
+{
+	int i = 0;
+	int j = 0;
+	bool isPassed = true;
+	for(i = 0; i < 5; i++)
+	{
+		switch(i)
+		{
+			case 0:
+				if(!ShortCheck(i, 16, 16))
+						isPassed = false;
+				break;
+			case 1:
+				if(!ShortCheck(i, 8, 8))
+					isPassed = false;
+				if(!ShortCheck(i, 24, 8))
+					isPassed = false;
+				break;
+			case 2:
+				for(j = 0; j < 4; j++)
+				{
+					if(!ShortCheck(i, j*8 + 4, 4))
+					isPassed = false;
+					}
+				break;
+			case 3:
+				for(j = 0; j < 8; j++)
+				{
+					if(!ShortCheck(i, j*4 + 2, 2))
+					isPassed = false;
+				}
+				break;
+			case 4:
+				for(j = 0; j < 16; j++)
+				{
+					if(!ShortCheck(i, j*2 + 1, 1))
+					isPassed = false;
+			}
+				break;
+			default:
+				break;
+		}
+	}
+
+	if (isPassed) {
+		TOUCH_INFO_MSG("RSP Short Test Passed\n");
+		out_buf += snprintf(wlog_buf+out_buf, sizeof(wlog_buf)-out_buf,
+				"\nRSP Short Test passed.\n\n\n");
+	} else {
+		TOUCH_INFO_MSG("RSP Short Test Failed\n");
+		out_buf += snprintf(wlog_buf+out_buf, sizeof(wlog_buf)-out_buf,
+				"\nRSP Short Test Failed.\n\n\n");
+	}
+	write_log(NULL, wlog_buf);
+	msleep(50);
+	TOUCH_INFO_MSG("RSP Short Test - Completed\n");
+	return (isPassed)? 1 : 0;
+}
+
+
+int RspDisplayRawData(char *buf)
+{
+        int ret = 0;
+        int r = 0;
+        int c = 0;
+        int f = 0;
+
+        TOUCH_INFO_MSG("[%s] Start Touch Raw Data Display \n", __func__);
+
+        memset(RspAvgImage,0,sizeof(RspAvgImage));
+
+        /* Sum up all 50 frames for each pixel */
+	for (f = 0; f < RSP_COLLECT_FRAMES; f++)
+	{
+		for (r = 0; r < RSP_MAX_ROW; r++)
+		{
+			for (c = 0; c < RSP_MAX_COL; c++)
+			{
+				RspAvgImage[r][c] += abs(RspImageStack[f][r][c]);
+			}
+		}
+	}
+
+	/* Divid each pixel by 50 for average & save average raw data*/
+	ret += snprintf(buf+ret, PAGE_SIZE - ret, "RSP Full Raw Capacitance Image Data :\n");
+	ret += snprintf(buf+ret, PAGE_SIZE - ret, "\nInfo: RSP Row = %d Col = %d\n",
+			(int)TxChannelCount, (int)RxChannelCount);
+	ret += snprintf(buf+ret, PAGE_SIZE - ret,
+			"==========================================================================================================\n:");
+
+	for (r = 0; r < (int)RxChannelCount; r++)
+		ret += snprintf(buf+ret, PAGE_SIZE-ret, "%5d ", r);
+	ret += snprintf(buf+ret, PAGE_SIZE - ret,
+			"\n----------------------------------------------------------------------------------------------------------\n");
+
+	for (r = 0; r < RSP_MAX_ROW; r++) {
+		for (c = 0; c < RSP_MAX_COL; c++)
+		{
+			RspAvgImage[r][c] /= RSP_COLLECT_FRAMES;
+			ret += snprintf(buf + ret, PAGE_SIZE - ret, "%5d ",
+					RspAvgImage[r][c]);
+		}
+		ret += snprintf(buf+ret, PAGE_SIZE - ret, "\n");
+	}
+
+	ret += snprintf(buf+ret, PAGE_SIZE-ret,
+				"------------------------------------------------------------------------------------------------------------\n");
+    return ret;
+}
+
+int RspDisplayNoiseP2P(char *buf)
+{
+	int r = 0;
+	int c = 0;
+	int diff =0;
+        int ret = 0;
+	TOUCH_INFO_MSG("%s\n", __func__);
+
+	/* Loops through all pixel and applies the calc. through all frames
+	     Cs_pp=Max(Cs_abs(c,r)) - Min(Cs_abs(c,r))
+	     where c=0, 1 ... 17 & r=1, 2 ... 31 */
+	ret  += snprintf(buf+ret, PAGE_SIZE-ret, "\nRSP Noise P-P Test Data :\n");
+	ret  += snprintf(buf+ret, PAGE_SIZE-ret,
+		"==========================================================================================================\n:");
+	for (r = 0; r < (int)RxChannelCount; r++)
+		ret += snprintf(buf+ret, PAGE_SIZE-ret, "%5d ", r);
+	ret += snprintf(buf+ret, PAGE_SIZE-ret,
+			"\n----------------------------------------------------------------------------------------------------------\n");
+
+	for (r = 0; r < RSP_MAX_ROW; r++)
+	{
+		for (c = 0; c < RSP_MAX_COL; c++)
+		{
+			diff = GetP2PMax(r, c) - GetP2PMin(r, c);
+			ImagepF[r][c] = diff;
+			ret += snprintf(buf+ret,
+					PAGE_SIZE-ret, "%5d ", ImagepF[r][c]);
+		}
+		ret += snprintf(buf+ret, PAGE_SIZE-ret, "\n");
+	}
+	ret += snprintf(buf+ret, PAGE_SIZE-ret,
+			"------------------------------------------------------------------------------------------------------------\n");
+    return ret;
+}
+
+
+int GroupNormalTest(int mode, char *buf)
 {
 	int ret = 0;
 	memcpy(LowerImageLimit, LowerImage, sizeof(LowerImageLimit));
 	memcpy(UpperImageLimit, UpperImage, sizeof(UpperImageLimit));
-	memcpy(RspSlopeDataMin, RspLowerSlope, sizeof(RspSlopeDataMin));
-	memcpy(RspSlopeDataMax, RspUpperSlope, sizeof(RspSlopeDataMax));
 	memcpy(RspNoiseP2PLimit, RspNoise, sizeof(RspNoiseP2PLimit));
-	RspSetFreq(0);
+
+	RspSetFreq(f2);
+	RspSetProductionTest();
+	RspSetReportType(eRT_RSPGroupTest);
+	RspResetReportAddress();
+
 	RspCollectRawData();
-	ret = RspGroupTest();
+
+	Reset();
+
+        if(mode == 0) {
+            ret = RspGroupTest();
+        } else if(mode == 1){  /* Display RawData*/
+            ret = RspDisplayRawData(buf);
+        } else if(mode == 2){  /* Display NoiseP2P */
+            ret = RspDisplayNoiseP2P(buf);
+        }
+
 	return ret;
 }
-int GroupLPWGTest(void)
+
+int RspShortTest(void)
 {
 	int ret = 0;
-	RspSetFreq(3);
-	RspCollectRawData();
-	ret = RspGroupTest();
+
+	RspSetFreq(f0);
+	RspSetProductionTest();
+	RspSetReportType(eRT_RSPGroupTest);
+	RspResetReportAddress();
+
+	RspResetShortTestRow();
+	RspGetShortTestRawData();
+	ret = RspShortTestCheckData();
+	Reset();
+
 	return ret;
 }
-int ShortTest(void)
-{
-	int ret = 0;
-	RspSetFreq(0);
-	RspCollectRawData();
-	ret = RspShortTest();
-	return ret;
-}
+
+
 void CheckCrash(char *rst, int min_caps_value)
 {
 	int i = 0;
@@ -3563,15 +3654,11 @@ retry:
 		break;
 	case 'q':
 		outbuf = strlcpy(f54_wlog_buf, "q - RSP Group Normal Test\n", sizeof(f54_wlog_buf));
-		ret = GroupNormalTest();
-		break;
-	case 'r':
-		outbuf = strlcpy(f54_wlog_buf, "r - RSP Group LPWG Test\n", sizeof(f54_wlog_buf));
-		ret = GroupLPWGTest();
+		ret = GroupNormalTest(mode, buf);
 		break;
 	case 's':
 		outbuf = strlcpy(f54_wlog_buf, "s - RSP Short Test\n", sizeof(f54_wlog_buf));
-		ret = ShortTest();
+		ret = RspShortTest();
 		break;
 	case 'x':
 		out_buf = strlcpy(wlog_buf, "x - Noise Delta Test\n", sizeof(wlog_buf));

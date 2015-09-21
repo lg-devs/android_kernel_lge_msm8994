@@ -60,10 +60,14 @@ struct ispif_device {
 	enum msm_ispif_state_t ispif_state;
 	struct msm_ispif_vfe_info vfe_info;
 	struct clk *ahb_clk[ISPIF_CLK_INFO_MAX];
+/*LGCHANGE,QCT Patch camif error 15.04.02*/
+	struct clk *clk[ISPIF_CLK_INFO_MAX];
 	struct completion reset_complete[VFE_MAX];
 	uint32_t hw_num_isps;
 	uint32_t num_ahb_clk;
+/*LGCHANGE,QCT Patch camif error 15.04.02*/
+	uint32_t num_clk;
 	uint32_t clk_idx;
-	struct regulator *fs_vfe;	//LGE_CHANGE, vdd_vfe to check if vfe is up
+	struct regulator *fs_vfe;	//                                         
 };
 #endif

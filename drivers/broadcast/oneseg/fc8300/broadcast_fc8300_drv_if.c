@@ -77,11 +77,15 @@ static unsigned int frequencyTable[50] = {
 
 static int currentBroadCast = TMM_13SEG;
 static int currentSelectedChannel = -1;
+static int oneseg_to_fullseg_value = 350;
+static int fullseg_to_oneseg_value = 450;
 
 s32 OnAir = 0;
 s32 broad_type;
 
-//extern void broadcast_fci_ringbuffer_flush();
+#ifndef BBM_I2C_TSIF
+extern void broadcast_fci_ringbuffer_flush();
+#endif
 
 /* Body of Internel function */
 int    broadcast_fc8300_get_stop_mode(void)
@@ -208,7 +212,9 @@ int    broadcast_fc8300_drv_if_set_channel(struct broadcast_dmb_set_ch_info *uda
 #endif
     ret = tunerbb_drv_fc8300_set_channel(frequency, udata->mode, udata->subchannel);
 
-    //broadcast_fci_ringbuffer_flush();
+#ifndef BBM_I2C_TSIF
+    broadcast_fci_ringbuffer_flush();
+#endif
 
     if(ret)
         return ERROR;
@@ -256,7 +262,7 @@ static void broadcast_fc8300_drv_if_get_oneseg_sig_info(struct fc8300Status_t *p
     per = pInfo->sig_info.info.oneseg_info.per = pst->per;
 
     pInfo->sig_info.info.oneseg_info.agc = pst->agc;
-    pInfo->sig_info.info.oneseg_info.rssi = pst->rssi;
+    pInfo->sig_info.info.oneseg_info.rssi = pst->rssi / (-100);
     pInfo->sig_info.info.oneseg_info.ErrTSP = pst->ErrTSP;
     pInfo->sig_info.info.oneseg_info.TotalTSP = pst->TotalTSP;
 
@@ -296,6 +302,8 @@ int    broadcast_fc8300_drv_if_get_sig_info(struct broadcast_dmb_control_info *p
     }
 
     layer = pInfo->cmd_info.layer;
+    pInfo->sig_info.info.mmb_info.oneseg_to_fullseg_value = oneseg_to_fullseg_value;
+    pInfo->sig_info.info.mmb_info.fullseg_to_oneseg_value = fullseg_to_oneseg_value;
 
     if((TimeCount_ms() - fcTimer) > 500) {
         if(before_irq_flag == irq_cnt)

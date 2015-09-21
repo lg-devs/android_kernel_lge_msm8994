@@ -42,7 +42,7 @@ void fci_ringbuffer_init(struct fci_ringbuffer *rbuf, void *data, size_t len)
 	rbuf->data = data;
 	rbuf->size = len;
 	rbuf->error = 0;
-#ifndef CONFIG_LGE_BROADCAST_SBTVD_LATIN
+#ifdef BBM_I2C_TSIF
 	init_waitqueue_head(&rbuf->queue);
 
 	spin_lock_init(&(rbuf->lock));
@@ -88,7 +88,7 @@ void fci_ringbuffer_reset(struct fci_ringbuffer *rbuf)
 
 void fci_ringbuffer_flush_spinlock_wakeup(struct fci_ringbuffer *rbuf)
 {
-#ifndef CONFIG_LGE_BROADCAST_SBTVD_LATIN
+#ifdef BBM_I2C_TSIF
 	unsigned long flags;
 
 	spin_lock_irqsave(&rbuf->lock, flags);

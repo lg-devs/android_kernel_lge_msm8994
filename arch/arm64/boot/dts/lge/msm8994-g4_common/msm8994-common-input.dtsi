@@ -162,8 +162,8 @@
 
 		/*firmware*/
 		need_upgrade = <1>;
-		fw_pid_addr = <0x0040 0x0040 0x0000 0x4e4>;     /*PLG446_BL6, PLG468_BL6, PLG446_BL7, PLG468_BL7*/
-		fw_ver_addr = <0x16d00 0x15500 0x0000 0x4e0>;    /*PLG446_BL6, PLG468_BL6, PLG446_BL7, PLG468_BL7*/
+		fw_pid_addr = <0x0040 0x0040 0x0000 0x4f4>;     /*PLG446_BL6, PLG468_BL6, PLG446_BL7, PLG468_BL7*/
+		fw_ver_addr = <0x16d00 0x15500 0x0000 0x4f0>;    /*PLG446_BL6, PLG468_BL6, PLG446_BL7, PLG468_BL7*/
 
 		/* Rx & Tx cap*/
 		tx_cap = <5 10 2 9 7 5 1 2 2 1 10 2 3 83 7 2 8 0 10 0 5 8 4 8 6 40 88>;
@@ -172,10 +172,10 @@
 		ref_chk_option = <0 0 1 1>;
 
 		/* firmware & panel_spec path */
-		fw_image = "synaptics/g4/PLG446-V1.05-PR1800278-DS5.2.13.1014_40055185.img",    /*PLG446_BL6*/
-			   "synaptics/g4/PLG468-V1.05-PR1801483-DS5.2.100.0.1005_50055185.img",             /*PLG468_BL6*/
-                           "synaptics/g4/JDI_Official_BL7.img",                                             /*PLG446_BL7*/
-			   "synaptics/g4/PLG468-V1.06-PR1801488-DS5.2.200.0.1010_50055186504C47343638.img"; /*PLG468_BL7*/
+		fw_image = "synaptics/g4/PLG446-V1.08-PR1819899-DS5.2.13.1014_40055188.img",    /*PLG446_BL6*/
+					"synaptics/g4/PLG468-V1.05-PR1801483-DS5.2.100.0.1005_50055185.img",             /*PLG468_BL6*/
+					"synaptics/g4/JDI_Official_BL7.img",                                             /*PLG446_BL7*/
+					"synaptics/g4/PLG468-V1.10-PR1829196-DS5.2.200.1.1002-5005518A504C47343638.img"; /*PLG468_BL7*/
 		panel_spec = "synaptics/g4/g4_limit.txt";
 		panel_spec_mfts = "synaptics/g4/g4_limit_mfts.txt";
 	};
@@ -287,8 +287,8 @@
 
 		/*firmware*/
 		need_upgrade = <1>;
-		fw_pid_addr = <0x0040 0x0040 0x0000 0x4e4>;     /*PLG446_BL6, PLG468_BL6, PLG446_BL7, PLG468_BL7*/
-		fw_ver_addr = <0x16d00 0x15500 0x0000 0x4e0>;    /*PLG446_BL6, PLG468_BL6, PLG446_BL7, PLG468_BL7*/
+		fw_pid_addr = <0x0040 0x0040 0x0000 0x4f4>;     /*PLG446_BL6, PLG468_BL6, PLG446_BL7, PLG468_BL7*/
+		fw_ver_addr = <0x16d00 0x15500 0x0000 0x4f0>;    /*PLG446_BL6, PLG468_BL6, PLG446_BL7, PLG468_BL7*/
 
 		/* Rx & Tx cap*/
 		tx_cap = <5 10 2 9 7 5 1 2 2 1 10 2 3 83 7 2 8 0 10 0 5 8 4 8 6 40 88>;
@@ -297,10 +297,10 @@
 		ref_chk_option = <0 0 1 1>;
 
 		/* firmware & panel_spec path */
-		fw_image = "synaptics/g4/PLG446-V1.05-PR1800278-DS5.2.13.1014_40055185.img",    /*PLG446_BL6*/
-			   "synaptics/g4/PLG468-V1.05-PR1801483-DS5.2.100.0.1005_50055185.img",             /*PLG468_BL6*/
-                           "synaptics/g4/JDI_Official_BL7.img",                                             /*PLG446_BL7*/
-			   "synaptics/g4/PLG468-V1.06-PR1801488-DS5.2.200.0.1010_50055186504C47343638.img"; /*PLG468_BL7*/
+		fw_image = "synaptics/g4/PLG446-V1.08-PR1819899-DS5.2.13.1014_40055188.img",    /*PLG446_BL6*/
+					"synaptics/g4/PLG468-V1.05-PR1801483-DS5.2.100.0.1005_50055185.img",             /*PLG468_BL6*/
+					"synaptics/g4/JDI_Official_BL7.img",                                             /*PLG446_BL7*/
+					"synaptics/g4/PLG468-V1.10-PR1829196-DS5.2.200.1.1002-5005518A504C47343638.img"; /*PLG468_BL7*/
 		panel_spec = "synaptics/g4/g4_limit.txt";
 		panel_spec_mfts = "synaptics/g4/g4_limit_mfts.txt";
 	};
@@ -413,8 +413,8 @@
 
 		/*firmware*/
 		need_upgrade = <1>;
-		fw_pid_addr = <0x0040 0x0040 0x0000 0x4e4>;     /*PLG446_BL6, PLG468_BL6, PLG446_BL7, PLG468_BL7*/
-		fw_ver_addr = <0x16d00 0x15500 0x0000 0x4e0>;    /*PLG446_BL6, PLG468_BL6, PLG446_BL7, PLG468_BL7*/
+		fw_pid_addr = <0x0040 0x0040 0x0000 0x4f4>;     /*PLG446_BL6, PLG468_BL6, PLG446_BL7, PLG468_BL7*/
+		fw_ver_addr = <0x16d00 0x15500 0x0000 0x4f0>;    /*PLG446_BL6, PLG468_BL6, PLG446_BL7, PLG468_BL7*/
 
 		/* Rx & Tx cap*/
 		tx_cap = <5 10 2 9 7 5 1 2 2 1 10 2 3 83 7 2 8 0 10 0 5 8 4 8 6 40 88>;
@@ -424,10 +424,10 @@
 		ref_chk_option = <0 0 1 1>;
 
 		/* firmware & panel_spec path */
-		fw_image = "synaptics/g4/PLG446-V1.05-PR1800278-DS5.2.13.1014_40055185.img",    /*PLG446_BL6*/
-			   "synaptics/g4/PLG468-V1.05-PR1801483-DS5.2.100.0.1005_50055185.img",             /*PLG468_BL6*/
-                           "synaptics/g4/JDI_Official_BL7.img",                                             /*PLG446_BL7*/
-			   "synaptics/g4/PLG468-V1.06-PR1801488-DS5.2.200.0.1010_50055186504C47343638.img"; /*PLG468_BL7*/
+		fw_image = "synaptics/g4/PLG446-V1.08-PR1819899-DS5.2.13.1014_40055188.img",    /*PLG446_BL6*/
+					"synaptics/g4/PLG468-V1.05-PR1801483-DS5.2.100.0.1005_50055185.img",             /*PLG468_BL6*/
+					"synaptics/g4/JDI_Official_BL7.img",                                             /*PLG446_BL7*/
+					"synaptics/g4/PLG468-V1.10-PR1829196-DS5.2.200.1.1002-5005518A504C47343638.img"; /*PLG468_BL7*/
 		panel_spec = "synaptics/g4/g4_limit.txt";
 		panel_spec_mfts = "synaptics/g4/g4_limit_mfts.txt";
 	};

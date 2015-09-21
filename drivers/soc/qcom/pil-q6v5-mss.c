@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2014, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2015, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -38,7 +38,7 @@
 
 #include <linux/time.h>
 
-/* Added getting MSM chip version info, 2014-12-21, secheol.pyo@lge.com*/
+/*                                                                     */
 #define FEATURE_LGE_MODEM_CHIPVER_INFO
 #ifdef FEATURE_LGE_MODEM_CHIPVER_INFO
 typedef struct modem_chip_info {
@@ -48,7 +48,7 @@ typedef struct modem_chip_info {
 } lg_chip_info;
 #endif
 
-/* FEATURE_LGE_MODEM_DEBUG_INFO, 2014-08-18, jin.park@lge.com */
+/*                                                            */
 #define FEATURE_LGE_MODEM_DEBUG_INFO
 #ifdef FEATURE_LGE_MODEM_DEBUG_INFO
 #include <asm/uaccess.h>
@@ -60,7 +60,7 @@ typedef struct modem_chip_info {
 #define MAX_SSR_REASON_LEN	81U
 #define STOP_ACK_TIMEOUT_MS	1000
 
-/* LGE_MODEM_RESET, 2013-12-17, wj1208.jo@lge.com */
+/*                                                */
 struct lge_hw_smem_id2_type {
 	uint32_t sbl_log_meta_info;
 	uint32_t sbl_delta_time;
@@ -408,6 +408,7 @@ static int modem_powerup(const struct subsys_desc *subsys)
 	INIT_COMPLETION(drv->stop_ack);
 	drv->subsys_desc.ramdump_disable = 0;
 	drv->ignore_errors = false;
+	drv->q6->desc.fw_name = subsys->fw_name;
 	return pil_boot(&drv->q6->desc);
 }
 
@@ -420,6 +421,13 @@ static void modem_crash_shutdown(const struct subsys_desc *subsys)
 		gpio_set_value(subsys->force_stop_gpio, 1);
 		mdelay(STOP_ACK_TIMEOUT_MS);
 	}
+}
+
+static void modem_free_memory(const struct subsys_desc *subsys)
+{
+	struct modem_data *drv = subsys_to_drv(subsys);
+
+	pil_free_memory(&drv->q6->desc);
 }
 
 static int modem_ramdump(int enable, const struct subsys_desc *subsys)
@@ -455,7 +463,12 @@ static irqreturn_t modem_wdog_bite_intr_handler(int irq, void *dev_id)
 	struct modem_data *drv = subsys_to_drv(dev_id);
 	if (drv->ignore_errors)
 		return IRQ_HANDLED;
+
 	pr_err("Watchdog bite received from modem software!\n");
+	if (drv->subsys_desc.system_debug &&
+			!gpio_get_value(drv->subsys_desc.err_fatal_gpio))
+		panic("%s: System ramdump requested. Triggering device restart!\n",
+							__func__);
 	subsys_set_crash_status(drv->subsys, true);
 	restart_modem(drv);
 
@@ -481,6 +494,7 @@ static int pil_subsys_init(struct modem_data *drv,
 	drv->subsys_desc.shutdown = modem_shutdown;
 	drv->subsys_desc.powerup = modem_powerup;
 	drv->subsys_desc.ramdump = modem_ramdump;
+	drv->subsys_desc.free_memory = modem_free_memory;
 	drv->subsys_desc.crash_shutdown = modem_crash_shutdown;
 	drv->subsys_desc.err_fatal_handler = modem_err_fatal_intr_handler;
 	drv->subsys_desc.stop_ack_handler = modem_stop_ack_intr_handler;
